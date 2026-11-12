@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.flowOn
 import org.piramalswasthya.stoptb.utils.throttleLatest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.withLock
+import org.piramalswasthya.stoptb.helpers.SyncDailyStore
 import org.json.JSONArray
 import org.json.JSONObject
 import org.piramalswasthya.stoptb.database.room.InAppDb
@@ -83,6 +84,7 @@ class VitalRepo @Inject constructor(
     suspend fun saveVitals(vitalCache: VitalCache) {
         withContext(Dispatchers.IO) {
             vitalDao.saveVitals(vitalCache)
+            SyncDailyStore.record("GENERAL_EXAMINATION", listOf(vitalCache.benId), "SAVE", "SUCCESS")
         }
     }
 
@@ -91,6 +93,7 @@ class VitalRepo @Inject constructor(
             val localData = vitalCache.copy(syncState = SyncState.UNSYNCED)
 
             vitalDao.saveVitals(localData)
+            SyncDailyStore.record("GENERAL_EXAMINATION", listOf(localData.benId), "SAVE", "SUCCESS")
 
             // Network failures leave the record UNSYNCED for the background push. If that push is
             // running, don't make the form wait for its whole queue: it (or the next cycle) sends
@@ -108,7 +111,9 @@ class VitalRepo @Inject constructor(
                 }
 
                 if (synced) {
-                    vitalDao.markSyncedIfUnchanged(localData)
+                    if (vitalDao.markSyncedIfUnchanged(localData)) {
+                        SyncDailyStore.record("GENERAL_EXAMINATION", listOf(localData.benId), "PUSH", "SUCCESS")
+                    }
                 }
 
                 synced
@@ -130,7 +135,11 @@ class VitalRepo @Inject constructor(
     suspend fun pushUnSyncedVitals(): Boolean = pushMutex.withLock {
         withContext(Dispatchers.IO) {
             val vitals = vitalDao.getVitals(SyncState.UNSYNCED)
-            if (vitals.isEmpty()) return@withContext true
+            if (vitals.isEmpty()) {
+                org.piramalswasthya.stoptb.helpers.logSyncModule("GENERAL_EXAMINATION", "PUSH",
+                    "NO_PENDING_DATA", "pending" to 0)
+                return@withContext true
+            }
             val user = preferenceDao.getLoggedInUser() ?: return@withContext true
 
             var successCount = 0
@@ -152,10 +161,12 @@ class VitalRepo @Inject constructor(
                 if (sendable.isEmpty()) continue
 
                 if (pushVitalChunk(sendable, user)) {
-                    database.withTransaction {
-                        sendable.forEach { (vital, _) -> vitalDao.markSyncedIfUnchanged(vital) }
+                    val markedBenIds = database.withTransaction {
+                        sendable.filter { (vital, _) -> vitalDao.markSyncedIfUnchanged(vital) }
+                            .map { (vital, _) -> vital.benId }
                     }
-                    successCount += sendable.size
+                    SyncDailyStore.record("GENERAL_EXAMINATION", markedBenIds, "PUSH", "SUCCESS")
+                    successCount += markedBenIds.size
                 } else if (sendable.size > 1) {
                     sendable.forEach { (vital, _) -> queue.addLast(listOf(vital)) }
                 } else {
@@ -171,6 +182,10 @@ class VitalRepo @Inject constructor(
             )
 
             // Keep the worker successful so failed records remain UNSYNCED for the next refresh.
+            org.piramalswasthya.stoptb.helpers.logSyncModule("GENERAL_EXAMINATION", "PUSH",
+                org.piramalswasthya.stoptb.helpers.syncPushOutcome(vitals.size, successCount),
+                "pending" to vitals.size, "locallyMarkedSynced" to successCount,
+                "remaining" to vitals.size - successCount)
             true
         }
     }
@@ -264,6 +279,7 @@ class VitalRepo @Inject constructor(
             )
 
             val responseBody = response.body()?.string()
+            SyncDailyStore.response("GENERAL_EXAMINATION", records.map { (vital, _) -> vital.benId }, response.code(), responseBody)
 
             if (!response.isSuccessful || responseBody.isNullOrBlank()) {
                 return false
@@ -286,12 +302,14 @@ class VitalRepo @Inject constructor(
             }
 
         } catch (e: IOException) {
+            SyncDailyStore.record("GENERAL_EXAMINATION", records.map { (vital, _) -> vital.benId }, "PUSH", "FAILURE", "NETWORK_${e.javaClass.simpleName}")
             throw e
         } catch (e: Exception) {
             if (!retriedAfterRefresh && shouldRetryWithRefresh(e, user.userName, user.password)) {
                 pushVitalChunk(records, user, retriedAfterRefresh = true)
             } else {
                 Timber.e(e, "Vital sync failed for benIds=%s", records.map { (vital, _) -> vital.benId })
+                SyncDailyStore.record("GENERAL_EXAMINATION", records.map { (vital, _) -> vital.benId }, "PUSH", "FAILURE", "EXCEPTION_${e.javaClass.simpleName}")
                 false
             }
         }
@@ -340,18 +358,28 @@ class VitalRepo @Inject constructor(
     }
 
     private suspend fun saveGeneralExaminationRecords(records: List<GeneralExaminationRecord>) {
+        var savedCount = 0
+        var skippedCount = 0
         // One transaction per [pullWriteChunkSize] records instead of one per record.
         // Room's InvalidationTracker fires per transaction, so a 20,000-record payload
         // used to invalidate VITALS - and every query observing it - twenty thousand
         // times, each invalidation re-running the open screen's list queries while the
         // next record waited behind them for the connection.
         records.chunked(pullWriteChunkSize).forEach { chunk ->
+            val savedIds = mutableListOf<Long>()
             database.withTransaction {
                 chunk.forEach perRecord@ { record ->
                     val beneficiary = record.beneficiaryID?.let { benDao.getBen(it) }
                         ?: record.beneficiaryRegID?.let { benDao.getBenByRegId(it) }
-                    val benId = beneficiary?.beneficiaryId ?: record.beneficiaryID ?: return@perRecord
-                    val benRegId = record.beneficiaryRegID ?: beneficiary?.benRegId ?: return@perRecord
+                    val benId = beneficiary?.beneficiaryId ?: record.beneficiaryID
+                    val benRegId = record.beneficiaryRegID ?: beneficiary?.benRegId
+                    if (benId == null || benRegId == null) {
+                        skippedCount++
+                        org.piramalswasthya.stoptb.helpers.logSyncSkip("GENERAL_EXAMINATION", "PULL",
+                            "BENEFICIARY_ID_OR_REGISTRATION_ID_MISSING", "recordId" to record.id,
+                            "benId" to benId, "benRegId" to benRegId)
+                        return@perRecord
+                    }
 
                     val existing = vitalDao.getVitals(benId)
                     val serverUpdatedDate = parseServerUpdateDate(record.updateDate ?: record.createdDate)
@@ -362,6 +390,11 @@ class VitalRepo @Inject constructor(
                             serverUpdatedDate
                         )
                     ) {
+                        skippedCount++
+                        org.piramalswasthya.stoptb.helpers.logSyncSkip("GENERAL_EXAMINATION", "PULL",
+                            if (existing?.syncState != SyncState.SYNCED) "LOCAL_PENDING_EDITS_PROTECTED"
+                            else "SERVER_VERSION_NOT_NEWER", "recordId" to record.id,
+                            "benId" to benId, "benRegId" to benRegId)
                         return@perRecord
                     }
                     vitalDao.saveVitals(
@@ -392,9 +425,14 @@ class VitalRepo @Inject constructor(
                             syncState = SyncState.SYNCED
                         )
                     )
+                    savedIds.add(benId)
+                    savedCount++
                 }
             }
+            SyncDailyStore.record("GENERAL_EXAMINATION", savedIds, "PULL", "SUCCESS")
         }
+        org.piramalswasthya.stoptb.helpers.logSyncModule("GENERAL_EXAMINATION", "PULL", "SUCCESS",
+            "received" to records.size, "saved" to savedCount, "skipped" to skippedCount)
     }
 
     private fun parseGeneralExaminationRecords(jsonObj: JSONObject): List<GeneralExaminationRecord> {

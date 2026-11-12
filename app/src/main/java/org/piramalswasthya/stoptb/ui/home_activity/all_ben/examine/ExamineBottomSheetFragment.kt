@@ -218,8 +218,7 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
         }
 
         // Shows Fill/View for the "Contact Followup" row based on the CONTACT_FOLLOW_UP form's own
-        // submission status (isContactFollowUpDone), gated on TPT_FOLLOW_UP completion only when
-        // the screening answer was Tpt Eligible — see ExamineViewModel.isContactFollowUpDone.
+        // submission status (isContactFollowUpDone); TPT registration is the separate "Start TPT" row.
         val followupRow = view.findViewById<View>(R.id.row_followup)
 //        if (isCounsellingOfficer && showContactTracingForms) {
         if (privilege.examineShowContactTracingRows && showContactTracingForms) {
@@ -253,6 +252,47 @@ class ExamineBottomSheetFragment : BottomSheetDialogFragment() {
             }
         } else {
             followupRow.visibility = View.GONE
+        }
+
+        // Start TPT (TPT_FOLLOW_UP PRE_SUBMIT: registration/regimen) — Counselling Officer only;
+        // shown only once Contact Followup is submitted as TPT Eligible, Fill/View by PRE_SUBMIT status.
+        val startTptRow = view.findViewById<View>(R.id.row_start_tpt)
+        if (privilege.examineShowContactTracingRows && showContactTracingForms) {
+            startTptRow.findViewById<TextView>(R.id.tv_form_name).text = getString(R.string.start_tpt)
+            startTptRow.findViewById<TextView>(R.id.tv_not_filled).visibility = View.GONE
+            val startTptBtn = startTptRow.findViewById<MaterialButton>(R.id.btn_form_action)
+            startTptBtn.visibility = View.VISIBLE
+            startTptBtn.isEnabled = true
+            startTptBtn.setOnClickListener {
+                ContactTracingActivity.startForType(
+                    requireContext(), benId, ContactTracingActivity.CONTACT_TYPE_TPT_FOLLOW_UP,
+                    SectionPhase.PRE_SUBMIT
+                )
+            }
+            viewLifecycleOwner.lifecycleScope.launch {
+                viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    combine(
+                        viewModel.isContactFollowUpTptEligible,
+                        viewModel.isTptFollowUpPreSubmitDone
+                    ) { tptEligible, registered -> tptEligible to registered }
+                        .collect { (tptEligible, registered) ->
+                            startTptRow.visibility = if (tptEligible) View.VISIBLE else View.GONE
+                            if (registered) {
+                                startTptBtn.text = getString(R.string.examine_btn_view)
+                                startTptBtn.backgroundTintList = ContextCompat.getColorStateList(
+                                    requireContext(), android.R.color.holo_green_dark
+                                )
+                            } else {
+                                startTptBtn.text = getString(R.string.examine_btn_fill)
+                                startTptBtn.backgroundTintList = ContextCompat.getColorStateList(
+                                    requireContext(), android.R.color.holo_red_dark
+                                )
+                            }
+                        }
+                }
+            }
+        } else {
+            startTptRow.visibility = View.GONE
         }
 
         // TPT Followup — Counselling Officer only.

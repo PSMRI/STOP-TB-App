@@ -4,8 +4,6 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.view.LayoutInflater
 import android.view.ViewGroup
-import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import org.piramalswasthya.stoptb.databinding.RvItemSyncLogBinding
 import org.piramalswasthya.stoptb.model.LogLevel
@@ -14,28 +12,34 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class SyncLogAdapter :
-    ListAdapter<SyncLogEntry, SyncLogAdapter.ViewHolder>(DiffCallback) {
+class SyncLogAdapter(private val open: (SyncLogEntry) -> Unit = {}) :
+    RecyclerView.Adapter<SyncLogAdapter.ViewHolder>() {
+
+    private var entries: List<SyncLogEntry> = emptyList()
+
+    fun showSnapshot(logs: List<SyncLogEntry>) {
+        if (entries == logs) return
+        entries = logs
+        // Rolling log windows can generate hundreds of queued remove animations.
+        // A bounded, animation-free snapshot avoids that AdapterHelper backlog.
+        notifyDataSetChanged()
+    }
+
+    override fun getItemCount(): Int = entries.size
 
     companion object {
         private const val MAX_DISPLAY_LENGTH = 500
     }
 
-    private object DiffCallback : DiffUtil.ItemCallback<SyncLogEntry>() {
-        override fun areItemsTheSame(oldItem: SyncLogEntry, newItem: SyncLogEntry) =
-            oldItem.id == newItem.id
-
-        override fun areContentsTheSame(oldItem: SyncLogEntry, newItem: SyncLogEntry) =
-            oldItem == newItem
-    }
-
     private val timeFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
 
     class ViewHolder(
-        private val binding: RvItemSyncLogBinding
+        private val binding: RvItemSyncLogBinding,
+        private val open: (SyncLogEntry) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(item: SyncLogEntry, timeFormat: SimpleDateFormat) {
+            binding.root.setOnClickListener { open(item) }
             val (label, bgColor, textColor) = when (item.level) {
                 LogLevel.ERROR -> Triple("E", Color.parseColor("#D32F2F"), Color.parseColor("#D32F2F"))
                 LogLevel.WARN -> Triple("W", Color.parseColor("#F57C00"), Color.parseColor("#F57C00"))
@@ -64,10 +68,10 @@ class SyncLogAdapter :
         val binding = RvItemSyncLogBinding.inflate(
             LayoutInflater.from(parent.context), parent, false
         )
-        return ViewHolder(binding)
+        return ViewHolder(binding, open)
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(getItem(position), timeFormat)
+        holder.bind(entries[position], timeFormat)
     }
 }

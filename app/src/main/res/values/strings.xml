@@ -1,4 +1,5 @@
 <resources>
+    <string name="sync_dashboard_no_manual_logs">No manual-refresh or direct-save logs to share in this session.</string>
 
     <!--    Pref-->
     <string name="PREF_NAME" translatable="false">Sakhi-pref-1</string>
@@ -213,6 +214,7 @@
     <string name="facilitator">Facilitator</string>
     <string name="form_input__no_alpha_space_error">No Alphabets or spaces allowed!</string>
     <string name="form_input_digit_only_error">Only Digits allowed!</string>
+    <string name="form_input_invalid_pincode">Pincode cannot start with 0</string>
     <string name="form_input_min_limit_error_decimal">%1$s should be greater than or equal to %2$.1f</string>
     <string name="form_input_max_limit_error">%1$s should be lesser than or equal to %2$d</string>
     <string name="form_input_max_limit_error_decimal">%1$s should be lesser than or equal to %2$.1f</string>
@@ -272,6 +274,7 @@
     <string name="contact_tracing_load_error">Could not load this form.</string>
     <string name="community_contact_tracing">Community Contacts</string>
     <string name="occupational_contact_tracing">Occupational Contacts</string>
+    <string name="household_contact_tracing">Household Contacts</string>
     <string name="contact_tracing_section_progress">Section %1$d of %2$d</string>
     <string name="contact_tracing_number_picker_decrement">Decrease</string>
     <string name="contact_tracing_number_picker_increment">Increase</string>
@@ -619,8 +622,30 @@
 
     <string name="regimen_type">Regimen Type</string>
     <string name="monthly_follow_up_done">Monthly follow up done</string>
-    <string name="adherence_to_medicines">Adherence to Medicines</string>
     <string name="any_discomfort">Any discomfort</string>
+    <string name="side_effects">Side Effects</string>
+    <string-array name="tb_side_effects">
+        <item>Nausea</item>
+        <item>Vomiting</item>
+        <item>Abdominal Pain</item>
+        <item>Yellowness of Skin</item>
+        <item>Dark colour Urine</item>
+        <item>Loose motions &gt;4 times in a day</item>
+        <item>Itching</item>
+        <item>Rashes</item>
+        <item>Tingling/burning/numbness in hands and feet</item>
+        <item>Pain in Joints</item>
+        <item>Impaired vision: Pain, Blurring of vision, Disturbance in colour vision</item>
+        <item>Flue like syndrome- Chills, Dry cough, Shortness of breath, loss of appetite, body ache and malaise</item>
+        <item>Swelling of face or legs, Less or no urine</item>
+        <item>Seeing abnormal things, changes of thoughts, suicidal thoughts</item>
+        <item>Tiredness, lethargy, headache, giddiness, pale look, palpitations</item>
+        <item>Ringing in ears, Loss of hearing, dizziness and loss of balance leading to recurrent fall</item>
+        <item>Slowness of activities, Swelling of face or neck, dis-appropriate weight gain</item>
+        <item>Pain and swelling in muscles and Tendons, difficulty in movement</item>
+        <item>Convulsion</item>
+        <item>Orange and red color of urine, sweat, sputum, saliva or tears</item>
+    </string-array>
     <string name="treatment_completed">Did the patient complete the full course of Treatment?</string>
     <string name="treatment_outcome">TB Treatment outcomes</string>
     <string name="reason_for_not_completing">Reason for not completing treatment</string>
@@ -636,16 +661,17 @@
         <item>INH Mono (6 Month)</item>
     </string-array>
 
-    <string-array name="adherence_options">
-        <item>Regular</item>
-        <item>Irregular</item>
-    </string-array>
+
+    <string name="remarks">Remarks</string>
 
     <string-array name="tb_treatment_outcomes">
+        <item>Treatment completed</item>
+        <item>Died</item>
+        <item>Treatment Failure</item>
+        <item>Lost to Follow Up</item>
+        <item>Mark as Duplicate</item>
         <item>Cured</item>
-        <item>Failed</item>
-        <item>Lost to Follow-up (LFU)</item>
-        <item>Death</item>
+        <item>Treatment Regimen Changed</item>
     </string-array>
 
     <string-array name="place_of_death">
@@ -1033,7 +1059,10 @@
     <string name="sync_entity_tb_confirmed">TB confirmed</string>
     <string name="sync_dashboard_no_logs">No sync logs yet. Trigger a sync to see activity.</string>
     <string name="sync_dashboard_clear_logs">Clear Logs</string>
-    <string name="sync_dashboard_export_logs">Export Logs</string>
+    <string name="sync_dashboard_export_logs">Share sync diagnostics</string>
+    <string name="sync_share_title">Share Logs / Summary</string>
+    <string name="sync_share_send">Share</string>
+    <string name="sync_share_unavailable">Unable to share diagnostics. Logs may be empty. Please refresh Summary or try again.</string>
     <string name="sync_dashboard_no_log_files">No log files to export</string>
     <string name="form_name">Form Name</string>
     <string name="no_records_found_hh">No Household records found.</string>
@@ -1074,6 +1103,7 @@
     <string name="tb_presumptive_alert_title">A Presumptive TB case!</string>
     <string name="tb_presumptive_alert_refer">Refer to X-ray and collect sputum for Truenat test</string>
     <string name="tb_presumptive_alert_refer_pregnant">Collect sputum for Truenat test</string>
+    <string name="tb_presumptive_alert_liquid_culture">Refer for Liquid Culture test</string>
     <string name="tb_presumptive_alert_family">Advise screening of all family members</string>
     <string name="referred_for_digital_chest_xray">Referred for digital chest x-ray</string>
     <string name="referred_for_sputum_collection">Referred for Sputum Collection</string>
@@ -1464,6 +1494,8 @@
     <string name="tb_reason_for_denial_sputum">Reason for Denial of Sputum Collection</string>
     <string name="tb_reason_for_denial_sputum_other">Specify other reason for denial (Sputum)</string>
     <string name="tb_sputum_submitted_at">Sputum Sample Submission Center</string>
+    <string name="tb_sputum_sample_collection_date">Sputum Sample Collection date</string>
+    <string name="tb_sputum_collection_date_range_error">Select today or yesterday only</string>
     <string name="sputum_sample_submitted_at_screening_camp">Sputum Sample Submitted at TB Screening Camp</string>
     <string name="tb_reason_not_conducted_naat">Reason True NAT not conducted</string>
     <string name="tb_reason_not_conducted_naat_other">Specify other reason (True NAT not conducted)</string>
@@ -1538,6 +1570,8 @@
     </string-array>
     <string name="counselling_date_hint">Date</string>
     <!-- Location Details Section -->
+    <string name="loc_gps_not_captured">(GPS not captured)</string>
+    <string name="loc_camp_site_msg">Registration done at camp site</string>
     <string name="loc_section_title">Location Details</string>
     <string name="loc_btn_refresh">Refresh</string>
     <string name="loc_status_fetching">Fetching Location…</string>
@@ -1613,6 +1647,33 @@
 
 
 
+    <!-- Order Status -->
+    <string name="order_status_pending">Pending</string>
+    <string name="order_status_completed">Completed</string>
+    <string name="order_status_failed">Failed</string>
+    <string name="order_status_closed">Closed</string>
+    <string name="order_status_manual_entry">Manual Entry</string>
+
+    <!-- Chest X-Ray Results -->
+    <string name="chest_xray_normal">Normal</string>
+    <string name="chest_xray_abnormal">Abnormal but not TB Presumptive</string>
+    <string name="chest_xray_tb_presumptive">TB Presumptive</string>
+    <string name="chest_xray_ai_invalid">AI Invalid Result</string>
+
+    <!-- MTB Results -->
+    <string name="mtb_result_positive">TB Positive</string>
+    <string name="mtb_result_negative">TB Negative</string>
+    <string name="mtb_result_invalid_error">Invalid/Error</string>
+
+    <!-- RIF Results -->
+    <string name="rif_result_dr_tb">DR TB</string>
+    <string name="rif_result_non_dr_tb">Non DR TB</string>
+    <string name="rif_result_indeterminate">Indeterminate</string>
+    <string name="rif_result_invalid_error">Invalid/Error</string>
+
+
+
+    <string name="loc_cb_update_location">Do you want to update the location details?</string>
 
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
@@ -1620,5 +1681,15 @@
 
 
 
+    <string name="sync_dashboard_tab_summary">Summary</string>
+    <string name="sync_summary_refresh">Refresh Summary</string>
+    <string name="sync_summary_scope">PUSH: day-wise local saves and their upload status. PULL: selected sync records saved to DB and skipped reasons. Today is default. PUSH totals persist; PULL run history covers this app session.</string>
+    <string name="sync_summary_push">PUSH</string>
+    <string name="sync_summary_pull">PULL</string>
+    <string name="sync_summary_history">History</string>
+    <string name="sync_summary_today">Today</string>
+    <string name="sync_summary_yesterday">Yesterday</string>
+    <string name="sync_summary_all">All</string>
+    <string name="sync_summary_empty">No structured sync reports yet. Run sync, then refresh this summary.</string>
 </resources>
 

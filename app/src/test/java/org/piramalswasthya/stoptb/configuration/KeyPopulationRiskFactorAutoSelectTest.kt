@@ -169,4 +169,65 @@ class KeyPopulationRiskFactorAutoSelectTest {
 
         assertTrue(selected.contains(elderlyIndex))
     }
+
+    @Test
+    fun contactOfKnownTbUsesMasterListId() {
+        assertEquals(
+            7,
+            KeyPopulationRiskFactorAutoSelect.optionId(
+                KeyPopulationRiskFactorAutoSelect.CONTACT_OF_KNOWN_TB_CODE
+            )
+        )
+    }
+
+    @Test
+    fun addsContactOfKnownTbAndDropsNotApplicable() {
+        val notApplicableId = KeyPopulationRiskFactorAutoSelect.optionId(
+            KeyPopulationRiskFactorAutoSelect.NOT_APPLICABLE_CODE
+        )
+        val updated = KeyPopulationRiskFactorAutoSelect.addContactOfKnownTb(
+            ids = listOf(notApplicableId, 26),
+            codes = listOf("NOT_APPLICABLE", "ELDERLY")
+        )
+
+        assertEquals(listOf(26, 7), updated?.ids)
+        assertEquals(listOf("ELDERLY", "CONTACT_OF_KNOWN_TB_PATIENTS"), updated?.codes)
+    }
+
+    @Test
+    fun contactSelectionIsUnchangedWhenAlreadyStored() {
+        val contactId = KeyPopulationRiskFactorAutoSelect.optionId(
+            KeyPopulationRiskFactorAutoSelect.CONTACT_OF_KNOWN_TB_CODE
+        )
+        val updated = KeyPopulationRiskFactorAutoSelect.addContactOfKnownTb(
+            ids = listOf(contactId),
+            codes = listOf(KeyPopulationRiskFactorAutoSelect.CONTACT_OF_KNOWN_TB_CODE)
+        )
+        assertEquals(null, updated)
+    }
+
+    @Test
+    fun storedContactLabelIsNormalizedToTheCode() {
+        val updated = KeyPopulationRiskFactorAutoSelect.addContactOfKnownTb(
+            ids = emptyList(),
+            codes = listOf(KeyPopulationRiskFactorAutoSelect.CONTACT_OF_KNOWN_TB_LABEL)
+        )
+        assertEquals(
+            listOf(KeyPopulationRiskFactorAutoSelect.CONTACT_OF_KNOWN_TB_CODE),
+            updated?.codes
+        )
+    }
+
+    @Test
+    fun selectsContactIndexAndDropsNotApplicable() {
+        val contactIndex = 4
+        val selected = mutableSetOf(notApplicableIndex)
+        val changed = KeyPopulationRiskFactorAutoSelect.selectContactOfKnownTb(
+            selected = selected,
+            contactIndex = contactIndex,
+            notApplicableIndex = notApplicableIndex
+        )
+        assertTrue(changed)
+        assertEquals(setOf(contactIndex), selected)
+    }
 }

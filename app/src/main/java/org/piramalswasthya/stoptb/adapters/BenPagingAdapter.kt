@@ -52,6 +52,7 @@ class BenPagingAdapter(
     private var contactFollowUpDoneIds: Set<Long> = emptySet()
     private var tptFollowUpDoneIds: Set<Long> = emptySet()
     private var tptEligibleIds: Set<Long> = emptySet()
+    private var tptRegistrationDoneIds: Set<Long> = emptySet()
     private val childCountMap = mutableMapOf<Long, Int>()
     private val householdMemberCountMap = mutableMapOf<Long, Int>()
     private val householdHeadNameMap = mutableMapOf<Long, String>()
@@ -124,6 +125,7 @@ class BenPagingAdapter(
             tptFollowUpDoneIds,
             tptEligibleIds,
             childCountMap,
+            tptRegistrationDoneBenIds = tptRegistrationDoneIds,
             showActionButtons = showActionButtons,
             showResultButton = showResultButton,
             showAnthropometryButton = showAnthropometryButton,
@@ -200,6 +202,7 @@ class BenPagingAdapter(
     fun submitContactFollowUpDoneBenIds(ids: Collection<Long>) { contactFollowUpDoneIds = swapIds(contactFollowUpDoneIds, ids) }
     fun submitTptFollowUpDoneBenIds(ids: Collection<Long>) { tptFollowUpDoneIds = swapIds(tptFollowUpDoneIds, ids) }
     fun submitTptEligibleBenIds(ids: Collection<Long>) { tptEligibleIds = swapIds(tptEligibleIds, ids) }
+    fun submitTptRegistrationDoneBenIds(ids: Collection<Long>) { tptRegistrationDoneIds = swapIds(tptRegistrationDoneIds, ids) }
 
     /**
      * Returns the new id set for [ids] and rebinds the loaded rows whose membership changed.

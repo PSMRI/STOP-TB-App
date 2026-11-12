@@ -35,6 +35,18 @@ class TBSuspectedCacheTest {
     }
 
     @Test
+    fun `liquid-culture fields are tablet-only on tb_suspected`() {
+        // tb_suspected has no liquid-culture columns (they live on tb_stoptb_diagnostics), so a
+        // pulled record carries null and re-deriving them must not queue another upload.
+        val derived = fromServer.copy(
+            recommendedForLiquidCultureTest = true,
+            isLiquidCultureConducted = true,
+            liquidCultureResult = "Positive",
+        )
+        assertThat(derived.withoutTabletOnlyFields()).isEqualTo(fromServer.withoutTabletOnlyFields())
+    }
+
+    @Test
     fun `a change to a field the server stores still counts`() {
         val derived = fromServer.copy(hasSymptoms = true, sputumTestResult = "TB Positive")
         assertThat(derived.withoutTabletOnlyFields()).isNotEqualTo(fromServer.withoutTabletOnlyFields())

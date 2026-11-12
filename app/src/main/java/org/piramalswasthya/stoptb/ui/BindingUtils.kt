@@ -27,6 +27,7 @@ import com.google.android.material.divider.MaterialDivider
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
@@ -78,7 +79,10 @@ fun setFormattedDateWithMonth(view: TextView, timestamp: Long?) {
 
 @BindingAdapter("scope", "recordCount")
 fun TextView.setRecordCount(scope: CoroutineScope, count: Flow<Int>?) {
-    count?.let { flow ->
+    // A recycled/rebound view must stop collecting its previous flow, otherwise it keeps
+    // receiving another card's count and flips between values on every DB emission.
+    (getTag(R.id.record_count_job) as? Job)?.cancel()
+    val job = count?.let { flow ->
         scope.launch {
             try {
                 flow.collect {
@@ -89,9 +93,9 @@ fun TextView.setRecordCount(scope: CoroutineScope, count: Flow<Int>?) {
             }
 
         }
-    } ?: run {
-        text = null
     }
+    setTag(R.id.record_count_job, job)
+    if (job == null) text = null
 }
 
 fun TextView.setCountBadgeText(count: Int) {

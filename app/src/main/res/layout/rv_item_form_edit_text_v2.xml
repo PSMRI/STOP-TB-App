@@ -34,6 +34,8 @@
             android:layout_height="wrap_content"
             asteriskRequired="@{form.required}"
             hintText="@{form.title}"
+            app:counterEnabled="@{form.showCharacterCounter}"
+            app:counterMaxLength="@{form.etMaxLength}"
             app:endIconMode="custom"
             app:errorEnabled="false"
             app:layout_constraintEnd_toEndOf="parent"

@@ -155,6 +155,17 @@ class TBScreeningDataset(
         hasDependants = true
     )
 
+    private val otherSymptomsDetails = FormElement(
+        id = 27,
+        inputType = InputType.EDIT_TEXT,
+        title = resources.getString(R.string.other_symptoms),
+        required = false,
+        isEnabled = false,
+        etMaxLength = 200,
+        showCharacterCounter = true,
+        isAlphanumeric = true
+    )
+
     private val otherDetailsHeading = FormElement(
         id = 20,
         inputType = InputType.HEADLINE,
@@ -222,6 +233,7 @@ class TBScreeningDataset(
     private var residentialAreaId: Int? = null
     private var editingExistingScreening: Boolean = false
     private var formReady: Boolean = false
+    private var isContactOfKnownTbPatient: Boolean = false
     private val autoSelectSession = KeyPopulationRiskFactorAutoSelect.Session()
     private var lastCommittedRiskFactorIndexes: Set<Int> = emptySet()
 
@@ -396,6 +408,7 @@ class TBScreeningDataset(
         hivStatus.entries = hivStatusOptions.map { it.label }.toTypedArray()
 
         if (saved == null) {
+            otherSymptomsDetails.value = null
             dateOfVisit.value = getDateFromLong(System.currentTimeMillis())
             val selectedIndexes = mutableSetOf<Int>()
             val pregnancyIndex = riskFactorOptions.indexOfFirst { it.code == "PREGNANCY" }
@@ -403,6 +416,7 @@ class TBScreeningDataset(
                 selectedIndexes.add(pregnancyIndex)
             }
             applyAutoSelectedRiskFactors(ben, selectedIndexes)
+            applyContactOfKnownTb(selectedIndexes)
             keyPopulationRiskFactors.value = selectedIndexes.toRiskFactorValue()
             lastCommittedRiskFactorIndexes = selectedIndexes
             hivStatus.value = null
@@ -421,6 +435,7 @@ class TBScreeningDataset(
             failureToGainWeightInChildren.value = boolToYesNo(saved.failureToGainWeightInChildren)
             decreasedActivityOrPlayfulnessInChildren.value = boolToYesNo(saved.decreasedActivityOrPlayfulnessInChildren)
             others.value              = boolToYesNo(saved.otherSymptoms)
+            otherSymptomsDetails.value = saved.otherSymptomsDetails
             historyOfTB.value        = boolToYesNo(saved.historyOfTb)
             currentlyTakingDrugs.value = boolToYesNo(saved.takingAntiTBDrugs)
             familyHistoryTB.value    = boolToYesNo(saved.familySufferingFromTB)
@@ -432,10 +447,10 @@ class TBScreeningDataset(
                 val matches = savedIds.contains(option.id) ||
                         savedCodes.any { it.equals(option.code, true) || it.equals(option.label, true) }
                 if (matches) index else null
-            }
-            keyPopulationRiskFactors.value =
-                if (selectedIndexes.isEmpty()) null else selectedIndexes.sorted().joinToString("|")
-            lastCommittedRiskFactorIndexes = selectedIndexes.toSet()
+            }.toMutableSet()
+            applyContactOfKnownTb(selectedIndexes)
+            keyPopulationRiskFactors.value = selectedIndexes.toRiskFactorValue()
+            lastCommittedRiskFactorIndexes = selectedIndexes
 
             hivStatus.value = hivStatusOptions.firstOrNull {
                 it.id == saved.hivStatusId ||
@@ -444,12 +459,19 @@ class TBScreeningDataset(
             }?.label
         }
 
+        updateOtherSymptomsDetailsState()
         setUpPage(buildFormList())
         formReady = true
     }
 
+    fun setContactOfKnownTbPatient(isContact: Boolean) {
+        isContactOfKnownTbPatient = isContact
+    }
+
     /**
-     * Re-reads age and residential area for a screening that has not been saved yet.
+     * Re-reads age, residential area, and household TB contact.
+     * Elderly and Urban Slum stay as saved on an existing screening.
+     * Contact of Known TB Patients is applied to new and existing screenings.
      * Returns true when the Key Population selection changed.
      */
     fun refreshAutoSelectedRiskFactors(
@@ -457,11 +479,15 @@ class TBScreeningDataset(
         residentialArea: String?,
         residentialAreaId: Int?
     ): Boolean {
-        if (!formReady || editingExistingScreening || ben == null) return false
-        residentialAreaLabel = residentialArea
-        this.residentialAreaId = residentialAreaId
+        if (!formReady || ben == null) return false
         val selectedIndexes = currentRiskFactorIndexes().toMutableSet()
-        val changed = applyAutoSelectedRiskFactors(ben, selectedIndexes)
+        var changed = false
+        if (!editingExistingScreening) {
+            residentialAreaLabel = residentialArea
+            this.residentialAreaId = residentialAreaId
+            changed = applyAutoSelectedRiskFactors(ben, selectedIndexes)
+        }
+        if (applyContactOfKnownTb(selectedIndexes)) changed = true
         if (changed) {
             keyPopulationRiskFactors.value = selectedIndexes.toRiskFactorValue()
         }
@@ -484,12 +510,20 @@ class TBScreeningDataset(
             fatigue.id              -> fatigue.value              = yesNoFromIndex(index)
             failureToGainWeightInChildren.id -> failureToGainWeightInChildren.value = yesNoFromIndex(index)
             decreasedActivityOrPlayfulnessInChildren.id -> decreasedActivityOrPlayfulnessInChildren.value = yesNoFromIndex(index)
-            others.id               -> others.value               = yesNoFromIndex(index)
+            others.id -> {
+                others.value = yesNoFromIndex(index)
+                updateOtherSymptomsDetailsState()
+                triggerDependants(others, index, 0, listOf(otherSymptomsDetails))
+            }
             historyOfTB.id          -> historyOfTB.value          = yesNoFromIndex(index)
             currentlyTakingDrugs.id -> currentlyTakingDrugs.value = yesNoFromIndex(index)
             familyHistoryTB.id      -> familyHistoryTB.value      = yesNoFromIndex(index)
             keyPopulationRiskFactors.id -> {
                 enforceNotApplicableExclusivity()
+                val selectedIndexes = currentRiskFactorIndexes().toMutableSet()
+                if (applyContactOfKnownTb(selectedIndexes)) {
+                    keyPopulationRiskFactors.value = selectedIndexes.toRiskFactorValue()
+                }
                 recordRiskFactorUserEdit()
             }
         }
@@ -500,6 +534,16 @@ class TBScreeningDataset(
             Log.d("ASYM_TEST", "Computed = ${isAsymptomatic.value}")
             listFlow.value.indexOf(isAsymptomatic).takeIf { it >= 0 } ?: -1
         } else -1
+    }
+
+    private fun updateOtherSymptomsDetailsState() {
+        val enabled = isYes(others)
+        otherSymptomsDetails.isEnabled = enabled
+        otherSymptomsDetails.required = enabled
+        if (!enabled) {
+            otherSymptomsDetails.value = null
+            otherSymptomsDetails.errorText = null
+        }
     }
 
     private fun applyAutoSelectedRiskFactors(
@@ -530,6 +574,19 @@ class TBScreeningDataset(
                 acceptedLabels
             ),
             session = autoSelectSession
+        )
+    }
+
+    private fun applyContactOfKnownTb(selectedIndexes: MutableSet<Int>): Boolean {
+        if (!isContactOfKnownTbPatient) return false
+        return KeyPopulationRiskFactorAutoSelect.selectContactOfKnownTb(
+            selected = selectedIndexes,
+            contactIndex = riskFactorOptions.indexOfFirst {
+                it.code == KeyPopulationRiskFactorAutoSelect.CONTACT_OF_KNOWN_TB_CODE
+            },
+            notApplicableIndex = riskFactorOptions.indexOfFirst {
+                it.code == KeyPopulationRiskFactorAutoSelect.NOT_APPLICABLE_CODE
+            }
         )
     }
 
@@ -615,6 +672,7 @@ class TBScreeningDataset(
             form.failureToGainWeightInChildren = if (isChildBeneficiary) isYes(failureToGainWeightInChildren) else null
             form.decreasedActivityOrPlayfulnessInChildren = if (isChildBeneficiary) isYes(decreasedActivityOrPlayfulnessInChildren) else null
             form.otherSymptoms         = others.value?.takeIf { it.isNotBlank() }?.let { isYes(others) }
+            form.otherSymptomsDetails = if (isYes(others)) otherSymptomsDetails.value?.trim() else null
             form.historyOfTb           = isYes(historyOfTB)
             form.takingAntiTBDrugs     = isYes(currentlyTakingDrugs)
             form.familySufferingFromTB = isYes(familyHistoryTB)
@@ -628,8 +686,15 @@ class TBScreeningDataset(
                 ?.split("|")?.mapNotNull { it.toIntOrNull() }
                 ?.mapNotNull { riskFactorOptions.getOrNull(it) }
                 .orEmpty()
-            form.keyPopulationRiskFactorIds = selectedRiskFactors.map { it.id }.takeIf { it.isNotEmpty() }
-            form.keyPopulationRiskFactors = selectedRiskFactors.map { it.code }.takeIf { it.isNotEmpty() }
+            val selectedIds = selectedRiskFactors.map { it.id }
+            val selectedCodes = selectedRiskFactors.map { it.code }
+            val withContact = if (isContactOfKnownTbPatient) {
+                KeyPopulationRiskFactorAutoSelect.addContactOfKnownTb(selectedIds, selectedCodes)
+            } else {
+                null
+            }
+            form.keyPopulationRiskFactorIds = (withContact?.ids ?: selectedIds).takeIf { it.isNotEmpty() }
+            form.keyPopulationRiskFactors = (withContact?.codes ?: selectedCodes).takeIf { it.isNotEmpty() }
 
             val selectedHiv = hivStatusOptions.firstOrNull { it.label == hivStatus.value }
             form.hivStatusId = selectedHiv?.id
@@ -687,17 +752,34 @@ class TBScreeningDataset(
             if (isPregnantBen) R.string.tb_presumptive_alert_refer_pregnant
             else R.string.tb_presumptive_alert_refer
         )
+        val liquidCultureText =
+            if (requiresLiquidCultureReferral())
+                "\n" + resources.getString(R.string.tb_presumptive_alert_liquid_culture)
+            else ""
         return when {
             hasDoubleStarYes() ->
                 resources.getString(R.string.tb_presumptive_alert_title) +
                     "\n" + referText +
+                    liquidCultureText +
                     "\n" + resources.getString(R.string.tb_presumptive_alert_family)
             hasSingleStarYes() ->
                 resources.getString(R.string.tb_presumptive_alert_title) +
-                    "\n" + referText
+                    "\n" + referText +
+                    liquidCultureText
             else -> null
         }
     }
+
+    /**
+     * Mirrors the TB_SCREENING branch of the Liquid Culture card queries in BenDao
+     * (historyOfTb / takingAntiTBDrugs / familySufferingFromTB = 1), so the popup
+     * mentions Liquid Culture exactly when the beneficiary will appear on that card.
+     */
+    private fun requiresLiquidCultureReferral(): Boolean = listOf(
+        historyOfTB,
+        currentlyTakingDrugs,
+        familyHistoryTB
+    ).any(::isYes)
 
     fun getFamilyContactAlert(): String? =
         if (requiresFamilyContactScreening())
@@ -726,6 +808,7 @@ class TBScreeningDataset(
             add(decreasedActivityOrPlayfulnessInChildren)
         }
         add(others)
+        if (isYes(others)) add(otherSymptomsDetails)
         add(isAsymptomatic)
         addAll(listOf(
             otherDetailsHeading,

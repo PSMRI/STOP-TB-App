@@ -148,6 +148,7 @@ class UserRepo @Inject constructor(
         )
         Timber.d("RoleManager: assignedRoleScreenNames=${user.assignedRoleScreenNames}")
         preferenceDao.registerUser(user)
+        preferenceDao.saveVillageMasterDefaults(response.data.villageMasterDefaults())
         // Auto-set location if user has exactly one village (common for ASHA workers)
         if (user.villages.size == 1) {
             val locationRecord = LocationRecord(

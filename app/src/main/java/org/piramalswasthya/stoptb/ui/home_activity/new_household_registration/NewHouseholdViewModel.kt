@@ -33,7 +33,7 @@ import javax.inject.Inject
 @HiltViewModel
 class NewHouseholdViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    preferenceDao: PreferenceDao,
+    private val preferenceDao: PreferenceDao,
     @ApplicationContext context: Context,
     private val benRepo: BenRepo,
     private val householdRepo: HouseholdRepo
@@ -64,6 +64,9 @@ class NewHouseholdViewModel @Inject constructor(
 
     private lateinit var user: User
     private lateinit var household: HouseholdCache
+
+    // Village of a saved household when the form opened (null for a new household / draft)
+    private var savedHouseholdVillageId: Int? = null
     private val dataset = HouseholdFormDataset(context, preferenceDao.getCurrentLanguage())
     val formList = dataset.listFlow
 
@@ -71,6 +74,14 @@ class NewHouseholdViewModel @Inject constructor(
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     // ─── Location state ───────────────────────────────────────────────────────
+
+    private companion object {
+        const val CAMP_SITE_REASON = "Registration done at camp site" // stored in existing gpsUnavailableReason
+    }
+
+    private val _isCampSite = MutableStateFlow(false)
+    val isCampSite: StateFlow<Boolean> = _isCampSite.asStateFlow()
+
 
     private val _locationState = MutableStateFlow<LocationState>(LocationState.Idle)
     val locationState: StateFlow<LocationState> = _locationState.asStateFlow()
@@ -101,6 +112,8 @@ class NewHouseholdViewModel @Inject constructor(
                         registrationType = isAshaFamily,
                         locationRecord = locationRecord
                     )
+                savedHouseholdVillageId =
+                    household.locationRecord.village.id.takeIf { household.householdId != 0L }
 
                 val villageNames = user.villages.map { it.name }.toTypedArray()
 
@@ -109,8 +122,11 @@ class NewHouseholdViewModel @Inject constructor(
                     householdRepo.getAllBenOfHousehold(household.householdId).size
                 } else 0
 
-                dataset.setupPage(household, villageNames, user.villages, registeredMemberCount)
-
+                // A new household takes the village's Pincode / Residential Area; a saved one keeps (and locks) its
+                // own and only uses the village's Pincode when it has none yet (saved before Pincode was on this form)
+                val villageDefaults = preferenceDao.getVillageDefaults(household.locationRecord.village.id)
+                dataset.setupPage(household, villageNames, user.villages, registeredMemberCount, villageDefaults)
+                _isCampSite.value = dataset.isRegisteredAtCampSite()
 
                 // Restore previously saved location state if editing an existing record
                 household.let { hh ->
@@ -145,7 +161,11 @@ class NewHouseholdViewModel @Inject constructor(
         _locationState.value = LocationState.Fetching
     }
 
+
     fun onLocationResult(lat: Double, lon: Double, detail: String? = null) {
+
+        if (_isCampSite.value) return
+
         val digipin = DigiPinHelper.generate(lat, lon)
         if (digipin == null) {
             Timber.tag(GpsDiagnostics.TAG).w("onLocationResult rejected: lat=$lat lon=$lon is outside supported bounds")
@@ -166,6 +186,7 @@ class NewHouseholdViewModel @Inject constructor(
     }
 
     fun onLocationFailed(reason: LocationState.Failed, detail: String? = null) {
+        if (_isCampSite.value) return
         Timber.tag(GpsDiagnostics.TAG).w("onLocationFailed: reason=$reason detail=$detail")
         _locationDetail.value = detail
         _locationState.value = reason
@@ -184,15 +205,27 @@ class NewHouseholdViewModel @Inject constructor(
         _gpsUnavailableReason.value = reason
     }
 
-    // ─── Validation ───────────────────────────────────────────────────────────
 
-    fun isLocationValid(): Boolean {
-        return when {
-            locationState.value is LocationState.Captured -> true
-            isGpsUnavailable.value && !gpsUnavailableReason.value.isNullOrBlank() -> true
-            else -> false
+    fun onCampSiteChanged(camp: Boolean) {
+        _isCampSite.value = camp
+        if (camp) {
+            _locationDetail.value = null
+            _locationState.value = LocationState.Idle
         }
     }
+
+    fun restoreLocationState(state: LocationState) {
+        _locationDetail.value = null
+        _locationState.value = state
+    }
+
+
+    // ─── Validation ───────────────────────────────────────────────────────────
+
+
+
+    fun isLocationValid(): Boolean =
+        _isCampSite.value || locationState.value is LocationState.Captured
 
     // ─── Save ─────────────────────────────────────────────────────────────────
 
@@ -207,7 +240,14 @@ class NewHouseholdViewModel @Inject constructor(
 
                     // Map location fields onto entity
                     val locState = locationState.value
-                    if (locState is LocationState.Captured) {
+                    if (_isCampSite.value) {
+                        household.gpsLatitude = null
+                        household.gpsLongitude = null
+                        household.digipin = null
+                        household.gpsTimestamp = null
+                        household.isGpsUnavailable = true
+                        household.gpsUnavailableReason = CAMP_SITE_REASON
+                    } else if (locState is LocationState.Captured) {
                         household.gpsLatitude = locState.lat
                         household.gpsLongitude = locState.lon
                         household.digipin = locState.digipin
@@ -244,7 +284,26 @@ class NewHouseholdViewModel @Inject constructor(
                         household.benId = linkBenId
                     }
                     householdRepo.persistRecord(household)
-                    benRepo.updateBenToSync(household.householdId, SyncState.UNSYNCED)
+                    dataset.getCapturedVillageDefaults()?.let { capturedDefaults ->
+                        preferenceDao.saveVillageDefaultsIfMissing(household.locationRecord.village.id, capturedDefaults)
+                    }
+                    // Saved household: its members (HoF included) always carry the household's village, Pincode
+                    // and Residential Area, so one household never has different values. When the village changed
+                    // this also moves them, otherwise they keep pushing the old village and the next pull puts
+                    // the household back there. Marks them UNSYNCED in the same transaction.
+                    val selectedVillage = household.locationRecord.village
+                    if (savedHouseholdVillageId != null) {
+                        benRepo.applyHouseholdLocationToMembers(
+                            householdId = household.householdId,
+                            village = selectedVillage,
+                            pinCode = household.family?.pinCode,
+                            residentialAreaId = household.details?.residentialAreaId ?: 0,
+                            residentialArea = household.details?.residentialArea
+                        )
+                        savedHouseholdVillageId = selectedVillage.id
+                    } else {
+                        benRepo.updateBenToSync(household.householdId, SyncState.UNSYNCED)
+                    }
                     if (linkBenId != 0L) {
                         benRepo.linkBenToHousehold(linkBenId, household.householdId, 19, "Self")
                     }

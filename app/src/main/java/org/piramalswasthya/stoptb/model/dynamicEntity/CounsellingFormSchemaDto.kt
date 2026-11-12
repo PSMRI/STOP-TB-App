@@ -54,8 +54,11 @@ data class CounsellingQuestionDto(
     @SerializedName("defaultValue") val defaultValue: String? = null,
     @SerializedName("containsPii") val containsPii: Boolean = false,
     @SerializedName("visibleByDefault") val visibleByDefault: Boolean = true,
+    @SerializedName("requiresBackFill") val requiresBackFill: Boolean = false,
+    @SerializedName("editableAfterSubmit") val editableAfterSubmit: Boolean = false,
     @SerializedName("validations") var validations: List<CounsellingValidationDto>? = null,
     @SerializedName("options") val options: List<CounsellingOptionDto>? = null,
+    @Transient val helperText: List<String> = emptyList(),
 
     // Runtime UI state — not from JSON
     @Transient var value: Any? = null,
@@ -64,7 +67,11 @@ data class CounsellingQuestionDto(
     @Transient var originalIsMandatory: Boolean? = null,
     // Set when the user taps the pencil on a submitted section's notes field.
     @Transient var remarksUnlocked: Boolean = false,
-    @Transient var remarksRequestFocus: Boolean = false
+    @Transient var remarksRequestFocus: Boolean = false,
+    // Contact Follow Up / TPT PRE_SUBMIT: a compatible saved answer that must not be changed.
+    @Transient var lockedAnswer: Boolean = false,
+    // Runtime-only override for field editability; null falls back to default adapter behavior.
+    @Transient var isFieldEditable: Boolean? = null
 ) {
     companion object {
         val ALWAYS_EDITABLE_UUIDS = setOf(
@@ -104,7 +111,10 @@ data class CounsellingOptionDto(
     @SerializedName("optionLabel") val optionLabel: String,
     @SerializedName("optionValue") val optionValue: String,
     @SerializedName("displayOrder") val displayOrder: Int,
-    @SerializedName("conditions") val conditions: List<CounsellingConditionDto>? = null
+    @SerializedName("conditions") val conditions: List<CounsellingConditionDto>? = null,
+    @SerializedName("optionUuid") val optionUuid: String? = null,
+    // Runtime only: false greys out just this option (e.g. CFU "Recommend for ATT").
+    @Transient var enabled: Boolean = true
 )
 
 data class CounsellingConditionDto(

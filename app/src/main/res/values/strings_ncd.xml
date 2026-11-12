@@ -30,6 +30,7 @@
     <string name="failure_to_gain_weight_children">Failure to gain weight (in Children)</string>
     <string name="decreased_activity_or_playfulness_children">Decreased activity or Playfulness (in Children)</string>
     <string name="others">Others</string>
+    <string name="other_symptoms">Other symptoms</string>
 
 
     <string name="cbac_recurrent_ulceration">Recurrent ulceration on palm or sole</string>
@@ -192,6 +193,7 @@
     <string name="not_screened">Not Screened</string>
     <string name="tb_suspected_sputum_test">TB Suspected Sputum Test</string>
     <string name="tb_tracking_submitted">TB Tracking submitted</string>
+    <string name="tb_followup_already_submitted_this_month">Your follow-up for this month has already been submitted</string>
     <string name="track">Track</string>
     <string name="filled_on">"Filled on "</string>
     <string name="save">Save</string>

@@ -214,7 +214,7 @@ class NewBenRegG15Fragment : Fragment() {
                         resources.getString(R.string.registration_successful),
                         Toast.LENGTH_LONG
                     ).show()
-                    WorkerUtils.triggerAmritPushWorker(requireContext())
+                    WorkerUtils.triggerAmritPushWorker(requireContext(), "DIRECT_SAVE")
                     findNavController().navigate(NewBenRegG15FragmentDirections.actionNewBenRegG15FragmentToHomeFragment())
                 }
 
