@@ -45,10 +45,13 @@
         tools:itemCount="2"
         tools:listitem="@layout/rv_item_ben" />
 
+    <!-- Starts hidden: shown only once the members have loaded and there are none (it used to
+         draw "No records found" until the first load finished). -->
     <FrameLayout
         android:id="@+id/fl_empty"
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:visibility="gone"
         app:layout_constraintBottom_toTopOf="@id/btn_next_page"
         app:layout_constraintTop_toBottomOf="@+id/ll_search">
 
@@ -58,6 +61,22 @@
             android:layout_gravity="center"
             android:text="@string/no_records_found"
             android:textAppearance="@style/TextAppearance.Material3.TitleLarge" />
+    </FrameLayout>
+
+    <!-- Loader until the first load finishes. -->
+    <FrameLayout
+        android:id="@+id/fl_loading"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toTopOf="@id/btn_next_page"
+        app:layout_constraintTop_toBottomOf="@+id/ll_search">
+
+        <ProgressBar
+            android:id="@+id/pb_list_loading"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="center"
+            android:indeterminateTint="?attr/colorPrimary" />
     </FrameLayout>
 
     <com.google.android.material.button.MaterialButton

@@ -5,15 +5,22 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.TBDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Languages
+import org.piramalswasthya.stoptb.model.DashboardBreakdownCounts
 import org.piramalswasthya.stoptb.model.LocationEntity
 import java.util.Calendar
 import javax.inject.Inject
@@ -86,9 +93,6 @@ class DashboardViewModel @Inject constructor(
 
         fun monthPeriodKey(month: Int): String = "$PERIOD_MONTH_PREFIX$month"
     }
-
-    private val _unscreened = MutableLiveData(TbGenderBreakdown())
-    val unscreened: LiveData<TbGenderBreakdown> get() = _unscreened
 
     private val _filters = MutableLiveData(DashboardFilterState())
     val filters: LiveData<DashboardFilterState> get() = _filters
@@ -170,6 +174,19 @@ class DashboardViewModel @Inject constructor(
 
     private var collectJobs = mutableListOf<Job>()
 
+    /**
+     * True only while the dashboard page is RESUMED (the visible ViewPager2 page).
+     * ViewPager2 keeps the off-screen page STARTED, so LiveData observers alone would keep
+     * ~70 Room COUNT queries re-running on every write while the user is elsewhere. When the
+     * page is hidden the queries are cancelled; the last values stay on screen and are
+     * refreshed as soon as the page becomes visible again.
+     */
+    private val dashboardVisible = MutableStateFlow(false)
+
+    fun setDashboardVisible(visible: Boolean) {
+        dashboardVisible.value = visible
+    }
+
     init {
         loadDashboardData()
     }
@@ -179,22 +196,30 @@ class DashboardViewModel @Inject constructor(
         loadDashboardData()
     }
 
-    private fun getAssignedVillageIds(): List<Int> =
-        villageList.flatMap { idsForVillage(it) }.distinct().ifEmpty { listOf(-1) }
+    private fun getAssignedVillageIds(villages: List<LocationEntity>): List<Int> =
+        villages.flatMap { idsForVillage(it) }.distinct().ifEmpty { listOf(-1) }
 
     /** Same village ids and living-beneficiary rules as the home Total Population card. */
-    private fun populationVillageIds(selectedVillageId: Int, selectedVillage: LocationEntity?): List<Int> {
+    private fun populationVillageIds(
+        villages: List<LocationEntity>,
+        selectedVillageId: Int,
+        selectedVillage: LocationEntity?
+    ): List<Int> {
         val ids = if (selectedVillageId == 0 || selectedVillage == null) {
-            villageList.map { it.id }.filter { it != 0 }.distinct()
+            villages.map { it.id }.filter { it != 0 }.distinct()
         } else {
             listOf(selectedVillage.id)
         }.ifEmpty { listOf(-1) }
         return if (ids.size == 1) listOf(ids.first(), ids.first()) else ids
     }
 
-    private fun idsForVillageFilter(selectedVillageId: Int, selectedVillage: LocationEntity?): List<Int> {
+    private fun idsForVillageFilter(
+        villages: List<LocationEntity>,
+        selectedVillageId: Int,
+        selectedVillage: LocationEntity?
+    ): List<Int> {
         val ids = if (selectedVillageId == 0 || selectedVillage == null) {
-            getAssignedVillageIds()
+            getAssignedVillageIds(villages)
         } else {
             idsForVillage(selectedVillage)
         }
@@ -281,65 +306,25 @@ class DashboardViewModel @Inject constructor(
 
         val (startTime, endTime) = getTimeRange()
         val selectedVillageId = _filters.value?.villageId ?: 0
-        val selectedVillage = villageList.firstOrNull { it.id == selectedVillageId }
+        // villageList decrypts and parses the logged-in user from prefs on every access: read once.
+        val villages = villageList
+        val selectedVillage = villages.firstOrNull { it.id == selectedVillageId }
         val villageName = if (selectedVillageId == 0) {
             ""
         } else {
             selectedVillage?.name?.substringBefore("(")?.trim().orEmpty()
         }
-        val assignedVillageIds = idsForVillageFilter(selectedVillageId, selectedVillage)
+        val assignedVillageIds = idsForVillageFilter(villages, selectedVillageId, selectedVillage)
 
         // Keep previous values on screen until new filtered results arrive (avoid flashing/sticking at 0).
 
-        collectBreakdown(
-            target = _tbScreening,
-            totalQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "", 0, 0) },
-            maleQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0, 0) },
-            femaleQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0, 0) },
-            childrenQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "", 1, 0) },
-            othersQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0, 0) },
-            seniorCitizenQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "", 0, 1) },
-        )
+        collectSection(_tbScreening) { tbDao.getDashboardTbScreeningBreakdown(assignedVillageIds, villageName, startTime, endTime) }
 
-        collectBreakdown(
-            target = _pastHistoryTb,
-            totalQuery = { tbDao.getDashboardPastHistoryTbCount(assignedVillageIds, villageName, startTime, endTime, "", 0, 0) },
-            maleQuery = { tbDao.getDashboardPastHistoryTbCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0, 0) },
-            femaleQuery = { tbDao.getDashboardPastHistoryTbCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0, 0) },
-            childrenQuery = { tbDao.getDashboardPastHistoryTbCount(assignedVillageIds, villageName, startTime, endTime, "", 1, 0) },
-            othersQuery = { tbDao.getDashboardPastHistoryTbCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0, 0) },
-            seniorCitizenQuery = { tbDao.getDashboardPastHistoryTbCount(assignedVillageIds, villageName, startTime, endTime, "", 0, 1) }
-        )
+        collectSection(_pastHistoryTb) { tbDao.getDashboardPastHistoryTbBreakdown(assignedVillageIds, villageName, startTime, endTime) }
 
-        collectBreakdown(
-            target = _antiTbDrugs,
-            totalQuery = { tbDao.getDashboardAntiTbDrugsCount(assignedVillageIds, villageName, startTime, endTime, "", 0, 0) },
-            maleQuery = { tbDao.getDashboardAntiTbDrugsCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0, 0) },
-            femaleQuery = { tbDao.getDashboardAntiTbDrugsCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0, 0) },
-            childrenQuery = { tbDao.getDashboardAntiTbDrugsCount(assignedVillageIds, villageName, startTime, endTime, "", 1, 0) },
-            othersQuery = { tbDao.getDashboardAntiTbDrugsCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0, 0) },
-            seniorCitizenQuery = { tbDao.getDashboardAntiTbDrugsCount(assignedVillageIds, villageName, startTime, endTime, "", 0, 1) }
-        )
+        collectSection(_antiTbDrugs) { tbDao.getDashboardAntiTbDrugsBreakdown(assignedVillageIds, villageName, startTime, endTime) }
 
-        collectBreakdown(
-            target = _presumptiveTb,
-            totalQuery = { tbDao.getDashboardPresumptiveTbCount(assignedVillageIds, villageName, startTime, endTime, "", 0) },
-            maleQuery = { tbDao.getDashboardPresumptiveTbCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0) },
-            femaleQuery = { tbDao.getDashboardPresumptiveTbCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0) },
-            childrenQuery = { tbDao.getDashboardPresumptiveTbCount(assignedVillageIds, villageName, startTime, endTime, "", 1) },
-            othersQuery = { tbDao.getDashboardPresumptiveTbCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0) },
-            seniorCitizenQuery = { zeroCountFlow() },
-        )
-
-        collectBreakdown(
-            target = _unscreened,
-            totalQuery = { tbDao.getDashboardUnscreenedCount(assignedVillageIds, villageName, startTime, endTime, "", 0) },
-            maleQuery = { tbDao.getDashboardUnscreenedCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0) },
-            femaleQuery = { tbDao.getDashboardUnscreenedCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0) },
-            childrenQuery = { tbDao.getDashboardUnscreenedCount(assignedVillageIds, villageName, startTime, endTime, "", 1) },
-            othersQuery = { tbDao.getDashboardUnscreenedCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0) },
-            seniorCitizenQuery = { zeroCountFlow() },
-        )
+        collectSection(_presumptiveTb) { tbDao.getDashboardPresumptiveTbBreakdown(assignedVillageIds, villageName, startTime, endTime) }
 
         collectBreakdown(
             target = _tbConfirmed,
@@ -351,63 +336,19 @@ class DashboardViewModel @Inject constructor(
             seniorCitizenQuery = { benDao.getDashboardFilteredTbConfirmedCount(assignedVillageIds, startTime, endTime, "", 0, 1) },
         )
 
-        collectBreakdown(
-            target = _digitalChestXray,
-            totalQuery = { tbDao.getDashboardDigitalChestXRayCount(assignedVillageIds, villageName, startTime, endTime, "", 0,0) },
-            maleQuery = { tbDao.getDashboardDigitalChestXRayCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0,0) },
-            femaleQuery = { tbDao.getDashboardDigitalChestXRayCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0,0) },
-            childrenQuery = { tbDao.getDashboardDigitalChestXRayCount(assignedVillageIds, villageName, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardDigitalChestXRayCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0,0) },
-            seniorCitizenQuery = { tbDao.getDashboardDigitalChestXRayCount(assignedVillageIds, villageName, startTime, endTime, "", 0,1) }
+        collectSection(_digitalChestXray) { tbDao.getDashboardDigitalChestXRayBreakdown(assignedVillageIds, villageName, startTime, endTime) }
 
-            )
+        collectSection(_sputumCollection) { tbDao.getDashboardSputumCollectionBreakdown(assignedVillageIds, villageName, startTime, endTime) }
 
-        collectBreakdown(
-            target = _sputumCollection,
-            totalQuery = { tbDao.getDashboardSputumCollectionCount(assignedVillageIds, villageName, startTime, endTime, "", 0,0) },
-            maleQuery = { tbDao.getDashboardSputumCollectionCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0,0) },
-            femaleQuery = { tbDao.getDashboardSputumCollectionCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0,0) },
-            childrenQuery = { tbDao.getDashboardSputumCollectionCount(assignedVillageIds, villageName, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardSputumCollectionCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0,0) },
-            seniorCitizenQuery = { tbDao.getDashboardSputumCollectionCount(assignedVillageIds, villageName, startTime, endTime, "", 0,1) }
+        collectSection(_trueNat) { tbDao.getDashboardTrueNatBreakdown(assignedVillageIds, villageName, startTime, endTime) }
 
-            )
+        collectSection(_liquidCulture) { tbDao.getDashboardLiquidCultureBreakdown(assignedVillageIds, villageName, startTime, endTime) }
 
-        collectBreakdown(
-            target = _trueNat,
-            totalQuery = { tbDao.getDashboardTrueNatCount(assignedVillageIds, villageName, startTime, endTime, "", 0,0) },
-            maleQuery = { tbDao.getDashboardTrueNatCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0,0) },
-            femaleQuery = { tbDao.getDashboardTrueNatCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0,0) },
-            childrenQuery = { tbDao.getDashboardTrueNatCount(assignedVillageIds, villageName, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardTrueNatCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0,0) },
-            seniorCitizenQuery = { tbDao.getDashboardTrueNatCount(assignedVillageIds, villageName, startTime, endTime, "", 0,1) }
+        collectSection(_hwcReferral) { tbDao.getDashboardHwcReferralBreakdown(assignedVillageIds, villageName, startTime, endTime) }
 
-            )
-
-        collectBreakdown(
-            target = _liquidCulture,
-            totalQuery = { tbDao.getDashboardLiquidCultureCount(assignedVillageIds, villageName, startTime, endTime, "", 0,0) },
-            maleQuery = { tbDao.getDashboardLiquidCultureCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0,0) },
-            femaleQuery = { tbDao.getDashboardLiquidCultureCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0,0) },
-            childrenQuery = { tbDao.getDashboardLiquidCultureCount(assignedVillageIds, villageName, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardLiquidCultureCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0,0) },
-            seniorCitizenQuery = { tbDao.getDashboardLiquidCultureCount(assignedVillageIds, villageName, startTime, endTime, "", 0,1) },
-
-            )
-
-        collectBreakdown(
-            target = _hwcReferral,
-            totalQuery = { tbDao.getDashboardHwcReferralCount(assignedVillageIds, villageName, startTime, endTime, "", 0,0) },
-            maleQuery = { tbDao.getDashboardHwcReferralCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0,0) },
-            femaleQuery = { tbDao.getDashboardHwcReferralCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0,0) },
-            childrenQuery = { tbDao.getDashboardHwcReferralCount(assignedVillageIds, villageName, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardHwcReferralCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0,0) },
-            seniorCitizenQuery = { tbDao.getDashboardHwcReferralCount(assignedVillageIds, villageName, startTime, endTime, "", 0,1) }
-
-            )
-
+        val populationIds = populationVillageIds(villages, selectedVillageId, selectedVillage)
         collectJobs += viewModelScope.launch {
-            benDao.getVillageHeadcount(populationVillageIds(selectedVillageId, selectedVillage))
+            whileVisible { benDao.getVillageHeadcount(populationIds) }
                 .collect { headcount ->
                     _coverage.value = CoverageStats(
                         population = headcount.population,
@@ -417,15 +358,7 @@ class DashboardViewModel @Inject constructor(
                 }
         }
 
-        collectBreakdown(
-            target = _nikshayCount,
-            totalQuery = { tbDao.getDashboardNikshayCount(assignedVillageIds, villageName, startTime, endTime, "", 0, 0) },
-            maleQuery = { tbDao.getDashboardNikshayCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0, 0) },
-            femaleQuery = { tbDao.getDashboardNikshayCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0, 0) },
-            childrenQuery = { tbDao.getDashboardNikshayCount(assignedVillageIds, villageName, startTime, endTime, "", 1, 0) },
-            othersQuery = { tbDao.getDashboardNikshayCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0, 0) },
-            seniorCitizenQuery = { tbDao.getDashboardNikshayCount(assignedVillageIds, villageName, startTime, endTime, "", 0, 1) },
-        )
+        collectSection(_nikshayCount) { tbDao.getDashboardNikshayBreakdown(assignedVillageIds, villageName, startTime, endTime) }
 
         collectBreakdown(
             target = _abhaCount,
@@ -453,27 +386,53 @@ class DashboardViewModel @Inject constructor(
         seniorCitizenQuery: () -> Flow<Int>,
     ) {
         collectJobs += viewModelScope.launch {
-            kotlinx.coroutines.flow.combine(
-                totalQuery(),
-                maleQuery(),
-                femaleQuery(),
-                childrenQuery(),
-                othersQuery(),
-                seniorCitizenQuery()
-            ) { values ->
-                TbGenderBreakdown(
-                    total = values[0],
-                    male = values[1],
-                    female = values[2],
-                    children = values[3],
-                    others = values[4],
-                    seniorCitizen = values[5]
-                )
-            }.collect { breakdown ->
+            whileVisible {
+                combine(
+                    totalQuery(),
+                    maleQuery(),
+                    femaleQuery(),
+                    childrenQuery(),
+                    othersQuery(),
+                    seniorCitizenQuery()
+                ) { values ->
+                    TbGenderBreakdown(
+                        total = values[0],
+                        male = values[1],
+                        female = values[2],
+                        children = values[3],
+                        others = values[4],
+                        seniorCitizen = values[5]
+                    )
+                }
+            }.distinctUntilChanged().collect { breakdown ->
                 target.value = breakdown
             }
         }
     }
+
+    /**
+     * One query returns all six numbers of a section (TbDashboardBreakdownQueries), instead of
+     * six COUNT queries that each re-ran on every write.
+     */
+    private fun collectSection(target: MutableLiveData<TbGenderBreakdown>, query: () -> Flow<DashboardBreakdownCounts>) {
+        collectJobs += viewModelScope.launch {
+            whileVisible(query).distinctUntilChanged().collect { counts ->
+                target.value = TbGenderBreakdown(
+                    total = counts.total,
+                    male = counts.male,
+                    female = counts.female,
+                    children = counts.children,
+                    others = counts.others,
+                    seniorCitizen = counts.seniorCitizen
+                )
+            }
+        }
+    }
+
+    /** Runs the Room queries built by [queries] only while the dashboard is visible. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun <T> whileVisible(queries: () -> Flow<T>): Flow<T> =
+        dashboardVisible.flatMapLatest { visible -> if (visible) queries() else emptyFlow() }
 
     // private fun collectPositiveNegativeBreakdown(
     //     target: MutableLiveData<TbPositiveNegativeBreakdown>,

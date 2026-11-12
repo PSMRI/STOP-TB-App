@@ -25,7 +25,7 @@ import java.util.TimeZone
         onUpdate = ForeignKey.CASCADE,
         onDelete = ForeignKey.CASCADE
     )],
-    indices = [Index(name = "ind_cbac", value = ["benId"/* "hhId"*/])]
+    indices = [Index(name = "ind_cbac", value = ["benId"/* "hhId"*/]), Index(name = "ind_cbac_sync", value = ["syncState"])]
 )
 data class CbacCache(
     @PrimaryKey(autoGenerate = true)

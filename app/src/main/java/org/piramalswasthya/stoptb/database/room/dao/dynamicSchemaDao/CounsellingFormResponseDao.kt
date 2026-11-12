@@ -91,6 +91,10 @@ interface CounsellingFormResponseDao {
     @Query("SELECT * FROM t_form_response")
     suspend fun getAllFormResponses(): List<CompleteFormResponse>
 
+    /** PR 6: the live responses of one form version, without their section/question rows. */
+    @Query("SELECT * FROM t_form_response WHERE formVersionId = :formVersionId AND isHistorySnapshot = 0")
+    suspend fun getLiveResponsesForVersion(formVersionId: Int): List<FormResponseEntity>
+
     // isHistorySnapshot = 0 keeps this scoped to the live response only, so re-syncing the
     // current response (e.g. the village-wide Contact/TPT prefetch in PullTBFromAmritWorker)
     // never deletes previously stored TPT Follow-up History snapshot rows (see refreshTptHistory),

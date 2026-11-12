@@ -1,10 +1,16 @@
 package org.piramalswasthya.stoptb.repositories
 
 import androidx.room.withTransaction
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.flow.flowOn
+import org.piramalswasthya.stoptb.utils.throttleLatest
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.withLock
 import org.piramalswasthya.stoptb.helpers.SyncDailyStore
 import org.json.JSONArray
 import org.json.JSONObject
@@ -24,19 +30,34 @@ import java.net.SocketTimeoutException
 import java.text.SimpleDateFormat
 import java.util.Locale
 import javax.inject.Inject
+import javax.inject.Singleton
 
+/**
+ * Singleton: [vitalBenIdStates] is shared in the process-wide app scope, so each extra instance
+ * would leave its sharing coroutine (and this repo) alive for the life of the process.
+ */
+@Singleton
 class VitalRepo @Inject constructor(
     private val vitalDao: VitalDao,
     private val benDao: BenDao,
     private val preferenceDao: PreferenceDao,
     private val userRepo: UserRepo,
     private val tmcNetworkApiService: AmritApiService,
-    private val database: InAppDb
+    private val database: InAppDb,
+    @org.piramalswasthya.stoptb.di.ApplicationScope private val appScope: kotlinx.coroutines.CoroutineScope
 ) {
 
     private companion object {
         /** Records per write transaction in the general-examination pull. */
         const val pullWriteChunkSize = 500
+        /** Records per push request (PR 7.3), same as the TB pushes. */
+        const val VITALS_CHUNK_SIZE = 20
+
+        /**
+         * PR 7.4: serializes the background push and the push right after a save, which could
+         * POST the same vital twice. Kept in the companion so it stays process-wide.
+         */
+        private val pushMutex = kotlinx.coroutines.sync.Mutex()
     }
 
     suspend fun getVitals(benId: Long): VitalCache? {
@@ -51,12 +72,16 @@ class VitalRepo @Inject constructor(
      */
     private val vitalBenIdStates: Flow<List<org.piramalswasthya.stoptb.model.BenIdSyncState>> =
         vitalDao.getVitalBenIdSyncStates()
+            // One query shared by all three sets and every collector of this repo instance,
+            // delivering at most 2 updates/s to the list screens during sync.
+            .throttleLatest(500L)
+            .shareIn(appScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), replay = 1)
 
-    val vitalBenIds: Flow<List<Long>> = vitalBenIdStates.map { rows -> rows.map { it.benId } }
+    val vitalBenIds: Flow<List<Long>> = vitalBenIdStates.map { rows -> rows.map { it.benId } }.flowOn(Dispatchers.Default)
     val unsyncedVitalBenIds: Flow<List<Long>> =
-        vitalBenIdStates.map { rows -> rows.filter { it.syncState == SyncState.UNSYNCED }.map { it.benId } }
+        vitalBenIdStates.map { rows -> rows.filter { it.syncState == SyncState.UNSYNCED }.map { it.benId } }.flowOn(Dispatchers.Default)
     val syncingVitalBenIds: Flow<List<Long>> =
-        vitalBenIdStates.map { rows -> rows.filter { it.syncState == SyncState.SYNCING }.map { it.benId } }
+        vitalBenIdStates.map { rows -> rows.filter { it.syncState == SyncState.SYNCING }.map { it.benId } }.flowOn(Dispatchers.Default)
 
     suspend fun saveVitals(vitalCache: VitalCache) {
         withContext(Dispatchers.IO) {
@@ -72,43 +97,92 @@ class VitalRepo @Inject constructor(
             vitalDao.saveVitals(localData)
             SyncDailyStore.record("GENERAL_EXAMINATION", listOf(localData.benId), "SAVE", "SUCCESS")
 
-            // Network failures leave the record UNSYNCED for the background push.
-            val synced = try {
-                pushSingleVital(localData)
-            } catch (e: IOException) {
-                Timber.w(e, "Vital push deferred to background sync for benId=%s", localData.benId)
-                false
-            }
-
-            if (synced) {
-                if (vitalDao.markSyncedIfUnchanged(localData)) {
-                    SyncDailyStore.record("GENERAL_EXAMINATION", listOf(localData.benId), "PUSH", "SUCCESS")
+            // Network failures leave the record UNSYNCED for the background push. If that push is
+            // running, don't make the form wait for its whole queue: it (or the next cycle) sends
+            // this row, which is already stored as UNSYNCED.
+            if (!pushMutex.tryLock()) {
+                // The running push may have read its queue before this save, so queue one more
+                // pass behind it (pushUnSyncedVitals waits for the same mutex) instead of leaving
+                // the row for an unrelated later trigger.
+                Timber.d("Vital push for benId=%s queued behind the running background push", localData.benId)
+                appScope.launch(Dispatchers.IO) {
+                    try {
+                        pushUnSyncedVitals()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Timber.w(e, "Follow-up vitals push failed; the row stays UNSYNCED for the next sync")
+                    }
                 }
+                return@withContext false
             }
+            try {
+                val synced = try {
+                    pushSingleVital(localData)
+                } catch (e: IOException) {
+                    Timber.w(e, "Vital push deferred to background sync for benId=%s", localData.benId)
+                    false
+                }
 
-            synced
+                if (synced) {
+                    if (vitalDao.markSyncedIfUnchanged(localData)) {
+                        SyncDailyStore.record("GENERAL_EXAMINATION", listOf(localData.benId), "PUSH", "SUCCESS")
+                    }
+                }
+
+                synced
+            } finally {
+                pushMutex.unlock()
+            }
         }
     }
 
-    suspend fun pushUnSyncedVitals(): Boolean {
-        return withContext(Dispatchers.IO) {
+    /**
+     * Pushes UNSYNCED vitals in chunks of [VITALS_CHUNK_SIZE] (PR 7.3; it was one request per
+     * record). stoptb/nurse/generalExamination/save takes a list in one transaction with the
+     * same per-beneficiary, per-day visit handling as single sends. A rejected chunk is retried
+     * one record at a time, so one bad record does not hold back the rest. Records whose
+     * beneficiary has no server benRegId yet are not sent and stay UNSYNCED, as before. Each
+     * sent chunk is marked SYNCED in one transaction, only for rows unchanged since read.
+     * A network error still stops the run (thrown, as before) so the worker retries.
+     */
+    suspend fun pushUnSyncedVitals(): Boolean = pushMutex.withLock {
+        withContext(Dispatchers.IO) {
             val vitals = vitalDao.getVitals(SyncState.UNSYNCED)
             if (vitals.isEmpty()) {
                 org.piramalswasthya.stoptb.helpers.logSyncModule("GENERAL_EXAMINATION", "PUSH",
                     "NO_PENDING_DATA", "pending" to 0)
                 return@withContext true
             }
+            val user = preferenceDao.getLoggedInUser() ?: return@withContext true
 
             var successCount = 0
             var failCount = 0
+            val queue = ArrayDeque(vitals.chunked(VITALS_CHUNK_SIZE))
 
-            vitals.forEach { vital ->
-                val synced = pushSingleVital(vital)
-                if (synced) {
-                    if (vitalDao.markSyncedIfUnchanged(vital)) {
-                        SyncDailyStore.record("GENERAL_EXAMINATION", listOf(vital.benId), "PUSH", "SUCCESS")
-                        successCount += 1
+            while (queue.isNotEmpty()) {
+                val chunk = queue.removeFirst()
+                val sendable = chunk.mapNotNull { vital ->
+                    val benRegId = benDao.getBen(vital.benId)?.benRegId?.takeIf { it > 0L }
+                    if (benRegId == null) {
+                        Timber.d("Vital push waiting for beneficiary registration: benId=%s", vital.benId)
+                        null
+                    } else {
+                        vital to benRegId
                     }
+                }
+                failCount += chunk.size - sendable.size
+                if (sendable.isEmpty()) continue
+
+                if (pushVitalChunk(sendable, user)) {
+                    val markedBenIds = database.withTransaction {
+                        sendable.filter { (vital, _) -> vitalDao.markSyncedIfUnchanged(vital) }
+                            .map { (vital, _) -> vital.benId }
+                    }
+                    SyncDailyStore.record("GENERAL_EXAMINATION", markedBenIds, "PUSH", "SUCCESS")
+                    successCount += markedBenIds.size
+                } else if (sendable.size > 1) {
+                    sendable.forEach { (vital, _) -> queue.addLast(listOf(vital)) }
                 } else {
                     failCount += 1
                 }
@@ -193,7 +267,7 @@ class VitalRepo @Inject constructor(
 
     // Network failures (IOException) propagate so the push worker retries with
     // backoff. A token refresh is retried at most once.
-    private suspend fun pushSingleVital(vitalCache: VitalCache, retriedAfterRefresh: Boolean = false): Boolean {
+    private suspend fun pushSingleVital(vitalCache: VitalCache): Boolean {
         val user = preferenceDao.getLoggedInUser() ?: return false
 
         // The benRegId stored with the vital is the one known when the form was
@@ -204,14 +278,22 @@ class VitalRepo @Inject constructor(
             Timber.d("Vital push waiting for beneficiary registration: benId=%s", vitalCache.benId)
             return false
         }
+        return pushVitalChunk(listOf(vitalCache to benRegId), user)
+    }
 
+    /** One save request for [records] (vital to current benRegId); true when the server accepted it. */
+    private suspend fun pushVitalChunk(
+        records: List<Pair<VitalCache, Long>>,
+        user: org.piramalswasthya.stoptb.model.User,
+        retriedAfterRefresh: Boolean = false
+    ): Boolean {
         return try {
             val response = tmcNetworkApiService.saveGeneralExamination(
-                listOf(GeneralExaminationSaveRequest.from(vitalCache.copy(benRegId = benRegId), user))
+                records.map { (vital, benRegId) -> GeneralExaminationSaveRequest.from(vital.copy(benRegId = benRegId), user) }
             )
 
             val responseBody = response.body()?.string()
-            SyncDailyStore.response("GENERAL_EXAMINATION", listOf(vitalCache.benId), response.code(), responseBody)
+            SyncDailyStore.response("GENERAL_EXAMINATION", records.map { (vital, _) -> vital.benId }, response.code(), responseBody)
 
             if (!response.isSuccessful || responseBody.isNullOrBlank()) {
                 return false
@@ -224,7 +306,7 @@ class VitalRepo @Inject constructor(
 
                 401, 5002 -> {
                     if (!retriedAfterRefresh && userRepo.refreshTokenTmc(user.userName, user.password)) {
-                        pushSingleVital(vitalCache, retriedAfterRefresh = true)
+                        pushVitalChunk(records, user, retriedAfterRefresh = true)
                     } else {
                         false
                     }
@@ -234,14 +316,14 @@ class VitalRepo @Inject constructor(
             }
 
         } catch (e: IOException) {
-            SyncDailyStore.record("GENERAL_EXAMINATION", listOf(vitalCache.benId), "PUSH", "FAILURE", "NETWORK_${e.javaClass.simpleName}")
+            SyncDailyStore.record("GENERAL_EXAMINATION", records.map { (vital, _) -> vital.benId }, "PUSH", "FAILURE", "NETWORK_${e.javaClass.simpleName}")
             throw e
         } catch (e: Exception) {
             if (!retriedAfterRefresh && shouldRetryWithRefresh(e, user.userName, user.password)) {
-                pushSingleVital(vitalCache, retriedAfterRefresh = true)
+                pushVitalChunk(records, user, retriedAfterRefresh = true)
             } else {
-                Timber.e(e, "Vital sync failed for benId=%s", vitalCache.benId)
-                SyncDailyStore.record("GENERAL_EXAMINATION", listOf(vitalCache.benId), "PUSH", "FAILURE", "EXCEPTION_${e.javaClass.simpleName}")
+                Timber.e(e, "Vital sync failed for benIds=%s", records.map { (vital, _) -> vital.benId })
+                SyncDailyStore.record("GENERAL_EXAMINATION", records.map { (vital, _) -> vital.benId }, "PUSH", "FAILURE", "EXCEPTION_${e.javaClass.simpleName}")
                 false
             }
         }

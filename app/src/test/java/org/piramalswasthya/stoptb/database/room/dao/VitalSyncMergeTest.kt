@@ -18,6 +18,7 @@ class VitalSyncMergeTest {
         override fun getAllVitalBenIds(): Flow<List<Long>> = flowOf(emptyList())
         override fun getVitalBenIdSyncStates(): Flow<List<BenIdSyncState>> = flowOf(emptyList())
         override fun getVitalBenIdsBySyncState(syncState: SyncState): Flow<List<Long>> = flowOf(emptyList())
+        override fun getVitalBenIdSyncStatesIn(benIds: Collection<Long>): Flow<List<BenIdSyncState>> = flowOf(emptyList())
     }
 
     @Test fun unchangedRecordReportsActualSyncAndWritesOnce() = runBlocking {

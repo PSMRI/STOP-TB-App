@@ -54,7 +54,7 @@ class NcdFragment : Fragment() {
             IconGridAdapter.GridIconClickListener {
                 findNavController().navigateSafe(it)
             },
-            viewModel.scope
+            viewLifecycleOwner
         )
         binding.rvIconGrid.adapter = iconAdapter
         iconAdapter.submitList(iconDataset.getNCDDataset(resources))

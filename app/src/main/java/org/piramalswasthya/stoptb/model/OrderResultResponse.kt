@@ -19,5 +19,9 @@ data class OrderResultData(
     val resultSummary: String? = null,
     val tbPresence: Boolean? = null,
     val drugResistancePresence: Boolean? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    // Why the order was closed without a result ("Not Conducted" / sputum not collected), as
+    // entered on the tablet that closed it: one of the English option values, or "Other: <text>".
+    // Sent by order/result and the changes feed; null for every other status.
+    val reasonToClose: String? = null
 )

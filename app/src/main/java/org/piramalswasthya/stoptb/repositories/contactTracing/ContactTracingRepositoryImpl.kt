@@ -3,6 +3,7 @@ package org.piramalswasthya.stoptb.repositories.contactTracing
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.room.withTransaction
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -467,8 +468,22 @@ class ContactTracingRepositoryImpl @Inject constructor(
         )
     }
 
-    override suspend fun submitResponseBulk(responseId: Long, phaseFilter: String?): Boolean {
+    // The form calls this directly; the background sweep calls the unlocked body below while
+    // holding syncMutex. Both under the one lock, so a user submit and a sweep can't POST the
+    // same response at the same time.
+    override suspend fun submitResponseBulk(responseId: Long, phaseFilter: String?): Boolean =
+        syncMutex.withLock { submitResponseBulkLocked(responseId, phaseFilter) }
+
+    private suspend fun submitResponseBulkLocked(responseId: Long, phaseFilter: String?): Boolean {
         val resp = responseDao.getFormResponseById(responseId) ?: return true
+        // Already sent with its current content: by the sweep while this call waited for the
+        // lock. Every edit, and submitResponse, sets the row UNSYNCED with a new updatedAt, and
+        // markSyncedIfUnchanged only marks the content it sent. The sweep's payload (no phase
+        // filter) holds every answered section, so it covers any single phase too.
+        if (resp.formResponse.syncStatus == "SYNCED") {
+            Timber.d("submitResponseBulk: responseId=$responseId already synced, not sent again")
+            return true
+        }
         if (resp.formResponse.beneficiaryId <= 0L) {
             // Saved before the beneficiary was registered; sent once registration
             // re-points it to the real ID. Stays UNSYNCED until then.
@@ -951,7 +966,13 @@ class ContactTracingRepositoryImpl @Inject constructor(
         )
     }
 
-    override suspend fun syncUnsyncedResponses(): Boolean {
+    // PR 7.4: PushContactTracingWorker and ContactTracingSyncWorker both call this; overlapping
+    // runs submitted the same responses twice. Serialized like CounsellingRepositoryImpl's sync.
+    private val syncMutex = kotlinx.coroutines.sync.Mutex()
+
+    override suspend fun syncUnsyncedResponses(): Boolean = syncMutex.withLock { syncUnsyncedResponsesLocked() }
+
+    private suspend fun syncUnsyncedResponsesLocked(): Boolean {
         val unsynced = responseDao.getUnsyncedFormResponsesForTypes(
             listOf(
                 FormType.COMMUNITY_CONTACT_TRACING.name,
@@ -963,7 +984,7 @@ class ContactTracingRepositoryImpl @Inject constructor(
         Timber.d("syncUnsyncedResponses: ${unsynced.size} contact tracing record(s) pending sync")
         var allSuccess = true
         for (resp in unsynced) {
-            if (!submitResponseBulk(resp.formResponse.responseId)) {
+            if (!submitResponseBulkLocked(resp.formResponse.responseId, null)) {
                 allSuccess = false
             }
         }
