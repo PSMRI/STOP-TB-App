@@ -21,8 +21,17 @@ class TBSuspectedListViewModel @Inject constructor(
     // PR 6: paged, and the search runs in SQL. The whole village used to be loaded and
     // filtered in Kotlin on every keystroke and every database write.
     @OptIn(ExperimentalCoroutinesApi::class)
+    /**
+     * The query the latest paged data was built for (the filter value, before any trimming).
+     * The screen passes it to ListTransitions.onDataSubmitted, so new pages of the previous query
+     * (a write invalidating them during the search debounce) can't take the new search's scroll.
+     */
+    @Volatile
+    var appliedQuery: String? = null
+        private set
+
     val benList = filter.debounceTyping()
-        .flatMapLatest { query -> recordsRepo.tbPresumptivePaged(query) }
+        .flatMapLatest { query -> appliedQuery = query; recordsRepo.tbPresumptivePaged(query) }
         .cachedIn(viewModelScope)
 
     fun filterText(text: String) {

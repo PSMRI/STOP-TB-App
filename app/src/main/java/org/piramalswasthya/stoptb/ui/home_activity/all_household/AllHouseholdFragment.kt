@@ -131,7 +131,7 @@ class AllHouseholdFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch { viewModel.householdList.collectLatest { page -> listTransitions.onDataSubmitted(); householdAdapter.submitData(page) } }
+                launch { viewModel.householdList.collectLatest { page -> listTransitions.onDataSubmitted(viewModel.appliedQuery); householdAdapter.submitData(page) } }
                 launch {
                     // PR 6 UX: spinner while the first page loads (the screen was blank before).
                     householdAdapter.renderListStates(onSettled = { listTransitions.onSettled() }, errorAnchor = binding.root, render = { awaitingFirstLoad, isEmpty ->

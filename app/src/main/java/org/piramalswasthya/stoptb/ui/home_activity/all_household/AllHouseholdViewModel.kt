@@ -41,8 +41,17 @@ class AllHouseholdViewModel @Inject constructor(
 
     // PR 6: paged; the search and the sort that ran over the whole list in Kotlin are in SQL.
     @OptIn(ExperimentalCoroutinesApi::class)
+    /**
+     * The query the latest paged data was built for (the filter value, before any trimming).
+     * The screen passes it to ListTransitions.onDataSubmitted, so new pages of the previous query
+     * (a write invalidating them during the search debounce) can't take the new search's scroll.
+     */
+    @Volatile
+    var appliedQuery: String? = null
+        private set
+
     val householdList: Flow<PagingData<HouseHoldBasicDomain>> = filter.debounceTyping()
-        .flatMapLatest { query -> recordsRepo.householdsPaged(query.trim().lowercase()) }
+        .flatMapLatest { query -> appliedQuery = query; recordsRepo.householdsPaged(query.trim().lowercase()) }
         .cachedIn(viewModelScope)
 
     private var _selectedHouseholdId: Long = 0L

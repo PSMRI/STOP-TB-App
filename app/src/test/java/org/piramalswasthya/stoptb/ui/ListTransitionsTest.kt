@@ -24,7 +24,7 @@ class ListTransitionsTest {
     /** The first load of the screen, before any search. */
     private fun openScreen() {
         transitions.onQueryChanged("")
-        transitions.onDataSubmitted()
+        transitions.onDataSubmitted("")
         refresh(loading, done)
         scrolls = 0
     }
@@ -35,7 +35,7 @@ class ListTransitionsTest {
         // the listener sees both.
         openScreen()
         transitions.onQueryChanged("ram")
-        transitions.onDataSubmitted()
+        transitions.onDataSubmitted("ram")
         refresh(loading, done)
         assertEquals(1, scrolls)
         assertTrue(tracker.firstLoadSettled)
@@ -45,12 +45,12 @@ class ListTransitionsTest {
     fun theOldQueryFinishingDuringTheDebounceDoesNotSettleTheNewOne() {
         openScreen()
         transitions.onQueryChanged("r")
-        transitions.onDataSubmitted()
+        transitions.onDataSubmitted("r")
         refresh(loading)
         transitions.onQueryChanged("ra") // typed on; "ra" is still debouncing
         refresh(done) // "r" finishes
         assertEquals(0, scrolls)
-        transitions.onDataSubmitted() // "ra" submitted
+        transitions.onDataSubmitted("ra") // "ra" submitted
         refresh(loading, done)
         assertEquals(1, scrolls)
     }
@@ -61,10 +61,10 @@ class ListTransitionsTest {
         // reported, only the final NotLoading.
         openScreen()
         transitions.onQueryChanged("r")
-        transitions.onDataSubmitted()
+        transitions.onDataSubmitted("r")
         refresh(loading)
         transitions.onQueryChanged("ra")
-        transitions.onDataSubmitted()
+        transitions.onDataSubmitted("ra")
         refresh(done)
         assertEquals(1, scrolls)
     }
@@ -74,7 +74,7 @@ class ListTransitionsTest {
         openScreen()
         refresh(loading, done) // a sync write invalidated the list
         transitions.onQueryChanged("") // same query again, e.g. a trimmed trailing space
-        transitions.onDataSubmitted()
+        transitions.onDataSubmitted("")
         refresh(loading, done)
         assertEquals(0, scrolls)
     }
@@ -83,7 +83,7 @@ class ListTransitionsTest {
     fun eachSearchScrollsOnceOnly() {
         openScreen()
         transitions.onQueryChanged("ram")
-        transitions.onDataSubmitted()
+        transitions.onDataSubmitted("ram")
         refresh(loading, done)
         refresh(loading, done) // later reloads of the same results keep the user's position
         assertEquals(1, scrolls)
@@ -93,10 +93,36 @@ class ListTransitionsTest {
     fun aFailedRefreshThatIsRetriedSettlesWhenTheRetryFinishes() {
         openScreen()
         transitions.onQueryChanged("ram")
-        transitions.onDataSubmitted()
+        transitions.onDataSubmitted("ram")
         refresh(loading, LoadState.Error(IllegalStateException("db")))
         assertEquals(0, scrolls)
         refresh(loading, done)
         assertEquals(1, scrolls)
+    }
+
+    @Test
+    fun theOldQuerysPagesReloadedDuringTheDebounceDoNotTakeTheScroll() {
+        // A write invalidates the old query's source while the new query is debouncing: the pager
+        // emits a new generation of the old query's pages, which is submitted and refreshed.
+        openScreen()
+        transitions.onQueryChanged("r")
+        transitions.onDataSubmitted("r")
+        refresh(loading, done)
+        assertEquals(1, scrolls)
+        transitions.onQueryChanged("ra") // "ra" debouncing
+        transitions.onDataSubmitted("r") // new generation of "r" after a sync write
+        refresh(loading, done)
+        assertEquals(1, scrolls)
+        transitions.onDataSubmitted("ra") // "ra" arrives
+        refresh(loading, done)
+        assertEquals(2, scrolls)
+    }
+
+    @Test
+    fun dataWhoseQueryIsNotKnownYetNeverTakesTheScroll() {
+        transitions.onQueryChanged("ram")
+        transitions.onDataSubmitted(null)
+        refresh(loading, done)
+        assertEquals(0, scrolls)
     }
 }
