@@ -24,8 +24,11 @@ fun <T> Flow<T>.throttleLatest(periodMs: Long): Flow<T> = flow {
         }
         try {
             while (true) {
-                val value = values.receiveCatching().getOrNull() ?: break
-                emit(value)
+                // isClosed, not a null check: a Flow<T?> may emit null, which must be delivered.
+                val received = values.receiveCatching()
+                if (received.isClosed) break
+                @Suppress("UNCHECKED_CAST")
+                emit(received.getOrNull() as T)
                 delay(periodMs)
             }
         } finally {

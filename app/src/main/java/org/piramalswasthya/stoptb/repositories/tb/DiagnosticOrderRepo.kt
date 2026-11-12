@@ -415,7 +415,7 @@ class DiagnosticOrderRepo @Inject constructor(
         try {
             benIdLocks.withLock(benId) {
                 val updated = suspectedFromDiagnostics(tbDao.getTbSuspected(benId), benId, diag, reasonForRefusalMDRRIF)
-                if (updated != null) tbLocalRepo.saveTBSuspected(updated)
+                if (updated != null) tbLocalRepo.saveTBSuspectedLocked(updated)
             }
         } catch (e: Exception) {
             Timber.e(e, "syncTBSuspectedFromDiagnostics failed for benId=$benId")

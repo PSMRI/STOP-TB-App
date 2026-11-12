@@ -65,8 +65,17 @@ internal fun parseServerUpdateDate(dateString: String?): Long {
     // an unparseable updateDate became 0L, and shouldApplyServerRecord() treats 0L as
     // "no server timestamp, apply it" - so every record was rewritten on every pull
     // instead of only the changed ones, invalidating every observing query each time.
-    return ServerDateParser.parse(dateString, serverUpdateDatePatterns) ?: 0L
+    return ServerDateParser.parse(dateString, serverUpdateDatePatterns) ?: run {
+        // Still 0L (apply the record), but no longer silent: a format the patterns don't know
+        // makes every pull rewrite those records. Logged once per distinct string.
+        if (unparseableUpdateDates.add(dateString) && unparseableUpdateDates.size <= 20) {
+            Timber.w("Unparseable server updateDate \"%s\": add its format to serverUpdateDatePatterns", dateString)
+        }
+        0L
+    }
 }
+
+private val unparseableUpdateDates: MutableSet<String> = java.util.Collections.synchronizedSet(HashSet())
 
 internal val serverUpdateDatePatterns = listOf(
     "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",

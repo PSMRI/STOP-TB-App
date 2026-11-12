@@ -184,6 +184,22 @@ class TbLocalRepo @Inject constructor(
                         cache.rifOrderId = fresh.rifOrderId
                         cache.rifOrderStatus = fresh.rifOrderStatus
                     }
+                    // Same order id, but the snapshot still says PENDING while a result arrived
+                    // meanwhile (changes feed, poll, manual entry on another path): keep the
+                    // fresh status and result. An order never goes back from a final status to
+                    // PENDING through a form snapshot; a re-order gets a new order id instead.
+                    if (isStalePending(cache.xrayOrderStatus, fresh.xrayOrderStatus)) {
+                        cache.xrayOrderStatus = fresh.xrayOrderStatus
+                        cache.chestXRayResult = cache.chestXRayResult ?: fresh.chestXRayResult
+                    }
+                    if (isStalePending(cache.trueNatOrderStatus, fresh.trueNatOrderStatus)) {
+                        cache.trueNatOrderStatus = fresh.trueNatOrderStatus
+                        cache.naatResult = cache.naatResult ?: fresh.naatResult
+                    }
+                    if (isStalePending(cache.rifOrderStatus, fresh.rifOrderStatus)) {
+                        cache.rifOrderStatus = fresh.rifOrderStatus
+                        cache.trueNatRifResult = cache.trueNatRifResult ?: fresh.trueNatRifResult
+                    }
                 }
                 tbDao.saveTbDiagnostics(cache)
             }
@@ -193,13 +209,28 @@ class TbLocalRepo @Inject constructor(
         }
     }
 
+    /** The snapshot's order is still PENDING (or unset) while the saved row has moved past it. */
+    private fun isStalePending(snapshotStatus: String?, freshStatus: String?): Boolean {
+        fun pending(status: String?) = status.isNullOrBlank() || status.equals("PENDING", ignoreCase = true)
+        return pending(snapshotStatus) && !pending(freshStatus)
+    }
+
     suspend fun getTBSuspected(benId: Long): TBSuspectedCache? {
         return withContext(Dispatchers.IO) {
             tbDao.getTbSuspected(benId)
         }
     }
 
+    /**
+     * Form saves take the beneficiary's lock, like syncTBSuspectedFromDiagnostics' read-and-write,
+     * so that sync can't write a row derived from a read taken before this save.
+     */
     suspend fun saveTBSuspected(tbSuspectedCache: TBSuspectedCache) {
+        benIdLocks.withLock(tbSuspectedCache.benId) { saveTBSuspectedLocked(tbSuspectedCache) }
+    }
+
+    /** [saveTBSuspected] for a caller that already holds this beneficiary's lock (Mutex isn't reentrant). */
+    internal suspend fun saveTBSuspectedLocked(tbSuspectedCache: TBSuspectedCache) {
         withContext(Dispatchers.IO) {
             benDao.getBen(tbSuspectedCache.benId)?.let { ben ->
                 ben.gpsLatitude?.let { tbSuspectedCache.latitude = it }

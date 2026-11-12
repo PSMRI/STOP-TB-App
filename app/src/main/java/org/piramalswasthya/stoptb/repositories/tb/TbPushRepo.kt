@@ -723,7 +723,9 @@ class TbPushRepo @Inject constructor(
         benIdLocks.withLocks(tbspList.map { it.benId }) {
             database.withTransaction {
                 tbspList.forEach perRecord@ { pushed ->
-                    val fresh = tbDao.getTbSuspected(pushed.benId) ?: return@perRecord
+                    // By primary key: a beneficiary can have several suspected rows, and the
+                    // newest one may not be the row that was pushed.
+                    val fresh = tbDao.getTbSuspectedById(pushed.id) ?: return@perRecord
                     val unchanged = fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)
                     if (unchanged) {
                         tbDao.saveTbSuspected(fresh.copy(syncState = SyncState.SYNCED))
