@@ -142,7 +142,8 @@ class TbPushRepo @Inject constructor(
     }
 
     /**
-     * Marks rows the hub has already accepted. A local failure here must not reach the chunk's
+     * Marks rows the hub has already accepted, and clears their retry records. A local failure
+     * in either step must not reach the chunk's
      * generic catch, which treats the chunk as rejected and re-sends each record on its own in
      * the same run. The rows stay UNSYNCED and go out again on the next cycle instead.
      */
@@ -236,8 +237,9 @@ class TbPushRepo @Inject constructor(
                                         Timber.w("TB Screening push: $notSent record(s) not sent (no server benRegId yet), stay UNSYNCED")
                                     }
                                     acknowledgedCount += sentRecords.size
-                                    successCount += markSyncedAfterAck { updateSyncStatusScreening(sentRecords) }
-                                    syncRetryStore.clear(SyncRetryStore.ENTITY_TB_SCREENING, sentRecords.map { it.id.toLong() })
+                                    successCount += markSyncedAfterAck {
+                                        updateSyncStatusScreening(sentRecords).also { syncRetryStore.clear(SyncRetryStore.ENTITY_TB_SCREENING, sentRecords.map { it.id.toLong() }) }
+                                    }
                                 }
 
                                 401, 5002 -> {
@@ -463,8 +465,9 @@ class TbPushRepo @Inject constructor(
                                         Timber.w("TB Diagnostics push: benIds=$excludedBenIds were NOT sent (no server benRegId yet) and stay UNSYNCED for the next cycle")
                                     }
                                     acknowledgedCount += sentRecords.size
-                                    markedSyncedCount += markSyncedAfterAck { updateSyncStatusDiagnostics(sentRecords) }
-                                    syncRetryStore.clear(SyncRetryStore.ENTITY_TB_DIAGNOSTICS, sentRecords.map { it.id.toLong() })
+                                    markedSyncedCount += markSyncedAfterAck {
+                                        updateSyncStatusDiagnostics(sentRecords).also { syncRetryStore.clear(SyncRetryStore.ENTITY_TB_DIAGNOSTICS, sentRecords.map { it.id.toLong() }) }
+                                    }
                                     successCount += sentRecords.size
                                 }
 
@@ -597,8 +600,9 @@ class TbPushRepo @Inject constructor(
                                         Timber.w("SYNC_DIAG[$callTag] TB Suspected push: benIds=$excludedBenIds were NOT sent (benId resolution failed above) and stay UNSYNCED for the next cycle")
                                     }
                                     acknowledgedCount += sentRecords.size
-                                    markedSyncedCount += markSyncedAfterAck { updateSyncStatusSuspected(sentRecords) }
-                                    syncRetryStore.clear(SyncRetryStore.ENTITY_TB_SUSPECTED, sentRecords.map { it.id.toLong() })
+                                    markedSyncedCount += markSyncedAfterAck {
+                                        updateSyncStatusSuspected(sentRecords).also { syncRetryStore.clear(SyncRetryStore.ENTITY_TB_SUSPECTED, sentRecords.map { it.id.toLong() }) }
+                                    }
                                     successCount += sentRecords.size
                                     Timber.d("SYNC_DIAG[$callTag] TB Suspected push: chunk marked SYNCED, benIds=${sentRecords.map { it.benId }}")
                                 }
@@ -725,8 +729,9 @@ class TbPushRepo @Inject constructor(
                                         Timber.w("TB Confirmed push: benIds=$excludedBenIds were NOT sent (no local BENEFICIARY row) and stay UNSYNCED for the next cycle")
                                     }
                                     acknowledgedCount += sentRecords.size
-                                    markedSyncedCount += markSyncedAfterAck { updateSyncStatusConfirmed(sentRecords) }
-                                    syncRetryStore.clear(SyncRetryStore.ENTITY_TB_CONFIRMED, sentRecords.map { it.id.toLong() })
+                                    markedSyncedCount += markSyncedAfterAck {
+                                        updateSyncStatusConfirmed(sentRecords).also { syncRetryStore.clear(SyncRetryStore.ENTITY_TB_CONFIRMED, sentRecords.map { it.id.toLong() }) }
+                                    }
                                     successCount += sentRecords.size
                                 }
 

@@ -108,6 +108,12 @@ class DeviceIntegrationRepo @Inject constructor(
         ) {
             lastRefreshAt = now
             lastRefreshHubUrl = hubUrl
+        } else {
+            // Drop an earlier "both integrated" entry: a forced refresh (maxAgeMs = 0) that now
+            // finds a device disconnected must not leave the next poll skipping its check and
+            // acting on the flag it just stored.
+            lastRefreshAt = 0L
+            lastRefreshHubUrl = null
         }
     }
 
