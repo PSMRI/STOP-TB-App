@@ -36,4 +36,17 @@ class FlowThrottleTest {
 
         assertEquals(listOf(1, 2, 3), emitted)
     }
+
+    @Test
+    fun aNullValueIsDeliveredAndDoesNotEndTheFlow() = runBlocking {
+        val emitted = flow<Int?> {
+            emit(1)
+            delay(150)
+            emit(null)
+            delay(150)
+            emit(3)
+        }.throttleLatest(periodMs = 50).toList()
+
+        assertEquals(listOf(1, null, 3), emitted)
+    }
 }

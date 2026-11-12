@@ -114,6 +114,9 @@ interface TBDao :
     @Query("SELECT * FROM TB_SUSPECTED WHERE benId =:benId ORDER BY id DESC limit 1")
     suspend fun getTbSuspected(benId: Long): TBSuspectedCache?
 
+    @Query("SELECT * FROM TB_SUSPECTED WHERE id = :id")
+    suspend fun getTbSuspectedById(id: Int): TBSuspectedCache?
+
     @Query("""
     SELECT *
     FROM TB_CONFIRMED_TREATMENT

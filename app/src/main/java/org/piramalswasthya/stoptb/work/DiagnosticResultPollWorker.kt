@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import org.piramalswasthya.stoptb.repositories.isChangesFeedHealthy
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.database.room.SyncState
@@ -120,7 +121,15 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 // The changes feed already brings every order's status on each pull, so the
                 // village-wide status sweeps and per-order result calls are only needed when the
                 // hub has no feed.
-                val feedActive = preferenceDao.isChangesFeedActive()
+                val feedEnabled = preferenceDao.isChangesFeedActive()
+                // The preference only says the hub has a feed; it stays true when pulls start
+                // failing. Count on the feed only while it has saved a page recently for this hub;
+                // otherwise poll directly too (and ask for a pull), so results keep arriving.
+                val feedActive = isChangesFeedHealthy(feedEnabled, preferenceDao.getStoredCampHubUrl())
+                if (feedEnabled && !feedActive) {
+                    Timber.d("Changes feed not delivering; polling results directly this cycle")
+                    WorkerUtils.triggerCampQuickPullIfConnected(appContext, preferenceDao)
+                }
 
                 // The feed skips a row for an order this tablet created moments ago and moves past
                 // it, so a result that arrived then has to be asked for directly. Runs whether or
@@ -128,7 +137,7 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 // without an order id is not in pendingOrders). A pair is cleared only once its
                 // fetch succeeds; the worker keeps rescheduling while any remain.
                 var hasSkippedFeedOrders = false
-                if (feedActive) {
+                if (feedEnabled) {
                     val skipped = tbRepo.feedSkippedOrdersPastGrace()
                     skipped.forEach { (benId, type) ->
                         Timber.d("Polling $type result for benId=$benId skipped by the feed")
@@ -206,6 +215,9 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                     } else null
                 }
                 hasInProgress = pendingOrders.isNotEmpty()
+                // Nothing pending: drop every backoff slot, or a later order for the same
+                // beneficiary and test would inherit the old one's due time.
+                if (!hasInProgress) pollSchedule.retainOnly(emptyList())
 
 
                 // Fetch results with bounded parallelism instead of one-by-one sequential awaits
