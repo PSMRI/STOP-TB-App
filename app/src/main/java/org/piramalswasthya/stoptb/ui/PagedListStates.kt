@@ -23,7 +23,8 @@ import kotlinx.coroutines.flow.onStart
  * user during a sync (same rule as AllBenFragment and NonHHFragment). "Empty" needs the load to
  * have finished and reached the end, so the idle state before the first load never flashes
  * "No records found". [onRefreshStarted] runs when a refresh starts and [onSettled] when it
- * finishes (to clear a search loader, see [ListTransitions]).
+ * finishes (see [ListTransitions]); both are driven by every load-state change, not the
+ * conflated flow.
  */
 suspend fun PagingDataAdapter<*, *>.renderListStates(
     render: (awaitingFirstLoad: Boolean, isEmpty: Boolean) -> Unit,
@@ -31,32 +32,19 @@ suspend fun PagingDataAdapter<*, *>.renderListStates(
     onRefreshStarted: () -> Unit = {},
     errorAnchor: View? = null
 ) {
-    var firstLoadSettled = false
-    var refreshWasLoading = false
     var failedLoads = 0
     var failureShown: Snackbar? = null
-    // loadStateFlow is conflated: a refresh that starts and finishes while the main thread is busy
-    // can reach the collector as NotLoading only, and the search would never settle. A load-state
-    // listener is called for every change, so the start of a refresh is never missed.
-    val refreshStartListener: (CombinedLoadStates) -> Unit = { states ->
-        if (states.refresh is LoadState.Loading && !refreshWasLoading) {
-            refreshWasLoading = true
-            onRefreshStarted()
-        }
-    }
-    addLoadStateListener(refreshStartListener)
+    // loadStateFlow is conflated and skips equal states: a quick refresh can reach the collector as
+    // NotLoading only, or not at all (Loading then a NotLoading equal to the previous state), and
+    // the search would never settle. A load-state listener is called for every change, so the
+    // start and the end of each refresh are both seen there.
+    val refreshTracker = RefreshTracker(onRefreshStarted, onSettled)
+    val refreshListener: (CombinedLoadStates) -> Unit = { states -> refreshTracker.onRefreshState(states.refresh) }
+    addLoadStateListener(refreshListener)
     try {
     loadStateFlow.collectLatest { loadStates ->
         val refresh = loadStates.refresh
-        if (refresh is LoadState.NotLoading) {
-            firstLoadSettled = true
-            // Only when a refresh has just finished: an append of the previous query finishing
-            // while a new query is still debouncing must not settle (and clear) its pending scroll.
-            if (refreshWasLoading) {
-                refreshWasLoading = false
-                onSettled()
-            }
-        }
+        val firstLoadSettled = refreshTracker.firstLoadSettled
         // A failed load (a database error in the paging source) left the list empty, or stopped
         // at the last loaded row, with no way back. Retry a few times, backing off; then offer a
         // Retry action. Covers the first load (refresh), loading further rows (append), and
@@ -91,7 +79,7 @@ suspend fun PagingDataAdapter<*, *>.renderListStates(
         render(refresh is LoadState.Loading && !firstLoadSettled, isEmpty)
     }
     } finally {
-        removeLoadStateListener(refreshStartListener)
+        removeLoadStateListener(refreshListener)
     }
 }
 
@@ -109,42 +97,79 @@ fun <T : Any> PagingDataAdapter<T, *>.loadedIds(idOf: (T) -> Long): Flow<Set<Lon
         .distinctUntilChanged()
 
 /**
- * Smoother list transitions for the paged screens:
- * - a new search shows the top of its results, not the old scroll offset (call [onQueryChanged]
- *   when the query changes, and pass [onRefreshStarted] / [onSettled] to renderListStates);
- * - badge and sync-icon updates rebind rows without the cross-fade that made them flash.
+ * Follows a paged list's refresh state, change by change, and reports when a refresh starts and
+ * when it finishes. Fed from a load-state listener (every change), not the conflated flow.
+ * An append finishing never counts: only the refresh state is looked at.
  */
-class ListTransitions(private val list: RecyclerView) {
-    private var scrollToTopPending = false
-    // Set once a refresh starts after the query changed, so a refresh of the previous query that
-    // finishes during the search debounce does not settle (and clear) the new query's scroll.
-    private var newQueryLoading = false
-    private var lastQuery: String? = null
+internal class RefreshTracker(
+    private val onRefreshStarted: () -> Unit,
+    private val onSettled: () -> Unit
+) {
+    var firstLoadSettled = false
+        private set
+    private var refreshLoading = false
 
-    init {
+    fun onRefreshState(refresh: LoadState) {
+        when (refresh) {
+            is LoadState.Loading -> if (!refreshLoading) {
+                refreshLoading = true
+                onRefreshStarted()
+            }
+            is LoadState.NotLoading -> {
+                firstLoadSettled = true
+                if (refreshLoading) {
+                    refreshLoading = false
+                    onSettled()
+                }
+            }
+            is LoadState.Error -> refreshLoading = false
+        }
+    }
+}
+
+/**
+ * Smoother list transitions for the paged screens:
+ * - a new search shows the top of its results, not the old scroll offset. Call [onQueryChanged]
+ *   when the query changes, [onDataSubmitted] right before each `submitData`, and pass
+ *   [onSettled] to renderListStates;
+ * - badge and sync-icon updates rebind rows without the cross-fade that made them flash.
+ *
+ * The scroll belongs to the data of the latest query: it runs at the first refresh that finishes
+ * after that data was submitted. A refresh of the previous query finishing during the search
+ * debounce (before the new data is submitted) doesn't take it, and neither does a background
+ * reload when no query changed. Submitting new data while the previous refresh is still loading
+ * reports no new "refresh started", which is why this keys on the submit instead.
+ */
+class ListTransitions internal constructor(private val scrollToTop: () -> Unit) {
+
+    constructor(list: RecyclerView) : this({ list.scrollToPosition(0) }) {
         (list.itemAnimator as? SimpleItemAnimator)?.supportsChangeAnimations = false
     }
 
+    private var scrollToTopPending = false
+    private var pendingDataSubmitted = false
+    private var lastQuery: String? = null
+
     /**
      * [query] is the query as the screen's filter will see it. A keystroke that leaves it
-     * unchanged (e.g. a trailing space the screen trims) starts no reload, so nothing would clear
-     * the pending scroll and the next background reload would jump the list to the top.
+     * unchanged (e.g. a trailing space the screen trims) submits no new data, so it sets nothing.
      */
     fun onQueryChanged(query: String) {
         if (query == lastQuery) return
         lastQuery = query
         scrollToTopPending = true
-        newQueryLoading = false
+        pendingDataSubmitted = false
     }
 
-    fun onRefreshStarted() {
-        if (scrollToTopPending) newQueryLoading = true
+    /** Call right before `submitData`: the next refresh to finish belongs to this data. */
+    fun onDataSubmitted() {
+        if (scrollToTopPending) pendingDataSubmitted = true
     }
 
     fun onSettled() {
-        if (!scrollToTopPending || !newQueryLoading) return
+        if (!scrollToTopPending || !pendingDataSubmitted) return
         scrollToTopPending = false
-        newQueryLoading = false
-        list.scrollToPosition(0)
+        pendingDataSubmitted = false
+        scrollToTop()
     }
 }
