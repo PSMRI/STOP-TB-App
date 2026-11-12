@@ -13,6 +13,7 @@ import java.io.OutputStreamWriter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -41,6 +42,7 @@ class SyncLogFileWriter @Inject constructor(
 
     private val handlerThread = HandlerThread("SyncLogWriter").apply { start() }
     private val handler = Handler(handlerThread.looper)
+    private val queuedWrites = AtomicInteger(0)
 
     private var currentWriter: BufferedWriter? = null
     private var currentDate: String? = null
@@ -51,10 +53,19 @@ class SyncLogFileWriter @Inject constructor(
         val now = System.currentTimeMillis()
         val levelStr = level.name.padEnd(5)
         val ts = timestampFormat.get()!!.format(Date(now))
-        val line = "$ts [$levelStr] [$tag] $message\n"
+        val safeTag = tag.take(SyncLogLimits.MAX_TAG_CHARS)
+        val safeMessage = message.take(SyncLogLimits.MAX_MESSAGE_CHARS).let {
+            if (message.length > SyncLogLimits.MAX_MESSAGE_CHARS) it + SyncLogLimits.TRUNCATION_SUFFIX else it
+        }
+        val line = ("$ts [$levelStr] [$safeTag] $safeMessage")
+            .take(SyncLogLimits.MAX_FILE_LINE_CHARS) + "\n"
         val today = dateFormat.get()!!.format(Date(now))
 
-        handler.post {
+        if (queuedWrites.incrementAndGet() > SyncLogLimits.MAX_QUEUED_WRITES) {
+            queuedWrites.decrementAndGet()
+            return
+        }
+        if (!handler.post {
             try {
                 ensureWriter(today)
                 currentWriter?.write(line)
@@ -62,8 +73,10 @@ class SyncLogFileWriter @Inject constructor(
             } catch (e: Exception) {
                 Timber.e(e, "SyncLogFileWriter: failed to write log")
                 closeWriter()
+            } finally {
+                queuedWrites.decrementAndGet()
             }
-        }
+        }) queuedWrites.decrementAndGet()
     }
 
     fun runRotation() {
