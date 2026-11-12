@@ -28,6 +28,7 @@
     <string name="failure_to_gain_weight_children">बच्चों में वजन बढ़ने में असमर्थता</string>
     <string name="decreased_activity_or_playfulness_children">बच्चों में गतिविधि या खेलने की इच्छा में कमी</string>
     <string name="others">अन्य</string>
+    <string name="other_symptoms">अन्य लक्षण</string>
     <string name="cbac_recurrent_ulceration">हथेली या तलवे पर बार-बार होने वाले छाले</string>
     <string name="cbac_recurrent_tingling">हथेली या तलवे में बार-बार झुनझुनी होना</string>
     <string name="cbac_recurrent_cloudy">धुंधला या अस्पष्ट दिखना</string>
@@ -186,6 +187,7 @@
     <string name="not_screened">जांच नहीं हुई</string>
     <string name="tb_suspected_sputum_test">संदिग्ध टीबी के लिए बलगम जांच</string>
     <string name="tb_tracking_submitted">टीबी ट्रैकिंग जमा हो गई</string>
+    <string name="tb_followup_already_submitted_this_month">इस महीने का आपका फॉलो-अप पहले ही जमा हो चुका है</string>
     <string name="track">ट्रैक करें</string>
     <string name="filled_on">भरा गया दिनांक</string>
     <string name="save">सहेजें (Save)</string>

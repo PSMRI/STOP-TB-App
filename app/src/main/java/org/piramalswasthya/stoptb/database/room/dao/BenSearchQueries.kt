@@ -33,13 +33,7 @@ interface BenSearchQueries {
                 WHERE b2.temperature IS NOT NULL AND b2.temperature >= 100.0
                 UNION
                 SELECT v.benId FROM BEN_VITALS v
-                WHERE (v.pulseRate IS NOT NULL AND v.pulseRate < 60)
-                   OR (v.pulseRate IS NOT NULL AND v.pulseRate > 90)
-                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic < 90)
-                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic >= 140)
-                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
-                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
-                   OR (v.rbs IS NOT NULL AND v.rbs >= 100)
+                WHERE ${ABNORMAL_VITALS_CONDITION}
                 UNION
                 SELECT ts.benId FROM TB_SUSPECTED ts
                 WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
@@ -112,18 +106,7 @@ interface BenSearchQueries {
                 )
             ))
             OR (:source = 8 AND isDeath = 0 AND (
-                benId IN (
-                    SELECT ts.benId FROM TB_SUSPECTED ts
-                    WHERE ts.isLiquidCultureConducted IS NOT NULL
-                )
-                OR benId IN (
-                    SELECT td.benId FROM TB_DIAGNOSTICS td
-                    WHERE td.isLiquidCultureConducted IS NOT NULL
-                )
-                OR benId IN (
-                    SELECT tbs.benId FROM TB_SCREENING tbs
-                    WHERE tbs.recommendedForLiquidCultureTest = 1
-                )
+                ${LIQUID_CULTURE_REFERRAL_CONDITION}
             ))
             OR (:source = 9 AND isDeath = 0 AND hhId IS NOT NULL AND EXISTS (
                 SELECT 1
@@ -133,6 +116,19 @@ interface BenSearchQueries {
                 WHERE b2.hhId = BEN_BASIC_CACHE.hhId
                   AND b2.isDeactivate = 0
                   AND b2.isDeath = 0
+                  AND (
+                        ts.isTbConfirmed = 1
+                        OR td.isTbConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                  )
+            ) AND NOT EXISTS (
+                -- TPT is for household contacts only: exclude the confirmed TB patient(s) themselves
+                SELECT 1
+                FROM BEN_BASIC_CACHE b3
+                LEFT JOIN TB_SUSPECTED ts ON b3.benId = ts.benId
+                LEFT JOIN TB_DIAGNOSTICS td ON b3.benId = td.benId
+                WHERE b3.benId = BEN_BASIC_CACHE.benId
                   AND (
                         ts.isTbConfirmed = 1
                         OR td.isTbConfirmed = 1
@@ -218,13 +214,7 @@ interface BenSearchQueries {
                 WHERE b2.temperature IS NOT NULL AND b2.temperature >= 100.0
                 UNION
                 SELECT v.benId FROM BEN_VITALS v
-                WHERE (v.pulseRate IS NOT NULL AND v.pulseRate < 60)
-                   OR (v.pulseRate IS NOT NULL AND v.pulseRate > 90)
-                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic < 90)
-                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic >= 140)
-                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
-                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
-                   OR (v.rbs IS NOT NULL AND v.rbs >= 100)
+                WHERE ${ABNORMAL_VITALS_CONDITION}
                 UNION
                 SELECT ts.benId FROM TB_SUSPECTED ts
                 WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
@@ -297,18 +287,7 @@ interface BenSearchQueries {
                 )
             ))
             OR (:source = 8 AND isDeath = 0 AND (
-                benId IN (
-                    SELECT ts.benId FROM TB_SUSPECTED ts
-                    WHERE ts.isLiquidCultureConducted IS NOT NULL
-                )
-                OR benId IN (
-                    SELECT td.benId FROM TB_DIAGNOSTICS td
-                    WHERE td.isLiquidCultureConducted IS NOT NULL
-                )
-                OR benId IN (
-                    SELECT tbs.benId FROM TB_SCREENING tbs
-                    WHERE tbs.recommendedForLiquidCultureTest = 1
-                )
+                ${LIQUID_CULTURE_REFERRAL_CONDITION}
             ))
             OR (:source = 9 AND isDeath = 0 AND hhId IS NOT NULL AND EXISTS (
                 SELECT 1
@@ -318,6 +297,19 @@ interface BenSearchQueries {
                 WHERE b2.hhId = BEN_BASIC_CACHE.hhId
                   AND b2.isDeactivate = 0
                   AND b2.isDeath = 0
+                  AND (
+                        ts.isTbConfirmed = 1
+                        OR td.isTbConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                  )
+            ) AND NOT EXISTS (
+                -- TPT is for household contacts only: exclude the confirmed TB patient(s) themselves
+                SELECT 1
+                FROM BEN_BASIC_CACHE b3
+                LEFT JOIN TB_SUSPECTED ts ON b3.benId = ts.benId
+                LEFT JOIN TB_DIAGNOSTICS td ON b3.benId = td.benId
+                WHERE b3.benId = BEN_BASIC_CACHE.benId
                   AND (
                         ts.isTbConfirmed = 1
                         OR td.isTbConfirmed = 1
@@ -530,13 +522,7 @@ interface BenSearchQueries {
                 WHERE b2.temperature IS NOT NULL AND b2.temperature >= 100.0
                 UNION
                 SELECT v.benId FROM BEN_VITALS v
-                WHERE (v.pulseRate IS NOT NULL AND v.pulseRate < 60)
-                   OR (v.pulseRate IS NOT NULL AND v.pulseRate > 90)
-                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic < 90)
-                   OR (v.bpSystolic IS NOT NULL AND v.bpSystolic >= 140)
-                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
-                   OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
-                   OR (v.rbs IS NOT NULL AND v.rbs >= 100)
+                WHERE ${ABNORMAL_VITALS_CONDITION}
                 UNION
                 SELECT ts.benId FROM TB_SUSPECTED ts
                 WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
@@ -609,18 +595,7 @@ interface BenSearchQueries {
                 )
             ))
             OR (:source = 8 AND isDeath = 0 AND (
-                benId IN (
-                    SELECT ts.benId FROM TB_SUSPECTED ts
-                    WHERE ts.isLiquidCultureConducted IS NOT NULL
-                )
-                OR benId IN (
-                    SELECT td.benId FROM TB_DIAGNOSTICS td
-                    WHERE td.isLiquidCultureConducted IS NOT NULL
-                )
-                OR benId IN (
-                    SELECT tbs.benId FROM TB_SCREENING tbs
-                    WHERE tbs.recommendedForLiquidCultureTest = 1
-                )
+                ${LIQUID_CULTURE_REFERRAL_CONDITION}
             ))
             OR (:source = 9 AND isDeath = 0 AND hhId IS NOT NULL AND EXISTS (
                 SELECT 1
@@ -630,6 +605,19 @@ interface BenSearchQueries {
                 WHERE b2.hhId = BEN_BASIC_CACHE.hhId
                   AND b2.isDeactivate = 0
                   AND b2.isDeath = 0
+                  AND (
+                        ts.isTbConfirmed = 1
+                        OR td.isTbConfirmed = 1
+                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
+                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
+                  )
+            ) AND NOT EXISTS (
+                -- TPT is for household contacts only: exclude the confirmed TB patient(s) themselves
+                SELECT 1
+                FROM BEN_BASIC_CACHE b3
+                LEFT JOIN TB_SUSPECTED ts ON b3.benId = ts.benId
+                LEFT JOIN TB_DIAGNOSTICS td ON b3.benId = td.benId
+                WHERE b3.benId = BEN_BASIC_CACHE.benId
                   AND (
                         ts.isTbConfirmed = 1
                         OR td.isTbConfirmed = 1

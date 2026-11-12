@@ -6,6 +6,7 @@ import android.text.InputType
 import com.google.gson.Gson
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.helpers.Languages
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.FormElement
 import org.piramalswasthya.stoptb.model.HouseholdAmenities
 import org.piramalswasthya.stoptb.model.HouseholdCache
@@ -17,6 +18,7 @@ import org.piramalswasthya.stoptb.model.InputType.HEADLINE
 import org.piramalswasthya.stoptb.model.InputType.RADIO
 import org.piramalswasthya.stoptb.model.InputType.TEXT_VIEW
 import org.piramalswasthya.stoptb.model.LocationEntity
+import org.piramalswasthya.stoptb.model.VillageDefaults
 import timber.log.Timber
 import java.text.DateFormat
 import java.text.SimpleDateFormat
@@ -25,6 +27,16 @@ import java.util.Date
 import java.util.Locale
 
 class HouseholdFormDataset(context: Context, language: Languages) : Dataset(context, language) {
+
+    private val preferenceDao = PreferenceDao(context)
+    // True when the selected village had no saved Residential Area, so the user picked one here
+    private var isCapturingVillageDefaults = false
+    // Edit mode: the household's own village and values, restored if the user switches back to that village
+    private var savedRecordVillageId: Int? = null
+    private var savedRecordValues: VillageDefaults? = null
+    private var savedRecordOtherResidentialArea: String? = null
+    // Village resolved when the user changed the dropdown; mapValues saves this same one
+    private var villageChosenInForm: LocationEntity? = null
     companion object {
         private fun getCurrentDate(): String {
             val calendar = Calendar.getInstance()
@@ -80,7 +92,20 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_registered_camp_site),
         arrayId = R.array.nhhr_yes_no_array,
         entries = resources.getStringArray(R.array.nhhr_yes_no_array),
-        required = true
+        required = true,
+        hasDependants = true
+
+
+    )
+
+    private val updateLocationDetails = FormElement(
+        id = 1060,
+        inputType = RADIO,
+        title = resources.getString(R.string.loc_cb_update_location),
+        arrayId = R.array.nhhr_yes_no_array,
+        entries = resources.getStringArray(R.array.nhhr_yes_no_array),
+        required = false,
+        hasDependants = true   // needed, otherwise the fragment listener never fires
     )
 
     private val firstNameHeadOfFamily = FormElement(
@@ -183,13 +208,13 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.ben_reg_address),
         arrayId = -1, required = true, etMaxLength = 2000
     )
-//    private val pinCode = FormElement(
-//        id = 22, inputType = EDIT_TEXT,
-//        title = resources.getString(R.string.str_pincode),
-//        arrayId = -1, required = true,
-//        etInputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL,
-//        etMaxLength = 6, min = 100000, max = 999999
-//    )
+    private val pinCode = FormElement(
+        id = 25, inputType = EDIT_TEXT,
+        title = resources.getString(R.string.str_pincode),
+        arrayId = -1, required = true,
+        etInputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL,
+        etMaxLength = 6, min = 100000, max = 999999
+    )
     private val villageHamlet = FormElement(
         id = 23, inputType = DROPDOWN,
         title = resources.getString(R.string.nbr_village),
@@ -202,6 +227,14 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         }
     }
 
+    // Position of "Other" in nhhr_fuel_cooking_array (ID 8). Keep fixed: new fuels are appended after it.
+    private val OTHER_FUEL_INDEX = 7
+
+    private fun isOtherFuelSelected(): Boolean {
+        val otherLabel = fuelForCooking.entries?.getOrNull(OTHER_FUEL_INDEX) ?: return false
+        return fuelForCooking.value == otherLabel
+    }
+
     private fun setDefaultRegisteredAtCampSiteIfNeeded() {
         if (registeredAtCampSite.value.isNullOrBlank()) {
             // entries = ["Yes", "No"] — default to "No"
@@ -212,7 +245,8 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
     suspend fun setupPage(hh: HouseholdCache?,
                               villageNames: Array<String>? = null,
                               villageEntityList: List<LocationEntity> = emptyList(),
-                              registeredMemberCount: Int = 0
+                              registeredMemberCount: Int = 0,
+                              villageDefaults: VillageDefaults? = null
     ) {
 
         val list = mutableListOf<FormElement>()
@@ -231,7 +265,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
               //  mohallaName,
                 povertyLine,
                 address,
-            //    pinCode,
+                pinCode,
                 villageHamlet,
                 residentialArea
             )
@@ -268,7 +302,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
 //            mohallaName.value = saved.mohallaName
             povertyLine.value = povertyLine.getStringFromPosition(saved.povertyLineId)
             address.value = saved.address?.takeIf { it.isNotBlank() } ?: villageHamlet.value
-           // pinCode.value = saved.pinCode
+            pinCode.value = saved.pinCode?.trim()?.takeIf { it.isNotEmpty() }
         }
         setDefaultPovertyLineIfNeeded()
         setDefaultRegisteredAtCampSiteIfNeeded()
@@ -282,11 +316,41 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         hh?.details?.let { saved ->
             residentialArea.value = residentialArea.getStringFromPosition(saved.residentialAreaId)
             otherResidentialArea.value = saved.otherResidentialArea
-            typeOfHouse.value = typeOfHouse.getStringFromPosition(saved.houseTypeId)
+            // Legacy: pehle index 3 = "Other". Ab 3 = Pucca Stone and Mortar, Other = index 4.
+            val isLegacyOther = saved.houseTypeId == 3 &&
+                    saved.houseType.equals("Other", ignoreCase = true)
+            typeOfHouse.value =
+                if (isLegacyOther) typeOfHouse.entries?.last()
+                else typeOfHouse.getStringFromPosition(saved.houseTypeId)
+            otherTypeOfHouse.value = saved.otherHouseType
             houseOwnership.value = houseOwnership.getStringFromPosition(saved.isHouseOwnedId)
+        }
+        if (hh != null && hh.householdId != 0L) {
+            val recordPinCode = hh.family?.pinCode?.trim()?.takeIf { it.isNotEmpty() }
+                ?: villageDefaults?.pinCode?.trim()?.takeIf { villageDefaults.hasPinCode }
+            val recordValues = VillageDefaults(
+                pinCode = recordPinCode,
+                residentialAreaId = hh.details?.residentialAreaId ?: 0
+            )
+            savedRecordVillageId = hh.locationRecord.village.id
+            savedRecordValues = recordValues
+            savedRecordOtherResidentialArea = hh.details?.otherResidentialArea
+            pinCode.value = recordPinCode
+            if (recordValues.hasPinCode) pinCode.inputType = TEXT_VIEW
+            if (recordValues.hasResidentialArea) residentialArea.inputType = TEXT_VIEW
+            // Saved before Residential Area was required: ask for it, otherwise saving would clear it on every member
+            else residentialArea.required = true
+            isCapturingVillageDefaults = !recordValues.hasPinCode || !recordValues.hasResidentialArea
+        } else {
+            // New household: Pincode & Residential Area come from the village (captured once on the location screen).
+            // A value the village doesn't have yet but a draft restored is kept, and remembered for the village on save.
+            applyVillageDefaults(villageDefaults, keepEnteredValues = true)
         }
         if (residentialArea.value == residentialArea.entries!!.last()) {
             list.add(list.indexOf(residentialArea) + 1, otherResidentialArea)
+        }
+        if (typeOfHouse.value == typeOfHouse.entries!!.last()) {
+            list.add(list.indexOf(typeOfHouse) + 1, otherTypeOfHouse)
         }
         val thirdPage =
             listOf(
@@ -302,15 +366,17 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             separateKitchen.value = separateKitchen.getStringFromPosition(saved.separateKitchenId)
             fuelForCooking.value = fuelForCooking.getStringFromPosition(saved.fuelUsedId)
             otherFuelForCooking.value = saved.otherFuelUsed
-            sourceOfWater.value = sourceOfWater.getStringFromPosition(saved.sourceOfDrinkingWaterId)
+            sourceOfWater.setSavedChoice(saved.sourceOfDrinkingWaterId, saved.sourceOfDrinkingWater)
             otherSourceOfWater.value = saved.otherSourceOfDrinkingWater
-            sourceOfElectricity.value =
-                sourceOfElectricity.getStringFromPosition(saved.availabilityOfElectricityId)
+            sourceOfElectricity.setSavedChoice(
+                saved.availabilityOfElectricityId,
+                saved.availabilityOfElectricity
+            )
             otherSourceOfElectricity.value = saved.otherAvailabilityOfElectricity
-            availOfToilet.value = availOfToilet.getStringFromPosition(saved.availabilityOfToiletId)
+            availOfToilet.setSavedChoice(saved.availabilityOfToiletId, saved.availabilityOfToilet)
             otherAvailOfToilet.value = saved.otherAvailabilityOfToilet
         }
-        if (fuelForCooking.value == fuelForCooking.entries!!.last()) {
+        if (isOtherFuelSelected()) {
             list.add(list.indexOf(fuelForCooking) + 1, otherFuelForCooking)
         }
         if (sourceOfWater.value == sourceOfWater.entries!!.last()) {
@@ -319,8 +385,13 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         if (sourceOfElectricity.value == sourceOfElectricity.entries!!.last()) {
             list.add(list.indexOf(sourceOfElectricity) + 1, otherSourceOfElectricity)
         }
-        if (availOfToilet.value == availOfToilet.entries!!.let { it[it.size - 2] }) {
+        if (availOfToilet.value == availOfToilet.entries!!.last()) {
             list.add(list.indexOf(availOfToilet) + 1, otherAvailOfToilet)
+        }
+        // Only for already-saved households: ask whether to update the location (default "No")
+        if (hh != null && hh.householdId != 0L) {
+            updateLocationDetails.value = updateLocationDetails.entries?.getOrNull(1)
+            list.add(updateLocationDetails)
         }
         setUpPage(list)
     }
@@ -390,8 +461,21 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_type_of_house),
         arrayId = R.array.nhhr_type_of_house_array,
         entries = resources.getStringArray(R.array.nhhr_type_of_house_array),
-        required = true
+        required = true,
+        hasDependants = true
     )
+
+    private val otherTypeOfHouse = FormElement(
+        id = 1061,
+        inputType = EDIT_TEXT,
+        title = resources.getString(R.string.nhhr_type_of_house_other),
+        arrayId = -1,
+        required = true,
+        hasSpeechToText = true,
+        etMaxLength = 50,
+        etInputType = InputType.TYPE_CLASS_TEXT
+    )
+
     private val houseOwnership = FormElement(
         id = 11,
         inputType = RADIO,
@@ -412,11 +496,20 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         details?.let { saved ->
             residentialArea.value = residentialArea.getStringFromPosition(saved.residentialAreaId)
             otherResidentialArea.value = saved.otherResidentialArea
-            typeOfHouse.value = typeOfHouse.getStringFromPosition(saved.houseTypeId)
+            // Legacy: pehle index 3 = "Other". Ab 3 = Pucca Stone and Mortar, Other = index 4.
+            val isLegacyOther = saved.houseTypeId == 3 &&
+                    saved.houseType.equals("Other", ignoreCase = true)
+            typeOfHouse.value =
+                if (isLegacyOther) typeOfHouse.entries?.last()
+                else typeOfHouse.getStringFromPosition(saved.houseTypeId)
+            otherTypeOfHouse.value = saved.otherHouseType
             houseOwnership.value = houseOwnership.getStringFromPosition(saved.isHouseOwnedId)
         }
         if (residentialArea.value == residentialArea.entries!!.last()) {
             list.add(list.indexOf(residentialArea) + 1, otherResidentialArea)
+        }
+        if (typeOfHouse.value == typeOfHouse.entries!!.last()) {
+            list.add(list.indexOf(typeOfHouse) + 1, otherTypeOfHouse)
         }
         setUpPage(list)
     }
@@ -476,7 +569,9 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_primary_water_other),
         arrayId = -1,
         required = true,
-        etMaxLength = 100
+        hasSpeechToText = true,
+        isAlphabetsOnly = true,
+        etMaxLength = 50
     )
 
 
@@ -496,7 +591,9 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_avail_electricity_other),
         arrayId = -1,
         required = true,
-        etMaxLength = 100
+        hasSpeechToText = true,
+        isAlphabetsOnly = true,
+        etMaxLength = 50
     )
 
 
@@ -516,7 +613,9 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         title = resources.getString(R.string.nhhr_avail_toilet_other),
         arrayId = -1,
         required = true,
-        etMaxLength = 100
+        hasSpeechToText = true,
+        isAlphabetsOnly = true,
+        etMaxLength = 50
     )
 
 
@@ -530,15 +629,17 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             separateKitchen.value = separateKitchen.getStringFromPosition(saved.separateKitchenId)
             fuelForCooking.value = fuelForCooking.getStringFromPosition(saved.fuelUsedId)
             otherFuelForCooking.value = saved.otherFuelUsed
-            sourceOfWater.value = sourceOfWater.getStringFromPosition(saved.sourceOfDrinkingWaterId)
+            sourceOfWater.setSavedChoice(saved.sourceOfDrinkingWaterId, saved.sourceOfDrinkingWater)
             otherSourceOfWater.value = saved.otherSourceOfDrinkingWater
-            sourceOfElectricity.value =
-                sourceOfElectricity.getStringFromPosition(saved.availabilityOfElectricityId)
+            sourceOfElectricity.setSavedChoice(
+                saved.availabilityOfElectricityId,
+                saved.availabilityOfElectricity
+            )
             otherSourceOfElectricity.value = saved.otherAvailabilityOfElectricity
-            availOfToilet.value = availOfToilet.getStringFromPosition(saved.availabilityOfToiletId)
+            availOfToilet.setSavedChoice(saved.availabilityOfToiletId, saved.availabilityOfToilet)
             otherAvailOfToilet.value = saved.otherAvailabilityOfToilet
         }
-        if (fuelForCooking.value == fuelForCooking.entries!!.last()) {
+        if (isOtherFuelSelected()) {
             list.add(list.indexOf(fuelForCooking) + 1, otherFuelForCooking)
         }
         if (sourceOfWater.value == sourceOfWater.entries!!.last()) {
@@ -547,11 +648,57 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
         if (sourceOfElectricity.value == sourceOfElectricity.entries!!.last()) {
             list.add(list.indexOf(sourceOfElectricity) + 1, otherSourceOfElectricity)
         }
-        if (availOfToilet.value == availOfToilet.entries!!.let { it[it.size - 2] }) {
+        if (availOfToilet.value == availOfToilet.entries!!.last()) {
             list.add(list.indexOf(availOfToilet) + 1, otherAvailOfToilet)
         }
 
         setUpPage(list)
+    }
+
+    private val legacyChoiceLabels = mapOf(
+        "hand pump inside house" to "Handpump Inside House",
+        "hand pump outside of house" to "Handpump Outside House"
+    )
+
+    private fun FormElement.isLastSelected(): Boolean = value != null && value == entries?.lastOrNull()
+
+    private fun FormElement.setSavedChoice(position: Int, savedLabel: String?) {
+        value = savedLabel
+            ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+            ?.let { resolveLocalizedChoice(arrayId, it) }
+            ?: getStringFromPosition(position)
+    }
+
+    private fun resolveLocalizedChoice(arrayId: Int, label: String): String? {
+        if (arrayId <= 0) return null
+        val englishArray = englishResources.getStringArray(arrayId)
+        val localizedArray = resources.getStringArray(arrayId)
+        val candidates = listOf(label, legacyChoiceLabels[label.trim().lowercase()]).filterNotNull()
+        for (candidate in candidates) {
+            val englishIndex = englishArray.indexOfFirst { it.equals(candidate, ignoreCase = true) }
+            if (englishIndex >= 0) return localizedArray.getOrNull(englishIndex)
+            val localIndex = localizedArray.indexOfFirst { it.equals(candidate, ignoreCase = true) }
+            if (localIndex >= 0) return localizedArray[localIndex]
+        }
+        return null
+    }
+
+    private fun validateAlphabetsOnly(formElement: FormElement): Int {
+        val value = formElement.value
+        if (value.isNullOrBlank() || value.none { it.isLetter() }) {
+            formElement.errorText = if (formElement.required) {
+                resources.getString(R.string.form_input_empty_error)
+            } else {
+                null
+            }
+            return -1
+        }
+        formElement.errorText = if (value.all { it.isAlphabetOrSpace() }) {
+            null
+        } else {
+            resources.getString(R.string.form_input_alphabet_space_only_error)
+        }
+        return -1
     }
 
     override suspend fun handleListOnValueChanged(formId: Int, index: Int): Int {
@@ -612,7 +759,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             fuelForCooking.id -> triggerDependants(
                 source = fuelForCooking,
                 passedIndex = index,
-                triggerIndex = fuelForCooking.entries!!.size - 1,
+                triggerIndex = OTHER_FUEL_INDEX,
                 target = otherFuelForCooking
             )
 
@@ -633,7 +780,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             availOfToilet.id -> triggerDependants(
                 source = availOfToilet,
                 passedIndex = index,
-                triggerIndex = availOfToilet.entries!!.size - 2,
+                triggerIndex = availOfToilet.entries!!.size - 1,
                 target = otherAvailOfToilet
             )
 
@@ -647,30 +794,62 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
                 //validateAllAlphabetsSpaceOnEditText(otherFuelForCooking)
             }
 
-            otherSourceOfWater.id -> {
-                validateEmptyOnEditText(otherSourceOfWater)
-                // validateAllAlphabetsSpaceOnEditText(otherSourceOfWater)
-            }
+            otherSourceOfWater.id -> validateAlphabetsOnly(otherSourceOfWater)
 
-            otherSourceOfElectricity.id -> {
-                validateEmptyOnEditText(otherSourceOfElectricity)
-                //  validateAllAlphabetsSpaceOnEditText(otherSourceOfElectricity)
-            }
+            otherSourceOfElectricity.id -> validateAlphabetsOnly(otherSourceOfElectricity)
 
-            otherAvailOfToilet.id -> {
-                validateEmptyOnEditText(otherAvailOfToilet)
-                // validateAllAlphabetsSpaceOnEditText(otherAvailOfToilet)
-            }
+            otherAvailOfToilet.id -> validateAlphabetsOnly(otherAvailOfToilet)
 
             address.id -> validateEmptyOnEditText(address)
-           // pinCode.id -> validatePincodeOnEditText(pinCode)
+            pinCode.id -> validatePincodeOnEditText(pinCode)
             villageHamlet.id -> {
                 Timber.d("Selected village = ${villageHamlet.value}")
 
                 address.value = villageHamlet.value
                 validateEmptyOnEditText(address)
 
+                // Pincode & Residential Area belong to the village: reset and refill from the new village's saved
+                // values, or leave blank for the user to capture.
+                // Same resolution as mapValues: the household's own village first when names repeat
+                val selectedVillage =
+                    villageEntities.find { it.name == villageHamlet.value && it.id == savedRecordVillageId }
+                        ?: villageEntities.find { it.name == villageHamlet.value }
+                villageChosenInForm = selectedVillage
+                if (selectedVillage != null && selectedVillage.id == savedRecordVillageId) {
+                    // Back to the household's own village (edit) → its own saved value, not the village's current one
+                    applyVillageDefaults(savedRecordValues)
+                    otherResidentialArea.value = savedRecordOtherResidentialArea
+                } else {
+                    applyVillageDefaults(selectedVillage?.let { preferenceDao.getVillageDefaults(it.id) })
+                }
+                triggerDependants(
+                    source = residentialArea,
+                    passedIndex = residentialArea.entries!!.indexOf(residentialArea.value),
+                    triggerIndex = residentialArea.entries!!.size - 1,
+                    target = otherResidentialArea
+                )
+
                 return getIndexOfElement(address)
+            }
+
+            typeOfHouse.id -> triggerDependants(
+                source = typeOfHouse,
+                passedIndex = index,
+                triggerIndex = typeOfHouse.entries!!.size - 1,
+                target = otherTypeOfHouse
+            )
+
+            otherTypeOfHouse.id -> {
+                validateEmptyOnEditText(otherTypeOfHouse)
+                val text = otherTypeOfHouse.value.orEmpty()
+                if (text.isNotEmpty() && !Regex("^[\\p{L}\\p{M} ]+$").matches(text)) {
+                    otherTypeOfHouse.errorText =
+                        resources.getString(R.string.form_input_alphabet_space_only_error)
+                    -1
+                } else {
+                    otherTypeOfHouse.errorText = null
+                    -1
+                }
             }
 
             else -> -1
@@ -712,7 +891,7 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             family.povertyLine =
                 povertyLine.getEnglishStringFromPosition(family.povertyLineId)
             family.address = address.value              // ADD
-           // family.pinCode = pinCode.value               // ADD
+            family.pinCode = pinCode.value?.trim()?.takeIf { it.isNotEmpty() }
         }
         (cacheModel as HouseholdCache).family = family
 
@@ -721,11 +900,51 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
 
         // ADD — resolve village name back to its entity, update locationRecord
         villageHamlet.value?.let { selectedName ->
-            val selectedVillage = villageEntities.find { it.name == selectedName }
+            // Prefer the village resolved in the form, then the household's own village with that name:
+            // two villages can share a name, and the first match would silently move the household
+            val existingId = cacheModel.locationRecord.village.id
+            val selectedVillage =
+                villageChosenInForm?.takeIf { it.name == selectedName }
+                    ?: villageEntities.find { it.name == selectedName && it.id == existingId }
+                    ?: villageEntities.find { it.name == selectedName }
             selectedVillage?.let {
                 cacheModel.locationRecord = cacheModel.locationRecord.copy(village = it)
             }
         }
+    }
+
+    /**
+     * Fills Pincode / Residential Area from the village's saved values and locks them; a value the village
+     * doesn't have is left blank (or, with [keepEnteredValues], as restored from a draft), editable and
+     * required, and remembered for the village on save.
+     */
+    private fun applyVillageDefaults(villageDefaults: VillageDefaults?, keepEnteredValues: Boolean = false) {
+        val savedPinCode = villageDefaults?.pinCode?.trim()?.takeIf { villageDefaults.hasPinCode }
+        pinCode.value = savedPinCode ?: pinCode.value?.takeIf { keepEnteredValues }
+        pinCode.errorText = null
+        pinCode.inputType = if (savedPinCode != null) TEXT_VIEW else EDIT_TEXT
+        pinCode.required = true
+
+        val savedResidentialArea = villageDefaults?.residentialAreaId
+            ?.takeIf { villageDefaults.hasResidentialArea }
+            ?.let { residentialArea.getStringFromPosition(it) }
+        if (savedResidentialArea != null || !keepEnteredValues) {
+            residentialArea.value = savedResidentialArea
+            otherResidentialArea.value = null
+        }
+        residentialArea.errorText = null
+        residentialArea.inputType = if (savedResidentialArea != null) TEXT_VIEW else DROPDOWN
+        residentialArea.required = true
+        isCapturingVillageDefaults = savedPinCode == null || savedResidentialArea == null
+    }
+
+    /** Values the user captured for a village that had none saved; null when nothing new was captured. */
+    fun getCapturedVillageDefaults(): VillageDefaults? {
+        if (!isCapturingVillageDefaults) return null
+        return VillageDefaults(
+            pinCode = pinCode.value?.trim()?.takeIf { VillageDefaults.isValidPinCode(it) },
+            residentialAreaId = residentialArea.getPosition()
+        )
     }
 
     private fun mapValuesForPage2(cacheModel: FormDataModel) {
@@ -737,6 +956,10 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
             details.otherResidentialArea = otherResidentialArea.value
             details.houseTypeId = typeOfHouse.getPosition()
             details.houseType = typeOfHouse.getEnglishStringFromPosition(details.houseTypeId)
+            details.otherHouseType =
+                if (typeOfHouse.value == typeOfHouse.entries!!.last())
+                    otherTypeOfHouse.value?.trim()
+                else null
             details.isHouseOwnedId = houseOwnership.getPosition()
             details.isHouseOwned =
                 houseOwnership.getEnglishStringFromPosition(details.isHouseOwnedId)
@@ -754,22 +977,25 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
 
             amenities.fuelUsedId = fuelForCooking.getPosition()
             amenities.fuelUsed = fuelForCooking.getEnglishStringFromPosition(amenities.fuelUsedId)
-            amenities.otherFuelUsed = otherFuelForCooking.value
+            amenities.otherFuelUsed = otherFuelForCooking.value.takeIf { isOtherFuelSelected() }
 
             amenities.sourceOfDrinkingWaterId = sourceOfWater.getPosition()
             amenities.sourceOfDrinkingWater =
                 sourceOfWater.getEnglishStringFromPosition(amenities.sourceOfDrinkingWaterId)
-            amenities.otherSourceOfDrinkingWater = otherSourceOfWater.value
+            amenities.otherSourceOfDrinkingWater =
+                otherSourceOfWater.value.takeIf { sourceOfWater.isLastSelected() }
 
             amenities.availabilityOfElectricityId = sourceOfElectricity.getPosition()
             amenities.availabilityOfElectricity =
                 sourceOfElectricity.getEnglishStringFromPosition(amenities.availabilityOfElectricityId)
-            amenities.otherAvailabilityOfElectricity = otherSourceOfElectricity.value
+            amenities.otherAvailabilityOfElectricity =
+                otherSourceOfElectricity.value.takeIf { sourceOfElectricity.isLastSelected() }
 
             amenities.availabilityOfToiletId = availOfToilet.getPosition()
             amenities.availabilityOfToilet =
                 availOfToilet.getEnglishStringFromPosition(amenities.availabilityOfToiletId)
-            amenities.otherAvailabilityOfToilet = otherAvailOfToilet.value
+            amenities.otherAvailabilityOfToilet =
+                otherAvailOfToilet.value.takeIf { availOfToilet.isLastSelected() }
         }
         (cacheModel as HouseholdCache).apply {
             this.amenities = amenity
@@ -783,6 +1009,8 @@ class HouseholdFormDataset(context: Context, language: Languages) : Dataset(cont
     fun getTotalMembers(): Int = totalMembersInHousehold.value?.toIntOrNull() ?: 0
 
     fun isTotalMembersValid(): Boolean = getTotalMembers() >= minRequiredMembers
+
+    fun isRegisteredAtCampSite(): Boolean = registeredAtCampSite.getPosition() == 0 // entries = [Yes, No]
 
     fun enableEditMode() {
         if (firstNameHeadOfFamily.inputType == TEXT_VIEW) firstNameHeadOfFamily.inputType = EDIT_TEXT

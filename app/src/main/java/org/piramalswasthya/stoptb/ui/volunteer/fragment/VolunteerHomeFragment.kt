@@ -322,8 +322,12 @@ class VolunteerHomeFragment : Fragment() {
 
     // Same reachability rule as the sign-in screen, interceptor and sync gate
     // (GET /common-api/health, 2xx). Blocking: call off the main thread.
-    private fun pingCampHub(): Boolean =
-        CampHubReachability.isReachable(pref.getCampHubUrl())
+    private fun pingCampHub(): Boolean {
+        val app = context?.applicationContext
+        val hub = pref.getCampHubUrl()
+        return if (app == null) CampHubReachability.isReachable(hub)
+        else org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.checkReachability(app, hub, "MANUAL_REFRESH_CHECK")
+    }
 
     private fun setUpViewPager() {
         binding.vp2Home.offscreenPageLimit = 1

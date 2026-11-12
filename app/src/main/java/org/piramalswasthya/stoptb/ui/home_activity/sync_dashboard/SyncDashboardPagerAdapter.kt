@@ -11,12 +11,13 @@ class SyncDashboardPagerAdapter(
     lifecycle: Lifecycle
 ) : FragmentStateAdapter(fragmentManager, lifecycle) {
 
-    override fun getItemCount(): Int = 2
+    override fun getItemCount(): Int = 3
 
     override fun createFragment(position: Int): Fragment {
         return when (position) {
             0 -> SyncStatusTabFragment()
             1 -> SyncLogsTabFragment()
+            2 -> SyncSummaryTabFragment()
             else -> throw IllegalArgumentException("Invalid tab position: $position")
         }
     }

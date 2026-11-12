@@ -79,7 +79,9 @@
     <string name="visit_on">&quot;भ्रमण तिथि&quot;</string>
     <string name="follow_up">फॉलो-अप</string>
     <string name="contact_tracing_follow_up">संपर्क का फॉलो-अप</string>
+    <string name="household_contact_tracing">परिवार के संपर्क</string>
     <string name="tpt_follow_up">टीपीटी फॉलो-अप</string>
+    <string name="start_tpt">टीपीटी शुरू करें</string>
     <string name="history">इतिहास</string>
     <string name="micro">माइक्रो बर्थ प्लान</string>
     <string name="_1st_anc">पहली गर्भ जांच (ANC)</string>

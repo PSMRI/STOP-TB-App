@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.dao.SyncDao
@@ -122,7 +123,7 @@ class SyncDashboardViewModel @Inject constructor(
     /** Makes every waiting record due now and starts a push. */
     fun retryNow(context: Context) {
         syncRetryStore.resetBackoff()
-        WorkerUtils.triggerAmritPushWorker(context.applicationContext)
+        WorkerUtils.triggerAmritPushWorker(context.applicationContext, "MANUAL_REFRESH")
     }
 
     private fun entityLabel(context: Context, entity: String): String = when (entity) {
@@ -145,7 +146,7 @@ class SyncDashboardViewModel @Inject constructor(
     }
 
     // Tab 2: Logs
-    val syncLogs: StateFlow<List<SyncLogEntry>> = syncLogManager.logs
+    val syncLogs: StateFlow<List<SyncLogEntry>> = syncLogManager.interactiveLogs
 
     fun clearLogs() = syncLogManager.clearLogs()
 
@@ -170,20 +171,55 @@ class SyncDashboardViewModel @Inject constructor(
         return result
     }
 
-    // Tab 2: Log export
-    private val _exportIntent = MutableStateFlow<Intent?>(null)
-    val exportIntent: StateFlow<Intent?> = _exportIntent.asStateFlow()
+    // Shared export for Logs and Summary.
+    internal data class PendingExport(val sessionId: String, val intent: Intent)
+    private val _exportIntent = MutableStateFlow<PendingExport?>(null)
+    internal val exportIntent: StateFlow<PendingExport?> = _exportIntent.asStateFlow()
 
     private val _exportEmpty = MutableStateFlow(false)
     val exportEmpty: StateFlow<Boolean> = _exportEmpty.asStateFlow()
 
-    fun exportLogs() {
+    private val _shareSummary = MutableStateFlow<String?>(null)
+    val shareSummary: StateFlow<String?> = _shareSummary.asStateFlow()
+    private var shareSummaryScope: String? = null
+    internal fun summaryScope(): String {
+        val user = preferenceDao.getLoggedInUser()
+        val session = org.piramalswasthya.stoptb.helpers.interactiveSyncLogSession.session.value
+        return "$session/${user?.userId}/${user?.serviceMapId}/$selectedVillage"
+    }
+    fun updateShareSummary(summary: String?, scope: String? = null) {
+        shareSummaryScope = scope
+        _shareSummary.value = summary
+    }
+    private val _exportBusy = MutableStateFlow(false)
+    val exportBusy: StateFlow<Boolean> = _exportBusy.asStateFlow()
+
+    fun exportLogs(includeLogs: Boolean = true, includeSummary: Boolean = false) {
+        if (_exportBusy.value || (!includeLogs && !includeSummary)) return
+        val logSession = org.piramalswasthya.stoptb.helpers.interactiveSyncLogSession
+        val sessionId = logSession.session.value ?: return
+        val summary = if (includeSummary) _shareSummary.value else null
+        if (includeSummary && summary == null) return
+        if (includeSummary && shareSummaryScope != summaryScope()) {
+            updateShareSummary(null)
+            _exportEmpty.value = true
+            return
+        }
+        _exportBusy.value = true
         viewModelScope.launch(Dispatchers.IO) {
-            val intent = syncLogExporter.createShareIntent(getApplication())
-            if (intent != null) {
-                _exportIntent.value = intent
-            } else {
+            try {
+                val intent = syncLogExporter.createShareIntent(getApplication(), sessionId, includeLogs, summary)
+                if (intent != null && logSession.isCurrent(sessionId)) {
+                    _exportIntent.value = PendingExport(sessionId, intent)
+                } else if (logSession.isCurrent(sessionId)) {
+                    _exportEmpty.value = true
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
                 _exportEmpty.value = true
+            } finally {
+                _exportBusy.value = false
             }
         }
     }

@@ -100,7 +100,8 @@ class SyncGateWorker @AssistedInject constructor(
                 Timber.d("SyncGate: push chain running, re-arming (attempt ${reArm + 1})")
                 val next = OneTimeWorkRequestBuilder<SyncGateWorker>()
                     .setInitialDelay(BUSY_RECHECK_SECONDS, TimeUnit.SECONDS)
-                    .setInputData(workDataOf(KEY_REARM to reArm + 1))
+                    .setInputData(androidx.work.Data.Builder().putAll(inputData)
+                        .putInt(KEY_REARM, reArm + 1).build())
                     .build()
                 workManager.enqueueUniqueWork(
                     WorkerUtils.syncGateUniqueName,
@@ -109,7 +110,10 @@ class SyncGateWorker @AssistedInject constructor(
                 )
             } else {
                 Timber.d("SyncGate: no running push chain, starting one")
-                WorkerUtils.enqueuePushChain(applicationContext)
+                WorkerUtils.enqueuePushChain(applicationContext,
+                    inputData.getString(org.piramalswasthya.stoptb.helpers.SyncDiagnostics.TRIGGER) ?: "AUTO_PUSH",
+                    inputData.getString(org.piramalswasthya.stoptb.helpers.SyncDiagnostics.RUN_ID) ?: java.util.UUID.randomUUID().toString(),
+                    inputData.getString(org.piramalswasthya.stoptb.helpers.SyncDiagnostics.LOG_SESSION))
             }
             Result.success()
         } catch (e: Exception) {
@@ -125,7 +129,9 @@ class SyncGateWorker @AssistedInject constructor(
     private suspend fun ensureCampHubConnected(): Hub {
         if (!preferenceDao.isCampModeEnabled() || preferenceDao.isCampHubConnected()) return Hub.READY
         val url = preferenceDao.getStoredCampHubUrl()?.takeIf { it.isNotBlank() } ?: return Hub.NOT_CONFIGURED
-        val reachable = withContext(Dispatchers.IO) { CampHubReachability.isReachable(url) }
+        val reachable = withContext(Dispatchers.IO) {
+            org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.checkReachability(applicationContext, url, "SYNC_GATE_CHECK")
+        }
         if (!reachable) return Hub.UNREACHABLE
         Timber.i("SyncGate: camp hub reachable again")
         preferenceDao.setCampHubConnected(true)
@@ -143,7 +149,8 @@ class SyncGateWorker @AssistedInject constructor(
         Timber.d("SyncGate: camp hub unreachable, re-checking in ${OFFLINE_RECHECK_SECONDS}s (attempt ${reArm + 1})")
         val next = OneTimeWorkRequestBuilder<SyncGateWorker>()
             .setInitialDelay(OFFLINE_RECHECK_SECONDS, TimeUnit.SECONDS)
-            .setInputData(workDataOf(KEY_OFFLINE_REARM to reArm + 1))
+            .setInputData(androidx.work.Data.Builder().putAll(inputData)
+                .putInt(KEY_OFFLINE_REARM, reArm + 1).build())
             .build()
         workManager.enqueueUniqueWork(WorkerUtils.syncGateUniqueName, ExistingWorkPolicy.REPLACE, next)
     }

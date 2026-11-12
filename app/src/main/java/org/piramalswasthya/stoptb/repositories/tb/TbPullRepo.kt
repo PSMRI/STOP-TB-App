@@ -35,6 +35,9 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.database.shared_preferences.SyncRetryStore
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
+import org.piramalswasthya.stoptb.helpers.SyncDailyStore
+import org.piramalswasthya.stoptb.helpers.logSyncModule
+import org.piramalswasthya.stoptb.helpers.logSyncSkip
 import org.piramalswasthya.stoptb.helpers.manualResultTextToStore
 import org.piramalswasthya.stoptb.helpers.serverResultOrNull
 import org.piramalswasthya.stoptb.model.BenRegCache
@@ -144,11 +147,15 @@ class TbPullRepo @Inject constructor(
                         when (responseStatusCode) {
                             200 -> {
                                 try {
-                                    saveTBScreeningCacheFromNewResponse(jsonObj)
+                                    val saved = saveTBScreeningCacheFromNewResponse(jsonObj)
+                                    logSyncModule("TB_SCREENING", "PULL", "SUCCESS",
+                                        "received" to getStopTbDataArray(jsonObj).length(), "saved" to saved.size,
+                                        "skipped" to getStopTbDataArray(jsonObj).length() - saved.size)
                                 } catch (e: CancellationException) {
                                     throw e // a cancelled pull must stop, not report 0 / -1 records
                                 } catch (e: Exception) {
                                     Timber.d("TB Screening entries not synced $e")
+                                    logSyncModule("TB_SCREENING", "PULL", "FAILURE", "reason" to e.javaClass.simpleName)
                                     return@withContext 0
                                 }
 
@@ -164,7 +171,12 @@ class TbPullRepo @Inject constructor(
                             }
 
                             5000 -> {
-                                if (errorMessage == "No record found") return@withContext 0
+                                if (errorMessage == "No record found") {
+                                    logSyncModule("TB_SCREENING", "PULL", "NO_RECORDS_RETURNED",
+                                        "received" to 0, "saved" to 0, "httpCode" to statusCode,
+                                        "backendStatus" to 5000)
+                                    return@withContext 0
+                                }
                             }
 
                             else -> {
@@ -243,6 +255,7 @@ class TbPullRepo @Inject constructor(
                                     throw e
                                 } catch (e: Exception) {
                                     Timber.e(e, "General OPD entries not synced")
+                                    logSyncModule("GENERAL_OPD", "PULL", "FAILURE", "reason" to e.javaClass.simpleName)
                                     return@withContext -1
                                 }
                             }
@@ -257,7 +270,12 @@ class TbPullRepo @Inject constructor(
                             }
 
                             5000 -> {
-                                if (errorMessage == "No record found") return@withContext 0
+                                if (errorMessage == "No record found") {
+                                    logSyncModule("GENERAL_OPD", "PULL", "NO_RECORDS_RETURNED",
+                                        "received" to 0, "saved" to 0, "httpCode" to statusCode,
+                                        "backendStatus" to 5000)
+                                    return@withContext 0
+                                }
                             }
 
                             else -> {
@@ -280,7 +298,9 @@ class TbPullRepo @Inject constructor(
     }
 
     suspend fun applyFeedTbScreenings(records: JSONArray) = withContext(Dispatchers.IO) {
-        saveTBScreeningCacheFromNewResponse(feedResponse(records))
+        saveTBScreeningCacheFromNewResponse(feedResponse(records)).also {
+            logSyncModule("TB_SCREENING", "PULL", "SUCCESS", "received" to records.length(), "saved" to it.size)
+        }
     }
 
     suspend fun applyFeedGeneralOpd(records: JSONArray) = withContext(Dispatchers.IO) {
@@ -288,17 +308,23 @@ class TbPullRepo @Inject constructor(
     }
 
     suspend fun applyFeedDiagnostics(records: JSONArray) = withContext(Dispatchers.IO) {
-        saveTBDiagnosticsCacheFromNewResponse(feedResponse(records))
+        saveTBDiagnosticsCacheFromNewResponse(feedResponse(records)).also {
+            logSyncModule("TB_DIAGNOSTICS", "PULL", "SUCCESS", "received" to records.length(), "saved" to it.size)
+        }
     }
 
     suspend fun applyFeedTbSuspected(records: JSONArray) = withContext(Dispatchers.IO) {
-        saveTBSuspectedCacheFromResponse(JSONObject().put("userId", 0).put("tbSuspectedList", records).toString())
+        saveTBSuspectedCacheFromResponse(JSONObject().put("userId", 0).put("tbSuspectedList", records).toString()).also {
+            logSyncModule("TB_SUSPECTED", "PULL", "SUCCESS", "received" to records.length(), "saved" to it.size)
+        }
     }
 
     suspend fun applyFeedTbConfirmed(records: JSONArray) = withContext(Dispatchers.IO) {
         saveTBConfirmedCacheFromResponse(
             JSONObject().put("userId", 0).put("tbConfirmedCases", records).toString(), rethrow = true
-        )
+        ).also {
+            logSyncModule("TB_CONFIRMED", "PULL", "SUCCESS", "received" to records.length(), "saved" to it.size)
+        }
     }
 
     // Diagnostic orders from the changes feed: one item per order row, with the same result fields
@@ -388,6 +414,10 @@ class TbPullRepo @Inject constructor(
         if (bulk.isNotEmpty()) {
             val truenatIntegrated = deviceIntegrationRepo.isTruenatIntegrated()
             var bulkApplied = 0
+            // Households of beneficiaries this page confirms. saveTBSuspected() selects "Contact of
+            // Known TB" on their members' screenings; this path writes TB_SUSPECTED directly, so
+            // that runs below, once the locks and the transaction are released.
+            val confirmedHouseholds = HashSet<Long>()
             benIdLocks.withLocks(bulk.map { it.ben.beneficiaryId }) {
                 database.withTransaction {
                     for (order in bulk) {
@@ -418,7 +448,12 @@ class TbPullRepo @Inject constructor(
                         if (suspected != null) {
                             order.ben.gpsLatitude?.let { suspected.latitude = it }
                             order.ben.gpsLongitude?.let { suspected.longitude = it }
-                            if (suspected != existingSuspected) tbDao.saveTbSuspected(suspected)
+                            if (suspected != existingSuspected) {
+                                tbDao.saveTbSuspected(suspected)
+                                if (suspected.isTBConfirmed == true || suspected.isConfirmed) {
+                                    order.ben.householdId?.takeIf { it > 0L }?.let { confirmedHouseholds += it }
+                                }
+                            }
                         }
                         if (skipKey in skippedBefore) appliedSkipKeys += skipKey
                         bulkApplied++
@@ -427,6 +462,15 @@ class TbPullRepo @Inject constructor(
             }
             applied += bulkApplied
             Timber.d("Feed diagnostic orders: applied $bulkApplied of ${bulk.size} in one transaction")
+            confirmedHouseholds.forEach { householdId ->
+                try {
+                    tbLocalRepo.applyKnownTbContactRiskFactors(householdId)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to apply known-TB contact risk factors after feed diagnostic orders")
+                }
+            }
         }
         preferenceDao.removeFeedSkippedOrders(appliedSkipKeys)
 
@@ -469,6 +513,17 @@ class TbPullRepo @Inject constructor(
         preferenceDao.removeFeedSkippedOrder(diagnosticOrderRepo.feedSkippedKey(benId, type))
     }
 
+    private suspend fun logTbSkip(module: String, item: JSONObject?, index: Int?, reason: String,
+                                  state: SyncState? = null, localUpdatedAt: Long? = null,
+                                  serverUpdatedAt: Long? = null) {
+        logSyncSkip(module, "PULL", reason, "recordIndex" to index,
+            "recordId" to item?.optLong("id", 0L)?.takeIf { it > 0L },
+            "benRegId" to (item?.optLong("beneficiaryRegID", 0L)?.takeIf { it > 0L }
+                ?: item?.optLong("benRegID", 0L)?.takeIf { it > 0L }),
+            "localSyncState" to state?.name, "localUpdatedAt" to localUpdatedAt,
+            "serverUpdatedAt" to serverUpdatedAt)
+    }
+
     private fun feedResponse(records: JSONArray): JSONObject =
         JSONObject().put("statusCode", 200).put("data", JSONObject().put("data", records))
 
@@ -493,9 +548,16 @@ class TbPullRepo @Inject constructor(
             val chunkEnd = minOf(chunkStart + pullWriteChunkSize, records.length())
             database.withTransaction {
                 val chunkItems = (chunkStart until chunkEnd).mapNotNull { index ->
-                    val item = records.optJSONObject(index) ?: return@mapNotNull null
+                    val item = records.optJSONObject(index)
+                    if (item == null) {
+                        logTbSkip("TB_SCREENING", null, index, "INVALID_RECORD_OBJECT")
+                        return@mapNotNull null
+                    }
                     val benRegId = item.optLong("beneficiaryRegID", 0L).takeIf { regId -> regId > 0 }
-                        ?: return@mapNotNull null
+                    if (benRegId == null) {
+                        logTbSkip("TB_SCREENING", item, index, "BENEFICIARY_REGISTRATION_ID_MISSING")
+                        return@mapNotNull null
+                    }
                     item to benRegId
                 }
                 // associateBy keeps the last duplicate; the per-record query it replaces used
@@ -516,11 +578,19 @@ class TbPullRepo @Inject constructor(
                 val pendingWrites = linkedMapOf<Long, TBScreeningCache>()
 
                 for ((item, benRegId) in chunkItems) {
-                    val benId = benIdByRegId[benRegId] ?: continue
+                    val benId = benIdByRegId[benRegId]
+                    if (benId == null) {
+                        logTbSkip("TB_SCREENING", item, null, "BENEFICIARY_NOT_FOUND_LOCALLY")
+                        continue
+                    }
                     val visitDate = getLongFromDateMultipleSupport(item.optString("visitDate"))
                     val existing = existingByBenId[benId]
                     val serverUpdatedDate = getServerUpdatedDate(item)
                     if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
+                        logTbSkip("TB_SCREENING", item, null,
+                            if (existing?.syncState != SyncState.SYNCED) "LOCAL_PENDING_EDITS_PROTECTED"
+                            else "SERVER_VERSION_NOT_NEWER", existing?.syncState,
+                            existing?.serverUpdatedDate, serverUpdatedDate)
                         continue
                     }
                     val cache = (existing ?: TBScreeningCache(benId = benId)).copy(
@@ -542,6 +612,13 @@ class TbPullRepo @Inject constructor(
                         failureToGainWeightInChildren = item.optNullableBoolean("failureToGainWeightInChildren") ?: existing?.failureToGainWeightInChildren,
                         decreasedActivityOrPlayfulnessInChildren = item.optNullableBoolean("decreasedActivityOrPlayfulnessInChildren") ?: existing?.decreasedActivityOrPlayfulnessInChildren,
                         otherSymptoms = item.optNullableBoolean("otherSymptoms") ?: existing?.otherSymptoms,
+                        otherSymptomsDetails = if (item.has("otherSymptomsDetails")) {
+                            item.optStringOrNull("otherSymptomsDetails")
+                        } else if (item.optNullableBoolean("otherSymptoms") == false) {
+                            null
+                        } else {
+                            existing?.otherSymptomsDetails
+                        },
                         referredForDigitalChestXray = item.optNullableBoolean("referredForDigitalChestXray"),
                         referredForSputumCollection = item.optNullableBoolean("referredForSputumCollection"),
                         sputumSampleSubmittedAt = item.optStringOrNull("sputumSampleSubmittedAt"),
@@ -591,6 +668,9 @@ class TbPullRepo @Inject constructor(
 
     private suspend fun saveGeneralOpdCacheFromNewResponse(jsonObj: JSONObject): Boolean {
         val records = getStopTbDataArray(jsonObj)
+        var savedCount = 0
+        var skippedCount = 0
+        var invalidCount = 0
         // One transaction per [pullWriteChunkSize] records instead of one per record - see that
         // constant for why. Room's withTransaction is reentrant, so the per-record one inside
         // `save` below joins this chunk's transaction rather than committing on its own; the
@@ -605,6 +685,7 @@ class TbPullRepo @Inject constructor(
                 val chunkRegIds = chunk.mapNotNull { item -> item?.optLong("beneficiaryRegID", 0L)?.takeIf { it > 0 } }.distinct()
                 val benIdByRegId = if (chunkRegIds.isEmpty()) emptyMap() else
                     benDao.getBenIdsByRegIds(chunkRegIds).associate { mapping -> mapping.benRegId to mapping.beneficiaryId }
+                val savedIds = mutableListOf<Int>()
                 database.withTransaction {
                     val chunkComplete = processGeneralOpdPullBatch(
                         records = chunk,
@@ -618,8 +699,18 @@ class TbPullRepo @Inject constructor(
                         },
                         save = saveRecord@ { record, incomingRows ->
                             val item = requireNotNull(record)
-                            val benRegId = item.optLong("beneficiaryRegID", 0L).takeIf { it > 0 } ?: return@saveRecord
-                            val ben = benIdByRegId[benRegId]?.let { benId -> benDao.getBen(benId) } ?: return@saveRecord
+                            val benRegId = item.optLong("beneficiaryRegID", 0L).takeIf { it > 0 }
+                            if (benRegId == null) {
+                                skippedCount++
+                                logTbSkip("GENERAL_OPD", item, null, "BENEFICIARY_REGISTRATION_ID_MISSING")
+                                return@saveRecord
+                            }
+                            val ben = benIdByRegId[benRegId]?.let { benId -> benDao.getBen(benId) }
+                            if (ben == null) {
+                                skippedCount++
+                                logTbSkip("GENERAL_OPD", item, null, "BENEFICIARY_NOT_FOUND_LOCALLY")
+                                return@saveRecord
+                            }
                             val serverUpdatedDate = getServerUpdatedDate(item)
                             val incomingComplaints = item.optChiefComplaintsOrNull()
                             val hasDrugs = item.has("drugs") && !item.isNull("drugs")
@@ -632,9 +723,15 @@ class TbPullRepo @Inject constructor(
                                     if (canRecoverChiefComplaints(existing, incomingComplaints, serverUpdatedDate)) {
                                         val recovered = existing!!.copy(chiefComplaints = incomingComplaints,
                                             chiefComplaintIds = null)
-                                        tbDao.saveGeneralOpd(recovered)
+                                        savedIds.add(tbDao.saveGeneralOpd(recovered).toInt())
+                                        savedCount++
                                         return@perRecord
                                     }
+                                    skippedCount++
+                                    logTbSkip("GENERAL_OPD", item, null,
+                                        if (existing?.syncState != SyncState.SYNCED) "LOCAL_PENDING_EDITS_PROTECTED"
+                                        else "SERVER_VERSION_NOT_NEWER", existing?.syncState,
+                                        existing?.serverUpdatedDate, serverUpdatedDate)
                                     return@perRecord
                                 }
                                 val complaints = incomingComplaints ?: existing?.chiefComplaints
@@ -655,6 +752,8 @@ class TbPullRepo @Inject constructor(
                                     syncState = SyncState.SYNCED
                                 )
                                 val opdId = tbDao.saveGeneralOpd(cache).toInt()
+                                savedIds.add(opdId)
+                                savedCount++
                                 // Parent and per-drug rows must become visible together, never from different revisions.
                                 if (hasDrugs || cache.medications != existing?.medications ||
                                     cache.frequency != existing?.frequency || cache.duration != existing?.duration) {
@@ -665,13 +764,20 @@ class TbPullRepo @Inject constructor(
                             }
                         },
                         onInvalid = { index, error ->
+                            invalidCount++
+                            skippedCount++
+                            logTbSkip("GENERAL_OPD", chunk[index], chunkOffset + index, generalOpdSkipReason(error))
                             Timber.e("General OPD pull skipped invalid record at index ${chunkOffset + index} (${error.javaClass.simpleName})")
                         }
                     )
                     if (!chunkComplete) complete = false
                 }
+                SyncDailyStore.record("GENERAL_OPD", savedIds, "PULL", "SUCCESS")
                 recordsBeforeChunk += chunk.size
             }
+        logSyncModule("GENERAL_OPD", "PULL", if (complete) "SUCCESS" else "PARTIAL_FAILURE",
+            "received" to records.length(), "saved" to savedCount, "skipped" to skippedCount,
+            "failed" to invalidCount)
         return complete
     }
 
@@ -695,11 +801,15 @@ class TbPullRepo @Inject constructor(
                         when (val responseStatusCode = jsonObj.getInt("statusCode")) {
                             200 -> {
                                 try {
-                                    saveTBDiagnosticsCacheFromNewResponse(jsonObj)
+                                    val saved = saveTBDiagnosticsCacheFromNewResponse(jsonObj)
+                                    logSyncModule("TB_DIAGNOSTICS", "PULL", "SUCCESS",
+                                        "received" to getStopTbDataArray(jsonObj).length(), "saved" to saved.size,
+                                        "skipped" to getStopTbDataArray(jsonObj).length() - saved.size)
                                 } catch (e: CancellationException) {
                                     throw e // a cancelled pull must stop, not report 0 / -1 records
                                 } catch (e: Exception) {
                                     Timber.d("TB Diagnostics entries not synced $e")
+                                    logSyncModule("TB_DIAGNOSTICS", "PULL", "FAILURE", "reason" to e.javaClass.simpleName)
                                     return@withContext 0
                                 }
                                 return@withContext 1
@@ -714,7 +824,12 @@ class TbPullRepo @Inject constructor(
                             }
 
                             5000 -> {
-                                if (errorMessage == "No record found") return@withContext 0
+                                if (errorMessage == "No record found") {
+                                    logSyncModule("TB_DIAGNOSTICS", "PULL", "NO_RECORDS_RETURNED",
+                                        "received" to 0, "saved" to 0, "httpCode" to response.code(),
+                                        "backendStatus" to 5000)
+                                    return@withContext 0
+                                }
                             }
 
                             else -> {
@@ -794,6 +909,20 @@ class TbPullRepo @Inject constructor(
             }.distinct()
             val benIdByRegId = if (chunkRegIds.isEmpty()) emptyMap() else
                 benDao.getBenIdsByRegIds(chunkRegIds).associate { mapping -> mapping.benRegId to mapping.beneficiaryId }
+            // Skip reasons for records this chunk can't apply, logged outside the locks below.
+            for (index in chunkStart until chunkEnd) {
+                val item = records.optJSONObject(index)
+                if (item == null) {
+                    logTbSkip("TB_DIAGNOSTICS", null, index, "INVALID_RECORD_OBJECT")
+                    continue
+                }
+                val benRegId = item.optLong("benRegID", 0L).takeIf { it > 0 }
+                if (benRegId == null) {
+                    logTbSkip("TB_DIAGNOSTICS", item, index, "BENEFICIARY_REGISTRATION_ID_MISSING")
+                } else if (benRegId !in benIdByRegId) {
+                    logTbSkip("TB_DIAGNOSTICS", item, index, "BENEFICIARY_NOT_FOUND_LOCALLY")
+                }
+            }
             val chunkBenIds = benIdByRegId.values.toSet()
             if (chunkBenIds.isEmpty()) continue
             benIdLocks.withLocks(chunkBenIds) {
@@ -806,6 +935,10 @@ class TbPullRepo @Inject constructor(
                         val serverUpdatedDate = getServerUpdatedDate(item)
                         val existing = tbDao.getTbDiagnostics(benId)
                         if (!shouldApplyServerRecord(existing?.syncState, existing?.serverUpdatedDate, serverUpdatedDate)) {
+                            logTbSkip("TB_DIAGNOSTICS", item, index,
+                                if (existing?.syncState != SyncState.SYNCED) "LOCAL_PENDING_EDITS_PROTECTED"
+                                else "SERVER_VERSION_NOT_NEWER", existing?.syncState,
+                                existing?.serverUpdatedDate, serverUpdatedDate)
                             continue
                         }
                         val cache = (existing ?: TBDiagnosticsCache(benId = benId)).copy(
@@ -824,6 +957,12 @@ class TbPullRepo @Inject constructor(
                             trueNatRifResult = item.optStringOrNull("trueNatRifResult") ?: existing?.trueNatRifResult,
                             rifOrderId = item.optStringOrNull("rifOrderId") ?: existing?.rifOrderId,
                             rifOrderStatus = item.optStringOrNull("rifOrderStatus") ?: existing?.rifOrderStatus,
+                            sputumCollectionDate = item.optLong("sputumCollectionDate")
+                                .takeIf { it > 0L }
+                                ?: item.optStringOrNull("sputumCollectionDate")?.toLongOrNull()?.takeIf { it > 0L }
+                                ?: item.optStringOrNull("sputumCollectionDate")
+                                    ?.let { getLongFromDateMultipleSupport(it).takeIf { parsed -> parsed > 0L } }
+                                ?: existing?.sputumCollectionDate,
                             serverUpdatedDate = serverUpdatedDate.takeIf { it > 0L },
                             syncState = SyncState.SYNCED
                         )
@@ -870,11 +1009,14 @@ class TbPullRepo @Inject constructor(
                             200 -> {
                                 try {
                                     val dataObj = jsonObj.getString("data")
-                                    saveTBSuspectedCacheFromResponse(dataObj)
+                                    val saved = saveTBSuspectedCacheFromResponse(dataObj)
+                                    logSyncModule("TB_SUSPECTED", "PULL", "SUCCESS", "saved" to saved.size,
+                                        "received" to null)
                                 } catch (e: CancellationException) {
                                     throw e // a cancelled pull must stop, not report 0 / -1 records
                                 } catch (e: Exception) {
                                     Timber.d("TB Suspected entries not synced $e")
+                                    logSyncModule("TB_SUSPECTED", "PULL", "FAILURE", "reason" to e.javaClass.simpleName)
                                     return@withContext 0
                                 }
 
@@ -890,7 +1032,12 @@ class TbPullRepo @Inject constructor(
                             }
 
                             5000 -> {
-                                if (errorMessage == "No record found") return@withContext 0
+                                if (errorMessage == "No record found") {
+                                    logSyncModule("TB_SUSPECTED", "PULL", "NO_RECORDS_RETURNED",
+                                        "received" to 0, "saved" to 0, "httpCode" to statusCode,
+                                        "backendStatus" to 5000)
+                                    return@withContext 0
+                                }
                             }
 
                             else -> {
@@ -949,9 +1096,10 @@ class TbPullRepo @Inject constructor(
                                 aiCoughAssessmentResult = incoming.aiCoughAssessmentResult,
                                 isNaatConducted = incoming.isNaatConducted ?: tbSuspectedCache.isNaatConducted,
                                 naatResult = incoming.naatResult ?: tbSuspectedCache.naatResult,
-                                recommendedForLiquidCultureTest = incoming.recommendedForLiquidCultureTest,
-                                isLiquidCultureConducted = incoming.isLiquidCultureConducted,
-                                liquidCultureResult = incoming.liquidCultureResult,
+                                // No tb_suspected column either; keep the tablet's copy.
+                                recommendedForLiquidCultureTest = incoming.recommendedForLiquidCultureTest ?: tbSuspectedCache.recommendedForLiquidCultureTest,
+                                isLiquidCultureConducted = incoming.isLiquidCultureConducted ?: tbSuspectedCache.isLiquidCultureConducted,
+                                liquidCultureResult = incoming.liquidCultureResult ?: tbSuspectedCache.liquidCultureResult,
                                 referralFacility = incoming.referralFacility,
                                 isTBConfirmed = incoming.isTBConfirmed,
                                 isDRTBConfirmed = incoming.isDRTBConfirmed,
@@ -973,11 +1121,17 @@ class TbPullRepo @Inject constructor(
                         )
                         Timber.d("SYNC_DIAG TB Suspected pull: benId=${tbSuspectedDTO.benId} serverId=${tbSuspectedDTO.id} matchedLocalId=${tbSuspectedCache?.id} localSyncState=${tbSuspectedCache?.syncState} localServerUpdatedDate=${tbSuspectedCache?.serverUpdatedDate} incomingServerUpdatedDate=${cache.serverUpdatedDate} shouldApply=$shouldApply")
                         if (shouldApply) {
-                            benDao.getBen(tbSuspectedDTO.benId)?.let {
+                            val beneficiary = benDao.getBen(tbSuspectedDTO.benId)
+                            if (beneficiary != null) {
                                 tbDao.saveTbSuspected(cache)
                                 tbSuspectedList.add(cache)
+                            } else {
+                                logSyncSkip("TB_SUSPECTED", "PULL", "BENEFICIARY_NOT_FOUND_LOCALLY",
+                                    "benId" to tbSuspectedDTO.benId, "recordId" to tbSuspectedDTO.id)
                             }
                         } else if (tbSuspectedCache != null && tbSuspectedCache.syncState != SyncState.SYNCED) {
+                            logSyncSkip("TB_SUSPECTED", "PULL", "LOCAL_PENDING_EDITS_PROTECTED",
+                                "benId" to tbSuspectedDTO.benId, "recordId" to tbSuspectedDTO.id)
                             Timber.w("SYNC_DIAG TB Suspected pull: benId=${tbSuspectedDTO.benId} server already has this record (serverId=${tbSuspectedDTO.id}) but local id=${tbSuspectedCache.id} is stuck at syncState=${tbSuspectedCache.syncState} — reconciliation SKIPPED, will remain unsynced until a push of this local row succeeds")
                         }
                     }
@@ -1013,12 +1167,15 @@ class TbPullRepo @Inject constructor(
                                 try {
                                     val dataObj = jsonObj.getString("data")
 
-                                    saveTBConfirmedCacheFromResponse(dataObj)
+                                    val saved = saveTBConfirmedCacheFromResponse(dataObj)
+                                    logSyncModule("TB_CONFIRMED", "PULL", "SUCCESS", "saved" to saved.size,
+                                        "received" to null)
 
                                 } catch (e: CancellationException) {
                                     throw e // a cancelled pull must stop, not report 0 / -1 records
                                 } catch (e: Exception) {
                                     Timber.e(e, "TBConfirmed: Error while saving data")
+                                    logSyncModule("TB_CONFIRMED", "PULL", "FAILURE", "reason" to e.javaClass.simpleName)
                                     return@withContext 0
                                 }
 
@@ -1034,6 +1191,8 @@ class TbPullRepo @Inject constructor(
 
                             5000 -> {
                                 if (errorMessage == "No record found") {
+                                    logSyncModule("TB_CONFIRMED", "PULL", "NO_RECORDS_RETURNED",
+                                        "received" to 0, "saved" to 0)
                                     return@withContext 0
                                 }
                             }
@@ -1097,6 +1256,9 @@ class TbPullRepo @Inject constructor(
                                 val cacheToSave = if (existing != null) cache.copy(id = existing.id) else cache
                                 tbDao.saveTbConfirmed(cacheToSave)
                                 tbConfirmedList.add(cacheToSave)
+                            } else if (existing?.syncState != SyncState.SYNCED) {
+                                logSyncSkip("TB_CONFIRMED", "PULL", "LOCAL_PENDING_EDITS_PROTECTED",
+                                    "benId" to cache.benId, "recordId" to cache.id)
                             }
 
                         } catch (e: CancellationException) {
@@ -1108,6 +1270,8 @@ class TbPullRepo @Inject constructor(
                             // The changes feed must not move its token past a record that wasn't saved.
                             if (rethrow) throw e
                             Timber.e(e, "TBConfirmed: skipping one record in this chunk")
+                            logSyncSkip("TB_CONFIRMED", "PULL", "LOCAL_SAVE_FAILED",
+                                "benId" to tbConfirmedDTO.benId, "errorType" to e.javaClass.simpleName)
                         }
                     }
                 }
@@ -1118,6 +1282,7 @@ class TbPullRepo @Inject constructor(
         } catch (e: Exception) {
             if (rethrow) throw e
             Timber.e(e, "TBConfirmed: Error parsing or saving JSON")
+            logSyncModule("TB_CONFIRMED", "PULL", "FAILURE", "reason" to e.javaClass.simpleName)
         }
 
         return tbConfirmedList

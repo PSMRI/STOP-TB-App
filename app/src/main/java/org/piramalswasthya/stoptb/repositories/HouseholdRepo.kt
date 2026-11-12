@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.repositories
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.piramalswasthya.stoptb.helpers.SyncDailyStore
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.HouseholdDao
 import org.piramalswasthya.stoptb.model.BenRegCache
@@ -27,6 +28,7 @@ class HouseholdRepo @Inject constructor(
             } else {
                 dao.update(it)
             }
+            if (!it.isDraft) SyncDailyStore.record("HOUSEHOLD", listOf(it.householdId), "SAVE", "SUCCESS")
         }
     }
 

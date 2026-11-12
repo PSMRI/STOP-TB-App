@@ -407,35 +407,35 @@ class IconDataset @Inject constructor(
     }
     fun getReferralDataset(resources: Resources) = listOf(
         Icon(
-            R.drawable.ic__ncd_eligibility,
+            R.drawable.ic_health_xray,
             resources.getString(R.string.referral_digital_chest_xray),
             resources.getString(R.string.home_card_referral_subtitle),
             recordsRepo.digitalChestXrayReferralCount,
             ReferralIconsFragmentDirections.actionReferralIconsFragmentToAllBenFragment(6)
         ),
         Icon(
-            R.drawable.ic__death,
+            R.drawable.ic_truenat_device,
             resources.getString(R.string.referral_true_nat),
             resources.getString(R.string.home_card_referral_subtitle),
             recordsRepo.trueNatReferralCount,
             ReferralIconsFragmentDirections.actionReferralIconsFragmentToAllBenFragment(7)
         ),
         Icon(
-            R.drawable.ic_check_circle,
+            R.drawable.ic_health_rural_post,
             resources.getString(R.string.referral_hwc),
             resources.getString(R.string.home_card_referral_subtitle),
             recordsRepo.hwcReferralCount,
             ReferralIconsFragmentDirections.actionReferralIconsFragmentToAllBenFragment(5)
         ),
         Icon(
-            R.drawable.ic_check_circle,
+            R.drawable.ic_health_test_tubes,
             resources.getString(R.string.referral_liquid_culture),
             resources.getString(R.string.home_card_referral_subtitle),
             recordsRepo.liquidCultureReferralCount,
             ReferralIconsFragmentDirections.actionReferralIconsFragmentToAllBenFragment(8)
         ),
         Icon(
-            R.drawable.ic_check_circle,
+            R.drawable.ic_clinical_assessment,
             resources.getString(R.string.referral_clinical_assessment),
             resources.getString(R.string.home_card_referral_subtitle),
             recordsRepo.clinicalAssessmentReferralCount,

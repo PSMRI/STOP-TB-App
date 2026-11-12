@@ -17,6 +17,15 @@
         android:background="?attr/colorPrimary"
         >
 
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
         <androidx.cardview.widget.CardView
             android:id="@+id/cv_login_item_container"
             android:layout_width="match_parent"
@@ -157,6 +166,43 @@
                         tools:ignore="SpeakableTextPresentCheck" />
                 </com.google.android.material.textfield.TextInputLayout>
 
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/til_pincode"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/padding_normal"
+                    asteriskRequired="@{true}"
+                    hintText="@{@string/str_pincode}"
+                    android:labelFor="@id/et_pincode">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/et_pincode"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:maxLength="6"
+                        android:maxLines="1" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/til_residential_area_dropdown"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/padding_normal"
+                    asteriskRequired="@{true}"
+                    hintText="@{@string/nhhr_type_residential_area}"
+                    android:labelFor="@id/actv_residential_area_dropdown">
+
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                        android:id="@+id/actv_residential_area_dropdown"
+                        listItems="@{@stringArray/nbr_residential_area_array}"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="none" />
+                </com.google.android.material.textfield.TextInputLayout>
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_continue"
                     android:layout_width="match_parent"
@@ -170,6 +216,10 @@
             </LinearLayout>
 
         </androidx.cardview.widget.CardView>
+
+        </FrameLayout>
+
+        </ScrollView>
 
 
     </FrameLayout>

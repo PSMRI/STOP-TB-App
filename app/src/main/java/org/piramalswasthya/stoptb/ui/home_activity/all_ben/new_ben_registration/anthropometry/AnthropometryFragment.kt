@@ -2,12 +2,16 @@ package org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration
 
 import android.app.AlertDialog
 import android.content.res.ColorStateList
+import android.graphics.Typeface
 import android.os.Bundle
 import android.text.InputFilter
+import android.text.InputType
 import android.text.Spanned
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
+import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
@@ -20,6 +24,8 @@ import kotlinx.coroutines.launch
 import dagger.hilt.android.AndroidEntryPoint
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.databinding.FragmentAnthropometryBinding
+import org.piramalswasthya.stoptb.databinding.RvItemFormNumberPickerBinding
+import org.piramalswasthya.stoptb.model.FormElement
 import org.piramalswasthya.stoptb.model.AgeUnit
 import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.Gender
@@ -40,6 +46,7 @@ class AnthropometryFragment : Fragment() {
         const val MAX_WEIGHT_KG = 250.0
         const val MIN_HEIGHT_CM = 30.0
         const val MAX_HEIGHT_CM = 250.0
+        const val DEFAULT_MEASUREMENT = "0"
         const val MIN_TEMPERATURE_F = 90.0
         const val MAX_TEMPERATURE_F = 110.0
         const val FEVER_TEMPERATURE_F = 99.0
@@ -71,9 +78,27 @@ class AnthropometryFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.etWeight.filters = arrayOf(decimalInputFilter())
-        binding.etHeight.filters = arrayOf(decimalInputFilter())
         binding.etTemperature.filters = arrayOf(decimalInputFilter())
+        bindMeasurementPicker(
+            picker = binding.weightPicker,
+            pickerId = 1,
+            label = getString(R.string.weight_kgs),
+            min = MIN_WEIGHT_KG,
+            max = MAX_WEIGHT_KG
+        ) {
+            validateWeight(showBlankError = false)
+            updateBmi()
+        }
+        bindMeasurementPicker(
+            picker = binding.heightPicker,
+            pickerId = 2,
+            label = getString(R.string.height_cms),
+            min = MIN_HEIGHT_CM,
+            max = MAX_HEIGHT_CM
+        ) {
+            validateHeight(showBlankError = false)
+            updateBmi()
+        }
 
         // Lock immediately for View-only — lockFormIfExistingData() below only fires once
         // existing data loads, which would leave a brand-new record editable otherwise.
@@ -90,21 +115,19 @@ class AnthropometryFragment : Fragment() {
             // Lock form FIRST so that setText below does not trigger the HWC alert in view mode
             lockFormIfExistingData(ben)
             binding.tvAgeGender.text = ben.getAgeGenderDisplayString()
-            binding.etWeight.setText(ben.weight?.formatOneDecimal().orEmpty())
-            binding.etHeight.setText(ben.height?.formatOneDecimal().orEmpty())
+            setPickerValue(
+                binding.weightPicker,
+                ben.weight?.formatOneDecimal() ?: DEFAULT_MEASUREMENT
+            )
+            setPickerValue(
+                binding.heightPicker,
+                ben.height?.formatOneDecimal() ?: DEFAULT_MEASUREMENT
+            )
             binding.etBmi.setText(ben.bmi?.formatOneDecimal().orEmpty())
             binding.etTemperature.setText(ben.temperature?.formatOneDecimal().orEmpty())
             selectTemperatureRange(ben.temperature)
         }
 
-        binding.etWeight.doAfterTextChanged {
-            validateWeight(showBlankError = false)
-            updateBmi()
-        }
-        binding.etHeight.doAfterTextChanged {
-            validateHeight(showBlankError = false)
-            updateBmi()
-        }
         binding.etTemperature.doAfterTextChanged {
             validateTemperature(showBlankError = false)
             selectTemperatureRange(binding.etTemperature.text?.toString()?.toDoubleOrNull())
@@ -135,8 +158,8 @@ class AnthropometryFragment : Fragment() {
             if (!validateInput()) return@setOnClickListener
             if (isHighTemperature()) showHighTemperatureAlert()
             viewModel.saveAnthropometry(
-                weightKg = binding.etWeight.text?.toString(),
-                heightCm = binding.etHeight.text?.toString(),
+                weightKg = measurementOrNull(binding.weightPicker.etNumberInput.text?.toString()),
+                heightCm = measurementOrNull(binding.heightPicker.etNumberInput.text?.toString()),
                 temperatureF = binding.etTemperature.text?.toString()
             )
         }
@@ -167,8 +190,8 @@ class AnthropometryFragment : Fragment() {
 
     private fun updateBmi() {
         val bmi = viewModel.calculateBmi(
-            heightCm = binding.etHeight.text?.toString(),
-            weightKg = binding.etWeight.text?.toString()
+            heightCm = binding.heightPicker.etNumberInput.text?.toString(),
+            weightKg = binding.weightPicker.etNumberInput.text?.toString()
         )
         binding.etBmi.setText(bmi?.formatOneDecimal().orEmpty())
     }
@@ -181,24 +204,28 @@ class AnthropometryFragment : Fragment() {
 
     private fun validateWeight(showBlankError: Boolean): Boolean {
         return validateOptionalRange(
-            value = binding.etWeight.text?.toString(),
+            value = enteredMeasurement(binding.weightPicker.etNumberInput.text?.toString()),
             min = MIN_WEIGHT_KG,
             max = MAX_WEIGHT_KG,
             errorMessage = getString(R.string.enter_weight_between_1_250_kg),
             showBlankError = showBlankError,
-            onErrorChanged = { binding.tilWeight.error = it }
+            onErrorChanged = { showFieldError(binding.weightPicker.tvError, it) }
         )
     }
 
     private fun validateHeight(showBlankError: Boolean): Boolean {
         return validateOptionalRange(
-            value = binding.etHeight.text?.toString(),
+            value = enteredMeasurement(binding.heightPicker.etNumberInput.text?.toString()),
             min = MIN_HEIGHT_CM,
             max = MAX_HEIGHT_CM,
             errorMessage = getString(R.string.enter_height_between_30_250_cm),
             showBlankError = showBlankError,
-            onErrorChanged = { binding.tilHeight.error = it }
+            onErrorChanged = { showFieldError(binding.heightPicker.tvError, it) }
         )
+    }
+
+    private fun enteredMeasurement(value: String?): String? {
+        return if (measurementOrNull(value) == null) null else value
     }
 
     private fun validateTemperature(showBlankError: Boolean): Boolean {
@@ -268,8 +295,8 @@ class AnthropometryFragment : Fragment() {
 
     private fun lockForm() {
         isFormLocked = true  // set before any setText triggers doAfterTextChanged
-        binding.etWeight.isEnabled = false
-        binding.etHeight.isEnabled = false
+        lockPicker(binding.weightPicker)
+        lockPicker(binding.heightPicker)
         binding.etTemperature.isEnabled = false
         binding.rbTempHypothermia.isEnabled = false
         binding.rbTempNormal.isEnabled = false
@@ -285,6 +312,88 @@ class AnthropometryFragment : Fragment() {
         binding.rbTempNormal.buttonTintList = disabledGrayStateList
         binding.rbTempHigh.buttonTintList = disabledGrayStateList
         binding.btnSubmit.backgroundTintList = disabledGrayStateList
+    }
+
+    private fun bindMeasurementPicker(
+        picker: RvItemFormNumberPickerBinding,
+        pickerId: Int,
+        label: String,
+        min: Double,
+        max: Double,
+        onValueChanged: () -> Unit
+    ) {
+        picker.form = FormElement(
+            id = pickerId,
+            inputType = org.piramalswasthya.stoptb.model.InputType.NUMBER_PICKER,
+            required = false,
+            title = label,
+            value = DEFAULT_MEASUREMENT,
+            min = 0,
+            max = max.toLong()
+        )
+        picker.tvLabel.setTypeface(picker.tvLabel.typeface, Typeface.BOLD)
+        picker.etNumberInput.apply {
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setTypeface(typeface, Typeface.BOLD)
+            filters = arrayOf(decimalInputFilter())
+            if (text.isNullOrBlank()) setText(DEFAULT_MEASUREMENT)
+            doAfterTextChanged {
+                picker.form?.value = it?.toString()
+                onValueChanged()
+            }
+        }
+        picker.btnIncrement.setOnClickListener {
+            stepMeasurement(picker.etNumberInput, delta = 1.0, min = min, max = max)
+        }
+        picker.btnDecrement.setOnClickListener {
+            stepMeasurement(picker.etNumberInput, delta = -1.0, min = min, max = max)
+        }
+    }
+
+    private fun setPickerValue(picker: RvItemFormNumberPickerBinding, value: String) {
+        val resolved = value.ifBlank { DEFAULT_MEASUREMENT }
+        picker.form?.value = resolved
+        if (picker.etNumberInput.text?.toString() != resolved) {
+            picker.etNumberInput.setText(resolved)
+        }
+    }
+
+    private fun measurementOrNull(value: String?): String? {
+        val trimmed = value?.trim().orEmpty()
+        val number = trimmed.toDoubleOrNull() ?: return null
+        if (number == 0.0) return null
+        return trimmed
+    }
+
+    private fun lockPicker(picker: RvItemFormNumberPickerBinding) {
+        picker.etNumberInput.isEnabled = false
+        picker.btnIncrement.isEnabled = false
+        picker.btnDecrement.isEnabled = false
+        picker.containerNumberPickerCard.alpha = 0.6f
+    }
+
+    private fun stepMeasurement(field: EditText, delta: Double, min: Double, max: Double) {
+        if (isFormLocked) return
+        val current = field.text?.toString()?.trim()?.toDoubleOrNull() ?: 0.0
+        val next = when {
+            current <= 0.0 && delta < 0.0 -> 0.0
+            current < min -> if (delta > 0.0) min else 0.0
+            else -> (current + delta).coerceIn(min, max)
+        }
+        val formatted = if (next == 0.0) DEFAULT_MEASUREMENT else next.formatOneDecimal()
+        if (field.text?.toString() == formatted) return
+        field.setText(formatted)
+        field.setSelection(field.text?.length ?: 0)
+    }
+
+    private fun showFieldError(errorView: TextView, message: String?) {
+        if (message.isNullOrBlank()) {
+            errorView.text = null
+            errorView.visibility = View.GONE
+        } else {
+            errorView.text = message
+            errorView.visibility = View.VISIBLE
+        }
     }
 
     private fun decimalInputFilter(): InputFilter {

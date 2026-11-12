@@ -53,6 +53,8 @@ import org.piramalswasthya.stoptb.utils.callPhoneNumber
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
 import javax.inject.Inject
+import org.piramalswasthya.stoptb.model.OrderAction
+import org.piramalswasthya.stoptb.model.DiagnosticOrderType
 
 @AndroidEntryPoint
 class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
@@ -338,73 +340,73 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 clickedOrderAction = { item, action, orderType ->
                     if (!showResultButton) return@BenClickListener
                     when (action) {
-                        "REFER" -> {
+                        OrderAction.REFER -> {
                             findNavController().navigate(
                                 AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
                                     benId = item.benId,
                                     viewOnly = false,
-                                    referralType = if (orderType == "XRAY_CHEST") 6 else 7
+                                    referralType = if (orderType == DiagnosticOrderType.XRAY_CHEST) 6 else 7
                                 )
                             )
                         }
-                        "COMPLETE" -> {
+                        OrderAction.COMPLETE -> {
                             findNavController().navigate(
                                 AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
                                     benId = item.benId,
                                     viewOnly = false,
-                                    referralType = if (orderType == "XRAY_CHEST") 6 else 7,
-                                    manualEntryAction = "COMPLETE"
+                                    referralType = if (orderType == DiagnosticOrderType.XRAY_CHEST) 6 else 7,
+                                    manualEntryAction = OrderAction.COMPLETE.name
                                 )
                             )
                         }
-                        "NOT_CONDUCTED" -> {
+                        OrderAction.NOT_CONDUCTED -> {
                             findNavController().navigate(
                                 AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
                                     benId = item.benId,
                                     viewOnly = false,
-                                    referralType = if (orderType == "XRAY_CHEST") 6 else 7,
-                                    manualEntryAction = "NOT_CONDUCTED"
+                                    referralType = if (orderType == DiagnosticOrderType.XRAY_CHEST) 6 else 7,
+                                    manualEntryAction = OrderAction.NOT_CONDUCTED.name
                                 )
                             )
                         }
-                        "REORDER" -> {
-                            viewModel.createNewOrder(item.benId, orderType, requireContext())
+                        OrderAction.REORDER -> {
+                            viewModel.createNewOrder(item.benId, orderType ?: return@BenClickListener, requireContext())
                         }
-                        "COMPLETE_RIF" -> {
+                        OrderAction.COMPLETE_RIF -> {
                             findNavController().navigate(
                                 AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
                                     benId = item.benId,
                                     viewOnly = false,
                                     referralType = 7,
-                                    manualEntryAction = "COMPLETE"
+                                    manualEntryAction = OrderAction.COMPLETE.name
                                 )
                             )
                         }
-                        "POLL" -> {
-                            viewModel.pollOrderResult(item.benId, orderType)
+                        OrderAction.POLL -> {
+                            viewModel.pollOrderResult(item.benId, orderType ?: return@BenClickListener)
                         }
-                        "RETRY_POLL" -> {
-                            viewModel.retryResultFetch(item.benId, orderType, requireContext())
+                        OrderAction.RETRY_POLL -> {
+                            viewModel.retryResultFetch(item.benId, orderType ?: return@BenClickListener, requireContext())
                         }
-                        "RETRY_PUSH" -> {
-                            viewModel.retryTest(item.benId, orderType, requireContext())
+                        OrderAction.RETRY_PUSH -> {
+                            viewModel.retryTest(item.benId, orderType ?: return@BenClickListener, requireContext())
                         }
-                        "CHECK_PUSH_ACTIVE" -> {
+                        OrderAction.CHECK_PUSH_ACTIVE -> {
                             viewModel.checkAndTrackInFlightPush(item.benId, requireContext())
                         }
-                        "RETRY_RIF_POLL" -> {
-                            viewModel.retryResultFetch(item.benId, "MDR_RIF", requireContext())
+                        OrderAction.RETRY_RIF_POLL -> {
+                            viewModel.retryResultFetch(item.benId, DiagnosticOrderType.MDR_RIF, requireContext())
                         }
-                        "VIEW" -> {
+                        OrderAction.VIEW -> {
                             findNavController().navigate(
                                 AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
                                     benId = item.benId,
                                     viewOnly = true,
-                                    referralType = if (orderType == "XRAY_CHEST") 6 else 7
+                                    referralType = if (orderType == DiagnosticOrderType.XRAY_CHEST) 6 else 7
                                 )
                             )
                         }
-                        "VIEW_RIF" -> {
+                        OrderAction.VIEW_RIF -> {
                             findNavController().navigate(
                                 AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
                                     benId = item.benId,
@@ -413,7 +415,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                                 )
                             )
                         }
-                        "ENTER_LC", "VIEW_LC" -> {
+                        OrderAction.ENTER_LC -> {
                             findNavController().navigate(
                                 AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
                                     benId = item.benId,
@@ -422,6 +424,17 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                                 )
                             )
                         }
+                        OrderAction.VIEW_LC -> {
+                            findNavController().navigate(
+                                AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
+                                    benId = item.benId,
+                                    viewOnly = true,
+                                    referralType = 8
+                                )
+                            )
+                        }
+                        // Disabled buttons — never clickable.
+                        OrderAction.NONE, OrderAction.NO_RESULT -> Unit
                     }
                 },
                 { item, benId, hhId, viewOnly ->
@@ -714,10 +727,10 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     is AllBenViewModel.OrderActionResult.Success -> {
                         Toast.makeText(requireContext(), state.message, Toast.LENGTH_LONG).show()
                         viewModel.resetOrderActionState()
-                        if (state.message.contains("completed", ignoreCase = true) || state.orderType.equals("MDR_RIF", ignoreCase = true)) {
-                            if (state.orderType.equals("MDR_RIF", ignoreCase = true)) {
+                        if (state.message.contains("completed", ignoreCase = true) || state.orderType == DiagnosticOrderType.MDR_RIF) {
+                            if (state.orderType == DiagnosticOrderType.MDR_RIF) {
                                 WorkerUtils.triggerRifDiagnosticResultPollWorker(requireContext())
-                            } else if (state.orderType.equals("SPUTUM_TRUENAT", ignoreCase = true)) {
+                            } else if (state.orderType == DiagnosticOrderType.SPUTUM_TRUENAT) {
                                 WorkerUtils.triggerTrueNatDiagnosticResultPollWorker(requireContext())
                             } else {
                                 WorkerUtils.triggerDiagnosticResultPollWorker(requireContext())
@@ -1043,6 +1056,12 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 }
 
                 launch {
+                    viewModel.tptRegistrationDoneBenIds.collectLatest { benIds ->
+                        benAdapter.submitTptRegistrationDoneBenIds(benIds)
+                    }
+                }
+
+                launch {
                     viewModel.tptEligibleBenIds.collectLatest { benIds ->
                         benAdapter.submitTptEligibleBenIds(benIds)
                     }
@@ -1091,10 +1110,16 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 getString(R.string.icon_title_ben)
             }
 
-            val icon = if (args.source == 6) {
+            val icon = if (args.source == 5) {
+                R.drawable.ic_health_rural_post
+            } else if (args.source == 6) {
                 R.drawable.ic_health_xray
             } else if (args.source == 7) {
                 R.drawable.ic_truenat_device
+            } else if (args.source == 8) {
+                R.drawable.ic_health_test_tubes
+            } else if (args.source == 10) {
+                R.drawable.ic_clinical_assessment
             } else {
                 R.drawable.ic__ben
             }

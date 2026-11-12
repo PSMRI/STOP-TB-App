@@ -172,7 +172,21 @@ class VitalScreenViewModel @Inject constructor(
                         pulseRateOption = pulseRateOption,
                         bpSystolic = bpSystolic,
                         bpDiastolic = bpDiastolic,
-                        rbs = rbs
+                        rbs = rbs,
+                        presentExaminationFindings = VitalHwcReferralRules.getPresentExaminationFindings(
+                            pallorId = pallorId,
+                            pallor = pallor,
+                            icterusId = icterusId,
+                            icterus = icterus,
+                            cyanosisId = cyanosisId,
+                            cyanosis = cyanosis,
+                            clubbingId = clubbingId,
+                            clubbing = clubbing,
+                            lymphadenopathyId = lymphadenopathyId,
+                            lymphadenopathy = lymphadenopathy,
+                            oedemaId = oedemaId,
+                            oedema = oedema
+                        )
                     )
                     val cache = (_existingVitals.value ?: VitalCache(benId = benId,benRegId = benRegId)).copy(
                         benId = benId,
@@ -208,7 +222,7 @@ class VitalScreenViewModel @Inject constructor(
                         referralTriggers = thresholdEvaluation.triggers,
                         syncState = SyncState.UNSYNCED
                     )
-                    vitalRepo.saveVitalsAndSync(cache)
+                    org.piramalswasthya.stoptb.helpers.withDirectSaveHttpOrigin { vitalRepo.saveVitalsAndSync(cache) }
                     if (thresholdEvaluation.shouldRefer) {
                         buildAutoReferral(thresholdEvaluation.referredFor)?.let {
                             ncdReferalRepo.saveReferedNCD(it)
@@ -311,38 +325,21 @@ class VitalScreenViewModel @Inject constructor(
 
     fun shouldShowTemperatureReferral(option: String?): Boolean = mapTemperatureOptionToValue(option)?.let { it >= 100.0 } == true
 
-    fun shouldShowPulseReferral(option: String?): Boolean = mapPulseOptionToValue(option)?.let { it < 60 || it > 90 } == true
-
-
-
-
-
-
-    fun shouldShowBpReferral(bpSystolic: String?, bpDiastolic: String?): Boolean {
-        val systolic = bpSystolic?.trim()?.toIntOrNull()
-        val diastolic = bpDiastolic?.trim()?.toIntOrNull()
-        return (systolic != null && (systolic < 90 || systolic >= 140)) ||
-                (diastolic != null && (diastolic < 60 || diastolic >= 90))
-    }
-
-    fun shouldShowRbsReferral(rbs: String?): Boolean {
-        val rbsValue = rbs?.trim()?.toDoubleOrNull() ?: return false
-        return rbsValue >= 100.0
-    }
-
     private fun evaluateThresholds(
         temperatureOption: String?,
         pulseRateOption: String?,
         bpSystolic: String?,
         bpDiastolic: String?,
-        rbs: String?
+        rbs: String?,
+        presentExaminationFindings: List<String>
     ): ThresholdEvaluation {
-        val triggers = getReferralTriggers(
-            temperatureOption = temperatureOption,
-            pulseRateOption = pulseRateOption,
-            bpSystolic = bpSystolic,
-            bpDiastolic = bpDiastolic,
-            rbs = rbs
+        val triggers = VitalHwcReferralRules.getReferralTriggers(
+            temperature = mapTemperatureOptionToValue(temperatureOption),
+            pulse = mapPulseOptionToValue(pulseRateOption),
+            systolic = bpSystolic?.trim()?.toIntOrNull(),
+            diastolic = bpDiastolic?.trim()?.toIntOrNull(),
+            rbs = rbs?.trim()?.toDoubleOrNull(),
+            presentExaminationFindings = presentExaminationFindings
         )
         val shouldRefer = triggers.isNotEmpty()
         return ThresholdEvaluation(
@@ -350,42 +347,6 @@ class VitalScreenViewModel @Inject constructor(
             referredFor = getDefaultReferralTests(benCache),
             triggers = triggers
         )
-    }
-
-    private fun getReferralTriggers(
-        temperatureOption: String?,
-        pulseRateOption: String?,
-        bpSystolic: String?,
-        bpDiastolic: String?,
-        rbs: String?
-    ): List<String> {
-        val triggers = mutableListOf<String>()
-        val temperature = mapTemperatureOptionToValue(temperatureOption)
-        if (temperature != null && temperature >= 100.0) {
-            triggers += "High Temperature: ${temperature.stripTrailingZeros()} F"
-        }
-
-        val pulse = mapPulseOptionToValue(pulseRateOption)
-        if (pulse != null && pulse > 90) {
-            triggers += "High Pulse: $pulse BPM"
-        } else if (pulse != null && pulse < 60) {
-            triggers += "Low Pulse: $pulse BPM"
-        }
-
-        val systolic = bpSystolic?.trim()?.toIntOrNull()
-        val diastolic = bpDiastolic?.trim()?.toIntOrNull()
-        if (systolic != null && diastolic != null) {
-            when {
-                systolic >= 140 || diastolic >= 90 -> triggers += "High BP: $systolic/$diastolic mmHg"
-                systolic < 90 || diastolic < 60 -> triggers += "Low BP: $systolic/$diastolic mmHg"
-            }
-        }
-
-        val rbsValue = rbs?.trim()?.toDoubleOrNull()
-        if (rbsValue != null && rbsValue >= 100.0) {
-            triggers += "High RBS: ${rbsValue.stripTrailingZeros()} mg/dl"
-        }
-        return triggers
     }
 
     private fun buildAutoReferral(selectedTests: List<String>): ReferalCache? {
@@ -439,7 +400,4 @@ class VitalScreenViewModel @Inject constructor(
     private fun mapPulseOptionToValue(option: String?): Int? {
         return option?.trim()?.toIntOrNull()
     }
-
-    private fun Double.stripTrailingZeros(): String =
-        if (this % 1.0 == 0.0) toInt().toString() else toString()
 }
