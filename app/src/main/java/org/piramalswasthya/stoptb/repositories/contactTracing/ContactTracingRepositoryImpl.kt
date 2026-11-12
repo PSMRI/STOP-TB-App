@@ -389,8 +389,14 @@ class ContactTracingRepositoryImpl @Inject constructor(
 
     private suspend fun submitResponseBulkLocked(responseId: Long, phaseFilter: String?): Boolean {
         val resp = responseDao.getFormResponseById(responseId) ?: return true
-        // Sent by the sweep while this call waited for the lock (and not changed since).
-        if (phaseFilter == null && resp.formResponse.syncStatus == "SYNCED") return true
+        // Already sent with its current content: by the sweep while this call waited for the
+        // lock. Every edit, and submitResponse, sets the row UNSYNCED with a new updatedAt, and
+        // markSyncedIfUnchanged only marks the content it sent. The sweep's payload (no phase
+        // filter) holds every answered section, so it covers any single phase too.
+        if (resp.formResponse.syncStatus == "SYNCED") {
+            Timber.d("submitResponseBulk: responseId=$responseId already synced, not sent again")
+            return true
+        }
         if (resp.formResponse.beneficiaryId <= 0L) {
             // Saved before the beneficiary was registered; sent once registration
             // re-points it to the real ID. Stays UNSYNCED until then.

@@ -68,14 +68,20 @@ internal fun parseServerUpdateDate(dateString: String?): Long {
     return ServerDateParser.parse(dateString, serverUpdateDatePatterns) ?: run {
         // Still 0L (apply the record), but no longer silent: a format the patterns don't know
         // makes every pull rewrite those records. Logged once per distinct string.
-        if (unparseableUpdateDates.add(dateString) && unparseableUpdateDates.size <= 20) {
+        val firstTime = synchronized(unparseableUpdateDates) {
+            unparseableUpdateDates.size < MAX_LOGGED_UNPARSEABLE_DATES && unparseableUpdateDates.add(dateString)
+        }
+        if (firstTime) {
             Timber.w("Unparseable server updateDate \"%s\": add its format to serverUpdateDatePatterns", dateString)
         }
         0L
     }
 }
 
-private val unparseableUpdateDates: MutableSet<String> = java.util.Collections.synchronizedSet(HashSet())
+// Distinct unparseable strings already logged; bounded, so a large pull can't grow it. After
+// the cap, further new formats are not logged.
+private val unparseableUpdateDates = HashSet<String>()
+private const val MAX_LOGGED_UNPARSEABLE_DATES = 20
 
 internal val serverUpdateDatePatterns = listOf(
     "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
