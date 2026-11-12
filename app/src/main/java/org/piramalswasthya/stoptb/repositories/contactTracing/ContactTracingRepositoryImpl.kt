@@ -381,8 +381,16 @@ class ContactTracingRepositoryImpl @Inject constructor(
         )
     }
 
-    override suspend fun submitResponseBulk(responseId: Long, phaseFilter: String?): Boolean {
+    // The form calls this directly; the background sweep calls the unlocked body below while
+    // holding syncMutex. Both under the one lock, so a user submit and a sweep can't POST the
+    // same response at the same time.
+    override suspend fun submitResponseBulk(responseId: Long, phaseFilter: String?): Boolean =
+        syncMutex.withLock { submitResponseBulkLocked(responseId, phaseFilter) }
+
+    private suspend fun submitResponseBulkLocked(responseId: Long, phaseFilter: String?): Boolean {
         val resp = responseDao.getFormResponseById(responseId) ?: return true
+        // Sent by the sweep while this call waited for the lock (and not changed since).
+        if (phaseFilter == null && resp.formResponse.syncStatus == "SYNCED") return true
         if (resp.formResponse.beneficiaryId <= 0L) {
             // Saved before the beneficiary was registered; sent once registration
             // re-points it to the real ID. Stays UNSYNCED until then.
@@ -913,7 +921,7 @@ class ContactTracingRepositoryImpl @Inject constructor(
         Timber.d("syncUnsyncedResponses: ${unsynced.size} contact tracing record(s) pending sync")
         var allSuccess = true
         for (resp in unsynced) {
-            if (!submitResponseBulk(resp.formResponse.responseId)) {
+            if (!submitResponseBulkLocked(resp.formResponse.responseId, null)) {
                 allSuccess = false
             }
         }

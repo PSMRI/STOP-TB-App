@@ -116,6 +116,29 @@ class TbListPagingEquivalenceTest {
         }
     }
 
+    /** A birth before 1970 is a negative dob; an age search must still find it (dob 0 = unknown). */
+    @Test
+    fun ageSearchFindsABirthBefore1970() = runBlocking {
+        val dob = java.util.Calendar.getInstance().apply { clear(); set(1960, java.util.Calendar.JANUARY, 1) }.timeInMillis
+        val benId = FIRST_BEN_ID + 900
+        db.benDao.upsert(
+            BenRegCache(
+                beneficiaryId = benId, isDeath = false, reasonOfDeathId = 0, placeOfDeathId = 0, ashaId = 1,
+                isKid = false, isAdult = true,
+                locationRecord = LocationRecord(
+                    country = LocationEntity(1, "India"), state = LocationEntity(2, "State"),
+                    district = LocationEntity(3, "District"), block = LocationEntity(4, "Block"),
+                    village = LocationEntity(VILLAGES[0], "Village")
+                ),
+                syncState = SyncState.SYNCED, isDraft = false, gender = Gender.MALE, dob = dob,
+                updatedDate = BASE, isDeactivate = false
+            ).apply { firstName = "Elder"; lastName = "Person" }
+        )
+        val years = ((System.currentTimeMillis() - dob) / 1000 / 31_557_600L).toString()
+        val found = db.benDao.getTbScreeningBenPage(VILLAGES[0], years, ALL_ROWS, 0).map { row -> row.ben.benId }
+        assertTrue("age $years should find the 1960 birth", benId in found)
+    }
+
     /** The screening list is every live beneficiary of the village, newest update first. */
     @Test
     fun screeningListIsTheWholeVillageNewestFirst() = runBlocking {
