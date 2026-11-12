@@ -20,6 +20,8 @@ import org.piramalswasthya.stoptb.repositories.RecordsRepo
 import org.piramalswasthya.stoptb.repositories.RowBadgeRepo
 import org.piramalswasthya.stoptb.ui.LoadedRowBadges
 import org.piramalswasthya.stoptb.ui.debounceTyping
+import org.piramalswasthya.stoptb.ui.pagedByQuery
+import org.piramalswasthya.stoptb.ui.QueryPages
 import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -37,18 +39,8 @@ class UnScreenedPeopleViewModel @Inject constructor(
      * used to hold the whole village's unscreened list plus every TB_SCREENING benId in memory
      * and filter both on each keystroke and each write.
      */
-    /**
-     * The query the latest paged data was built for (the filter value, before any trimming).
-     * The screen passes it to ListTransitions.onDataSubmitted, so new pages of the previous query
-     * (a write invalidating them during the search debounce) can't take the new search's scroll.
-     */
-    @Volatile
-    var appliedQuery: String? = null
-        private set
-
-    val unscreenedList: Flow<PagingData<BenBasicDomain>> = filter.debounceTyping()
-        .flatMapLatest { query -> appliedQuery = query; recordsRepo.unscreenedPaged(query.trim().lowercase()) }
-        .cachedIn(viewModelScope)
+    val unscreenedList: Flow<QueryPages<BenBasicDomain>> = filter.debounceTyping()
+        .pagedByQuery(viewModelScope) { query -> recordsRepo.unscreenedPaged(query.trim().lowercase()) }
 
     val unscreenedCount: StateFlow<Int> = recordsRepo.unscreenedNotTbScreenedCount
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)

@@ -134,7 +134,7 @@ class UnScreenedPeople : Fragment(),
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch { viewModel.unscreenedList.collectLatest { page -> listTransitions?.onDataSubmitted(viewModel.appliedQuery); benAdapter.submitData(page) } }
+                launch { viewModel.unscreenedList.collectLatest { page -> listTransitions?.onDataSubmitted(page.query); benAdapter.submitData(page.pages) } }
                 launch {
                     benAdapter.renderListStates(onSettled = { listTransitions?.onSettled() }, errorAnchor = binding.root, render = { awaitingFirstLoad, isEmpty ->
                         _binding?.let { b ->

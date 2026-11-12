@@ -106,7 +106,7 @@ class TBScreeningListFragment : Fragment() {
         // started the next time onViewCreated runs, each doing the same work on every emission.
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.benList.collectLatest { page -> listTransitions?.onDataSubmitted(viewModel.appliedQuery); benAdapter.submitData(page) }
+                viewModel.benList.collectLatest { page -> listTransitions?.onDataSubmitted(page.query); benAdapter.submitData(page.pages) }
             }
         }
         viewLifecycleOwner.lifecycleScope.launch {
