@@ -574,9 +574,14 @@ def canonical_display_name(package_id: str, requested: str | None = None) -> str
         return "StopTB_Internal_Testing_UAT"
     return "TBMJA_Internal_Testing_Prod"
 
-def canonical_description(package_id: str, version_name: str, version_code: str) -> str:
+def canonical_description(
+    package_id: str, version_name: str, version_code: str, commit: str | None = None
+) -> str:
     label = "UAT" if ".uat" in package_id else "PROD"
-    return f"{label} signed build updated to {version_name} ({version_code})"
+    text = f"{label} signed build updated to {version_name} ({version_code})"
+    if commit:
+        text += f" from commit {commit}"
+    return text
 
 
 def _normalized_app_name(app: dict[str, Any]) -> str:
@@ -1164,7 +1169,9 @@ def upload_apk(args: argparse.Namespace) -> None:
 
     filename = apk.name
     app_display_name = canonical_display_name(args.package_id, args.display_name)
-    app_description = canonical_description(args.package_id, args.version_name, args.version_code)
+    app_description = canonical_description(
+        args.package_id, args.version_name, args.version_code, args.commit
+    )
     log(f"Intune displayName will stay {app_display_name} (version stays in versionName/versionCode, not the app name)")
     log(f"Intune description will be updated to: {app_description}")
     log(
@@ -1410,6 +1417,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--app-id", default="")
     parser.add_argument("--exclusive", action="store_true",
                         help="Fail unless the app is assigned only to --group-id; ensure that assignment exists.")
+    parser.add_argument("--commit", default="",
+                        help="Short git commit of the build; shown in the Intune app description.")
     parser.add_argument("--create-if-missing", action="store_true",
                         help="Create the Intune app if none with the requested name exists.")
     args = parser.parse_args()
