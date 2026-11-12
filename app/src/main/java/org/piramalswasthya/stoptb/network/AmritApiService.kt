@@ -61,7 +61,7 @@ interface AmritApiService {
     @POST("flw-api/beneficiary/getBeneficiaryData")
     suspend fun getBeneficiaries(@Body userDetail: GetDataPaginatedRequests): Response<ResponseBody>
 
-    @GET("nikshay/syncStatus/missingBeneficiaries")
+    @GET("mmu-api/nikshay/syncStatus/missingBeneficiaries")
     suspend fun getMissingDataBeneficiaries(
         @Query("providerServiceMapID") providerServiceMapID: Int,
         @Query("villageID") villageID: Int,
@@ -69,7 +69,7 @@ interface AmritApiService {
         @Query("pageSize") pageSize: Int = 30
     ): Response<GetMissingDataBenResponse>
 
-    @POST("nikshay/syncStatus/update")
+    @POST("mmu-api/nikshay/syncStatus/update")
     suspend fun updateNikshaySyncStatus(
         @Body request: UpdateNikshaySyncStatusRequest
     ): Response<UpdateNikshaySyncStatusResponse>
