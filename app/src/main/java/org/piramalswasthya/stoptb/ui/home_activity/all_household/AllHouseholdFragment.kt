@@ -18,7 +18,10 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import org.piramalswasthya.stoptb.ui.ListTransitions
+import org.piramalswasthya.stoptb.ui.renderListStates
 import timber.log.Timber
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.HouseHoldListAdapter
@@ -124,12 +127,20 @@ class AllHouseholdFragment : Fragment() {
         )
         householdAdapter.setAddMemberVisible(canAddBeneficiary)
         binding.rvAny.adapter = householdAdapter
+        val listTransitions = ListTransitions(binding.rvAny)
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.householdList.collect { list ->
-                    binding.flEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
-                    householdAdapter.submitList(list)
+                launch { viewModel.householdList.collectLatest { page -> listTransitions.onDataSubmitted(page.query); householdAdapter.submitData(page.pages) } }
+                launch {
+                    // PR 6 UX: spinner while the first page loads (the screen was blank before).
+                    householdAdapter.renderListStates(onSettled = { listTransitions.onSettled() }, errorAnchor = binding.root, render = { awaitingFirstLoad, isEmpty ->
+                        _binding?.let { b ->
+                            b.flLoading.visibility = if (awaitingFirstLoad) View.VISIBLE else View.GONE
+                            b.flEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
+                            b.rvAny.visibility = if (awaitingFirstLoad || isEmpty) View.INVISIBLE else View.VISIBLE
+                        }
+                    })
                 }
             }
         }
@@ -156,7 +167,9 @@ class AllHouseholdFragment : Fragment() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
             override fun afterTextChanged(s: Editable?) {
-                viewModel.filterText(s?.toString()?.trim().orEmpty())
+                val query = s?.toString()?.trim().orEmpty()
+                listTransitions.onQueryChanged(query)
+                viewModel.filterText(query)
             }
         }
 

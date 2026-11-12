@@ -1053,6 +1053,7 @@
     <string name="sync_dashboard_age_days">%1$d days</string>
     <string name="sync_entity_beneficiary">Beneficiary</string>
     <string name="sync_entity_registration">Beneficiary registration</string>
+    <string name="sync_entity_tb_screening">TB screening</string>
     <string name="sync_entity_tb_diagnostics">TB diagnostics</string>
     <string name="sync_entity_tb_suspected">TB suspected</string>
     <string name="sync_entity_tb_confirmed">TB confirmed</string>
@@ -1067,6 +1068,7 @@
     <string name="no_records_found_hh">No Household records found.</string>
     <string name="something_went_wrong_nunable_to_connect_to_server_ntry_again_later">Something went wrong !\nUnable to connect to server !\nTry again later!</string>
     <string name="try_again">Try Again!</string>
+    <string name="list_load_failed">Could not load the list.</string>
     <string name="error_login_server_error">Server is busy, please try again in a moment</string>
 
     <string name="camera">Camera</string>

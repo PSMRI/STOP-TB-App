@@ -35,6 +35,7 @@ class SyncRetryStore @Inject constructor(
     companion object {
         const val ENTITY_BENEFICIARY = "BENEFICIARY"
         const val ENTITY_REGISTRATION = "REGISTRATION"
+        const val ENTITY_TB_SCREENING = "TB_SCREENING"
         const val ENTITY_TB_DIAGNOSTICS = "TB_DIAGNOSTICS"
         const val ENTITY_TB_SUSPECTED = "TB_SUSPECTED"
         const val ENTITY_TB_CONFIRMED = "TB_CONFIRMED"

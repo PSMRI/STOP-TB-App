@@ -23,6 +23,12 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceManager
 import org.piramalswasthya.stoptb.work.dynamicWoker.FormSyncWorker
 import org.piramalswasthya.stoptb.work.dynamicWoker.NCDFollowUpSyncWorker
 import org.piramalswasthya.stoptb.work.dynamicWoker.NDCFollowUpPushWorker
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.helpers.SyncDiagnostics
 import org.piramalswasthya.stoptb.helpers.SyncHttpOrigins
 import timber.log.Timber
@@ -42,6 +48,47 @@ object WorkerUtils {
     const val campAutoPullIntervalMs = 10_000L
     private const val campQuickPullDebounceMs = 10_000L
     private var lastCampQuickPullAt = 0L
+    private val campQuickPullLock = Any()
+
+    /**
+     * Runs fire-and-forget triggers from UI callers. The triggers query WorkManager's database
+     * synchronously (getWorkInfosForUniqueWork().get()), which must not run on the main thread:
+     * the camp loop called it every 10 s from VolunteerActivity on Main.
+     *
+     * One thread, so triggers run one at a time in the order they were made (they are blocking,
+     * not suspending): e.g. the first-sync DIRECT pull registered in onCreate must win over the
+     * quick AUTO_PULL from onCreate/onResume, or an interrupted first download restarts from
+     * page 0 (that order was implicit when these ran inline on Main).
+     */
+    private val triggerDispatcher = java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "worker-triggers").apply { isDaemon = true }
+    }.asCoroutineDispatcher()
+    private val triggerScope = CoroutineScope(SupervisorJob() + triggerDispatcher)
+
+    /**
+     * [triggerCampQuickPullIfConnected] on the same ordered thread as the async triggers, for the
+     * camp auto-pull loop. On Dispatchers.IO the loop could register AUTO_PULL before the
+     * first-sync DIRECT pull queued in onCreate, and that pull then kept the AUTO_PULL chain.
+     */
+    suspend fun triggerCampQuickPullInOrder(context: Context, preferenceDao: PreferenceDao) {
+        val appContext = context.applicationContext
+        withContext(triggerDispatcher) { triggerCampQuickPullIfConnected(appContext, preferenceDao) }
+    }
+
+    /** [triggerCampQuickPullIfConnected] off the main thread, for UI callers. */
+    fun triggerCampQuickPullAsync(context: Context, preferenceDao: PreferenceDao, force: Boolean = false) {
+        val appContext = context.applicationContext
+        triggerScope.launch { triggerCampQuickPullIfConnected(appContext, preferenceDao, force) }
+    }
+
+    /** [triggerAmritPullWorker] off the main thread, for UI callers that don't need the work IDs. */
+    fun triggerAmritPullWorkerAsync(context: Context, force: Boolean = false, triggerSource: String = "DIRECT") {
+        val appContext = context.applicationContext
+        // Captured here: the sync-log session is per caller, and the trigger thread has none of its own.
+        val syncRunId = java.util.UUID.randomUUID().toString()
+        val logSessionId = SyncHttpOrigins.captureSession()
+        triggerScope.launch { triggerAmritPullWorker(appContext, force, triggerSource, syncRunId, logSessionId) }
+    }
     @Volatile
     private var manualCampRefreshInProgress = false
 
@@ -361,13 +408,16 @@ object WorkerUtils {
         if (!preferenceDao.isCampModeEnabled() || !preferenceDao.isCampHubConnected()) return
 
         val now = SystemClock.elapsedRealtime()
-        if (!force && now - lastCampQuickPullAt < campQuickPullDebounceMs) return
+        // Callers run on background threads now; keep the debounce check-and-set atomic.
+        synchronized(campQuickPullLock) {
+            if (!force && now - lastCampQuickPullAt < campQuickPullDebounceMs) return
+            lastCampQuickPullAt = now
+        }
 
         // Pull and push are safe to overlap. This used to skip the pull while any upload ran, but
         // with the changes feed a pull is a small delta, and with uploads running most of the time
         // records from other tablets stopped arriving. The pull goes ahead; the unique pull chain
         // still stops two pulls overlapping.
-        lastCampQuickPullAt = now
         triggerAmritPullWorker(context, triggerSource = "AUTO_PULL")
     }
 
@@ -437,19 +487,31 @@ object WorkerUtils {
     }
 
     /**
-     * KEEP, not REPLACE: REPLACE cancels a poll that is already running and starts it again from
-     * the top, so a run that is part-way through its per-beneficiary network calls loses that work
-     * and repeats the writes it has already done. With ~9 call sites plus the worker's own 60s
-     * reschedule, runs were cancelling each other continuously (97 runs in 104 minutes, minimum
-     * gap 0.1s). KEEP lets an in-flight run finish; the worker reschedules itself every 60s while
-     * any order is still in progress, so nothing is lost — a trigger that arrives while a run is
-     * pending is simply folded into that run instead of restarting it.
+     * Runs a result-poll cycle now. If nothing is running, the new cycle replaces any delayed one,
+     * so a new order doesn't wait up to the full delay. If a cycle is running with nothing queued
+     * behind it, the new one is queued right behind it. If a cycle is running and already has a
+     * successor (its own delayed reschedule or an earlier trigger), the trigger is dropped: every
+     * cycle schedules its own successor, so a second queued cycle would never leave the chain.
+     * (REPLACE on a running cycle cancels it part-way through; KEEP ignored triggers entirely.)
+     * The WorkManager state check is a blocking query, so it runs off the caller's thread.
      */
     fun triggerDiagnosticResultPollWorker(context: Context) {
-        val workRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>().build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            DiagnosticResultPollWorker.name, ExistingWorkPolicy.KEEP, workRequest
-        )
+        val appContext = context.applicationContext
+        triggerScope.launch {
+            val workManager = WorkManager.getInstance(appContext)
+            val activeCycles = getActiveUniqueWorkInfos(workManager, DiagnosticResultPollWorker.name)
+            val running = activeCycles.any { info -> info.state == WorkInfo.State.RUNNING }
+            val hasQueuedSuccessor = activeCycles.any { info ->
+                info.state == WorkInfo.State.ENQUEUED || info.state == WorkInfo.State.BLOCKED
+            }
+            if (running && hasQueuedSuccessor) return@launch
+            val workRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>().build()
+            workManager.enqueueUniqueWork(
+                DiagnosticResultPollWorker.name,
+                if (running) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.REPLACE,
+                workRequest
+            )
+        }
     }
 
     fun triggerTrueNatDiagnosticResultPollWorker(context: Context) {

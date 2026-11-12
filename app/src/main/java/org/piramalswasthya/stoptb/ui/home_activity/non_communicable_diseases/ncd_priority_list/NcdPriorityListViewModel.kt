@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.ncd_priority_list
 
+import org.piramalswasthya.stoptb.ui.debounceTyping
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,7 +17,7 @@ class NcdPriorityListViewModel @Inject constructor(
 ) : ViewModel() {
     private val allBenList = recordsRepo.getNcdPriorityList
     private val filter = MutableStateFlow("")
-    val benList = allBenList.combine(filter) { list, filter ->
+    val benList = allBenList.combine(filter.debounceTyping()) { list, filter ->
         filterBenList(list.map { it.ben.asBasicDomainModel() }, filter)
     }
 

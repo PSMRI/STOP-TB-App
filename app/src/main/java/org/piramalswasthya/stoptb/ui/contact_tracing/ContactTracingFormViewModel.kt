@@ -782,11 +782,7 @@ class ContactTracingFormViewModel @Inject constructor(
         if (tbRepo.getTBConfirmed(benId) == null) {
             tbRepo.saveTBConfirmed(TBConfirmedTreatmentCache(benId = benId))
         }
-        val tbSuspected = tbRepo.getTBSuspected(benId) ?: TBSuspectedCache(benId = benId)
-        tbSuspected.isConfirmed = true
-        tbSuspected.isTBConfirmed = true
-        tbSuspected.syncState = SyncState.UNSYNCED
-        tbRepo.saveTBSuspected(tbSuspected)
+        tbRepo.markTbSuspectedConfirmed(benId, createIfMissing = true)
 
         // Auto-Sync TB rows on SAVE_SUCCESS
         WorkerUtils.triggerAmritPushWorker(context)

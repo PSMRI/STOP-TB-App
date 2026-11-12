@@ -1,30 +1,29 @@
 package org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.tb_suspected.list
 
+import org.piramalswasthya.stoptb.ui.debounceTyping
+import org.piramalswasthya.stoptb.ui.pagedByQuery
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import androidx.paging.cachedIn
 import kotlinx.coroutines.launch
-import org.piramalswasthya.stoptb.helpers.filterTbSuspectedList
 import org.piramalswasthya.stoptb.repositories.RecordsRepo
 import javax.inject.Inject
 
 @HiltViewModel
 class TBSuspectedListViewModel @Inject constructor(
-    recordsRepo: RecordsRepo
+    private val recordsRepo: RecordsRepo
 ) : ViewModel() {
 
-    private val allBenList = recordsRepo.tbSuspectedList
     private val filter = MutableStateFlow("")
-    // The filter runs over the whole list on every keystroke and on every database
-    // emission. Collected on lifecycleScope, that ran on the main thread - thousands of
-    // rows per typed character on a field device.
-    val benList = allBenList.combine(filter) { list, filter ->
-        filterTbSuspectedList(list, filter)
-    }.flowOn(Dispatchers.Default)
+    // PR 6: paged, and the search runs in SQL. The whole village used to be loaded and
+    // filtered in Kotlin on every keystroke and every database write.
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val benList = filter.debounceTyping()
+        .pagedByQuery(viewModelScope) { query -> recordsRepo.tbPresumptivePaged(query) }
 
     fun filterText(text: String) {
         viewModelScope.launch {

@@ -17,7 +17,8 @@ import org.piramalswasthya.stoptb.database.room.SyncState
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index(name = "ind_vitals_ben", value = ["benId"])]
+    // benId is the primary key, so the old ind_vitals_ben duplicated it (dropped in v62).
+    indices = [Index(name = "ind_vitals_sync", value = ["syncState"])]
 )
 data class VitalCache(
     @PrimaryKey
