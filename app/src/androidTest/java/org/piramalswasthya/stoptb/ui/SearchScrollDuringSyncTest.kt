@@ -4,6 +4,14 @@ import android.content.Context
 import android.view.View
 import android.view.ViewGroup
 import androidx.paging.Pager
+import androidx.paging.PagingData
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.CompletableDeferred
+import androidx.paging.cachedIn
 import androidx.paging.PagingConfig
 import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.DiffUtil
@@ -43,10 +51,11 @@ import org.piramalswasthya.stoptb.model.LocationRecord
  * PagingDataAdapter, renderListStates and ListTransitions, wired the way the list screens are
  * (debounced query -> flatMapLatest -> submitData).
  *
- * The case: the user types a new search, and while it is debouncing a sync write invalidates the
- * old search's source. The pager emits a new generation of the OLD search's pages, which the screen
- * submits and refreshes. That reload must not take the scroll; the new search's results must.
- * The debounce is longer than the screens' 300 ms so the write lands inside it every time.
+ * The case: the user types a new search and a sync write invalidates the OLD search's source, so
+ * the pager emits a new generation of the old search's pages. Whether those pages are submitted
+ * during the debounce or only after the query has switched (main thread busy, or replayed from the
+ * cache), they must not take the scroll; the new search's results must. The debounce is longer
+ * than the screens' 300 ms and the new search's pages are gated, so each ordering is exact.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -98,66 +107,125 @@ class SearchScrollDuringSyncTest {
         override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) = Unit
     }
 
+    private enum class Pipeline {
+        /** The screens' flow: pagedByQuery, every emission tagged with its query through the cache. */
+        TAGGED,
+        /**
+         * The previous flow: flatMapLatest + cachedIn, the query read from a separate field. Kept
+         * for comparison runs: on a device it passed both orderings too, because the old search's
+         * pages, once the query has switched, only come from the cache and replay as NotLoading -
+         * no refresh finishes for them, so they can't take the scroll.
+         */
+        APPLIED_QUERY_FIELD
+    }
+
+    /** Which search's results a page shows, from its first row ("r" = even ids, "ra" = multiples of 4). */
+    private fun shownSearch(firstId: Long?): String? = when (firstId) {
+        FIRST_BEN_ID + 198 -> "r"
+        FIRST_BEN_ID + 196 -> "ra"
+        else -> null
+    }
+
     /**
-     * Runs the scenario and returns, for each scroll to the top, the query of the data that was
-     * on screen. [tagWithQuery] = false submits without the query (the behaviour before the fix).
+     * Wires a list screen (debounced query -> paged flow -> collectLatest submitData,
+     * renderListStates, ListTransitions) and runs [steps]. Returns the search whose results were on
+     * screen at each scroll to the top.
      */
-    private fun scrollsWhenOldSearchReloadsDuringDebounce(tagWithQuery: Boolean): Pair<List<String?>, List<String?>> = runBlocking(Dispatchers.Main) {
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-        val query = MutableStateFlow("r")
-        var appliedQuery: String? = null
-        var typedQuery = "r"
-        val submitted = ArrayList<String?>()
-        val scrolledWith = ArrayList<String?>()
+    private fun runScreen(
+        pipeline: Pipeline,
+        steps: suspend Screen.() -> Unit
+    ): List<String?> = runBlocking(Dispatchers.Main) {
+        val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        val screenScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        val screen = Screen()
         val adapter = IdAdapter()
-        val transitions = ListTransitions { scrolledWith += submitted.lastOrNull() }
-        val pages = query.debounceTyping(DEBOUNCE_MS).flatMapLatest { search ->
-            appliedQuery = search
-            Pager(PagingConfig(pageSize = 30, initialLoadSize = 60, enablePlaceholders = false)) {
+        val transitions = ListTransitions { screen.scrolledWith += shownSearch(adapter.snapshot().items.firstOrNull()) }
+        val pager: (String) -> Flow<PagingData<Long>> = { search ->
+            val pages = Pager(PagingConfig(pageSize = 30, initialLoadSize = 60, enablePlaceholders = false)) {
                 NoCountPagingSource(db, arrayOf("BENEFICIARY")) { limit, offset -> idsFor(search, limit, offset) }
-            }.flow
+            }.flow.onEach { screen.produced += search }
+            if (search == "ra") flow { screen.newSearchGate.await(); emitAll(pages) } else pages
+        }
+        var appliedQuery: String? = null
+        val tagged: Flow<Pair<String?, PagingData<Long>>> = when (pipeline) {
+            Pipeline.TAGGED -> screen.query.debounceTyping(DEBOUNCE_MS)
+                .onEach { search -> screen.switchedTo = search }
+                .pagedByQuery(viewModelScope, pager)
+                .map { page -> page.query to page.pages }
+            Pipeline.APPLIED_QUERY_FIELD -> screen.query.debounceTyping(DEBOUNCE_MS)
+                .flatMapLatest { search -> appliedQuery = search; screen.switchedTo = search; pager(search) }
+                .cachedIn(viewModelScope)
+                .map { pages -> appliedQuery to pages }
         }
         try {
             transitions.onQueryChanged("r")
-            scope.launch {
-                pages.collectLatest { page ->
-                    val forQuery = if (tagWithQuery) appliedQuery else typedQuery
-                    submitted += appliedQuery
+            screenScope.launch {
+                tagged.collectLatest { (forQuery, pages) ->
+                    while (screen.busy) delay(10) // the main thread is busy; the latest emission waits
                     transitions.onDataSubmitted(forQuery)
-                    adapter.submitData(page)
+                    adapter.submitData(pages)
                 }
             }
-            scope.launch { adapter.renderListStates(render = { _, _ -> }, onSettled = { transitions.onSettled() }) }
-            withTimeout(10_000) { while (scrolledWith.isEmpty()) delay(20) } // "r" shown and at the top
-
-            // Type "ra"; while it debounces, a sync write reloads the "r" pages.
-            typedQuery = "ra"
-            transitions.onQueryChanged("ra")
-            query.value = "ra"
-            withContext(Dispatchers.IO) { db.benDao.upsert(bens[0].copy(updatedDate = 1_800_000_000_000L)) }
-            withTimeout(DEBOUNCE_MS) { while (submitted.size < 2) delay(10) } // "r" generation 2, inside the debounce
-            withTimeout(10_000) { while (submitted.lastOrNull() != "ra") delay(20) }
-            withTimeout(10_000) { while (adapter.snapshot().items.firstOrNull() != FIRST_BEN_ID + 196) delay(20) } // "ra" shown
+            screenScope.launch { adapter.renderListStates(render = { _, _ -> }, onSettled = { transitions.onSettled() }) }
+            withTimeout(10_000) { while (screen.scrolledWith.isEmpty()) delay(20) } // "r" shown, at the top
+            screen.typeNewSearch = { transitions.onQueryChanged("ra"); screen.query.value = "ra" }
+            screen.steps()
+            withTimeout(10_000) { while (shownSearch(adapter.snapshot().items.firstOrNull()) != "ra") delay(20) }
             delay(500) // let any late settle run
-            submitted.toList() to scrolledWith.toList()
+            screen.scrolledWith.toList()
         } finally {
-            scope.cancel()
+            screenScope.cancel()
+            viewModelScope.cancel()
         }
     }
 
-    @Test
-    fun theOldSearchReloadedDuringTheDebounceDoesNotTakeTheNewSearchsScroll() {
-        val (submitted, scrolledWith) = scrollsWhenOldSearchReloadsDuringDebounce(tagWithQuery = true)
-        assertEquals("the sync write reloaded the old search during the debounce", listOf("r", "r", "ra"), submitted)
-        assertEquals("one scroll for each search, the second with the new search's data", listOf("r", "ra"), scrolledWith)
+    private inner class Screen {
+        val query = MutableStateFlow("r")
+        val produced = ArrayList<String>()
+        val scrolledWith = ArrayList<String?>()
+        val newSearchGate = CompletableDeferred<Unit>()
+        @Volatile var busy = false
+        @Volatile var switchedTo: String? = null
+        lateinit var typeNewSearch: () -> Unit
+
+        /** A sync write to the table the old search reads, then wait for its new generation. */
+        suspend fun syncWriteReloadsOldSearch() {
+            val before = produced.count { search -> search == "r" }
+            withContext(Dispatchers.IO) { db.benDao.upsert(bens[0].copy(updatedDate = System.currentTimeMillis())) }
+            withTimeout(DEBOUNCE_MS) { while (produced.count { search -> search == "r" } == before) delay(10) }
+        }
     }
 
-    /** Without the query tag (before the fix) the old search's reload takes the scroll: the test can see the bug. */
+    /** The old search's source reloads while the new search is still debouncing. */
+    private suspend fun Screen.reloadDuringDebounce() {
+        typeNewSearch()
+        syncWriteReloadsOldSearch()
+        delay(300) // the reload is submitted and settles inside the debounce
+        newSearchGate.complete(Unit)
+    }
+
+    /**
+     * The old search's reloaded pages are held back (main thread busy) until after the query has
+     * switched to "ra", then submitted; only then do "ra"'s pages arrive.
+     */
+    private suspend fun Screen.oldPagesDeliveredAfterTheSwitch() {
+        busy = true
+        syncWriteReloadsOldSearch()
+        typeNewSearch()
+        withTimeout(10_000) { while (switchedTo != "ra") delay(10) } // switched; "ra" pages gated
+        busy = false
+        delay(1_000) // the old pages are submitted and settle
+        newSearchGate.complete(Unit)
+    }
+
     @Test
-    fun withoutTheQueryTagTheOldReloadTakesTheScroll() {
-        val (submitted, scrolledWith) = scrollsWhenOldSearchReloadsDuringDebounce(tagWithQuery = false)
-        assertEquals(listOf("r", "r", "ra"), submitted)
-        assertEquals(listOf("r", "r"), scrolledWith)
+    fun oldSearchReloadedDuringTheDebounceDoesNotTakeTheScroll() {
+        assertEquals(listOf("r", "ra"), runScreen(Pipeline.TAGGED) { reloadDuringDebounce() })
+    }
+
+    @Test
+    fun oldSearchPagesDeliveredAfterTheSwitchDoNotTakeTheScroll() {
+        assertEquals(listOf("r", "ra"), runScreen(Pipeline.TAGGED) { oldPagesDeliveredAfterTheSwitch() })
     }
 
     private companion object {

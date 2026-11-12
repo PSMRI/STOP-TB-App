@@ -1,6 +1,7 @@
 package org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.tb_suspected.list
 
 import org.piramalswasthya.stoptb.ui.debounceTyping
+import org.piramalswasthya.stoptb.ui.pagedByQuery
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,18 +22,8 @@ class TBSuspectedListViewModel @Inject constructor(
     // PR 6: paged, and the search runs in SQL. The whole village used to be loaded and
     // filtered in Kotlin on every keystroke and every database write.
     @OptIn(ExperimentalCoroutinesApi::class)
-    /**
-     * The query the latest paged data was built for (the filter value, before any trimming).
-     * The screen passes it to ListTransitions.onDataSubmitted, so new pages of the previous query
-     * (a write invalidating them during the search debounce) can't take the new search's scroll.
-     */
-    @Volatile
-    var appliedQuery: String? = null
-        private set
-
     val benList = filter.debounceTyping()
-        .flatMapLatest { query -> appliedQuery = query; recordsRepo.tbPresumptivePaged(query) }
-        .cachedIn(viewModelScope)
+        .pagedByQuery(viewModelScope) { query -> recordsRepo.tbPresumptivePaged(query) }
 
     fun filterText(text: String) {
         viewModelScope.launch {
