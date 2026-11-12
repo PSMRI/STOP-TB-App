@@ -797,13 +797,31 @@ class BenRepo @Inject constructor(
                 return rejected.isEmpty()
             }
 
+            // What the batch in flight has settled so far. BatchIsolation returns its outcome only
+            // once the whole split finishes, so without this a network error in a later half
+            // would drop the halves already accepted or rejected, and the rejected groups would
+            // lose their retry record and go out as fresh again on the next run.
+            val inFlightSent = mutableListOf<UploadGroup>()
+            val inFlightRejected = mutableListOf<UploadGroup>()
             try {
-                batches.forEach { batch -> outcomes += BatchIsolation.send(batch) { postUploadGroups(it) } }
+                batches.forEach { batch ->
+                    inFlightSent.clear()
+                    inFlightRejected.clear()
+                    outcomes += BatchIsolation.send(batch) { groups ->
+                        postUploadGroups(groups).also { accepted ->
+                            if (accepted) inFlightSent += groups
+                            else if (groups.size == 1) inFlightRejected += groups
+                        }
+                    }
+                }
             } catch (e: CancellationException) {
                 throw e // claimed rows are reset to UNSYNCED at the start of the next run
             } catch (e: Exception) {
                 // Network errors, and token-refresh failures (IllegalStateException), still
                 // record what the completed batches got back before the run fails.
+                if (inFlightSent.isNotEmpty() || inFlightRejected.isNotEmpty()) {
+                    outcomes += BatchIsolation.Outcome(inFlightSent.toList(), inFlightRejected.toList())
+                }
                 applyOutcomes()
                 throw e
             }
