@@ -75,7 +75,9 @@ class SyncLogTree(
             else -> LogLevel.DEBUG
         }
 
-        val effectiveLevel = promoteIfError(level, fullMessage, t)
+        // Classify against the original text so truncation cannot hide an error marker or
+        // a failure exclusion. Only the bounded text is retained or emitted.
+        val effectiveLevel = promoteIfError(level, message, t)
         syncLogManager.addLog(effectiveLevel, tag ?: "Sync", fullMessage)
     }
 
