@@ -338,9 +338,7 @@ class NewBenRegViewModel @Inject constructor(
         }
         // Restore/Inherit Location details
         // A saved beneficiary keeps its own location (it may have been updated separately from the household).
-        val benHasOwnLocation = benIdFromArgs != 0L &&
-                (ben.isGpsUnavailable ||
-                        (ben.gpsLatitude != null && ben.gpsLongitude != null && ben.digipin != null))
+        val benHasOwnLocation = benHasOwnLocation(ben)
         if (benHasOwnLocation) {
             if (ben.isGpsUnavailable) {
                 _isGpsUnavailable.value = true
@@ -381,6 +379,15 @@ class NewBenRegViewModel @Inject constructor(
             }
         }
     }
+
+    /**
+     * A saved beneficiary keeps its own location when it has a complete one (lat, lon and digipin)
+     * or is marked GPS-unavailable; otherwise it shows and saves the household's. One rule for
+     * both, so the form never shows the household location and then saves the beneficiary's.
+     */
+    private fun benHasOwnLocation(ben: BenRegCache): Boolean =
+        benIdFromArgs != 0L &&
+            (ben.isGpsUnavailable || (ben.gpsLatitude != null && ben.gpsLongitude != null && ben.digipin != null))
 
     // ─── Location callbacks (standalone registrations only) ─────────────
     fun setFetching() { _locationState.value = LocationState.Fetching }
@@ -594,8 +601,8 @@ class NewBenRegViewModel @Inject constructor(
                             ben.gpsUnavailableReason = null
                         }
                     } else if (usesHouseholdLocation) {
-                        val hasOwnLocation = benIdFromArgs != 0L && (ben.isGpsUnavailable || ben.gpsLatitude != null)
-                        if (!hasOwnLocation) {
+                        // Same rule as the restore in setUpPage, so what is saved is what the form showed.
+                        if (!benHasOwnLocation(ben)) {
                             ben.gpsLatitude = household.gpsLatitude
                             ben.gpsLongitude = household.gpsLongitude
                             ben.digipin = household.digipin

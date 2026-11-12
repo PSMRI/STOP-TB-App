@@ -807,6 +807,10 @@ class TBRepo @Inject constructor(
         if (bulk.isNotEmpty()) {
             val truenatIntegrated = isTruenatIntegrated()
             var bulkApplied = 0
+            // Households of beneficiaries this page confirms. saveTBSuspected() selects "Contact of
+            // Known TB" on their members' screenings; this path writes TB_SUSPECTED directly, so
+            // that runs below, once the locks and the transaction are released.
+            val confirmedHouseholds = HashSet<Long>()
             withBenIdLocks(bulk.map { it.ben.beneficiaryId }) {
                 database.withTransaction {
                     for (order in bulk) {
@@ -837,7 +841,12 @@ class TBRepo @Inject constructor(
                         if (suspected != null) {
                             order.ben.gpsLatitude?.let { suspected.latitude = it }
                             order.ben.gpsLongitude?.let { suspected.longitude = it }
-                            if (suspected != existingSuspected) tbDao.saveTbSuspected(suspected)
+                            if (suspected != existingSuspected) {
+                                tbDao.saveTbSuspected(suspected)
+                                if (suspected.isTBConfirmed == true || suspected.isConfirmed) {
+                                    order.ben.householdId?.takeIf { it > 0L }?.let { confirmedHouseholds += it }
+                                }
+                            }
                         }
                         if (skipKey in skippedBefore) appliedSkipKeys += skipKey
                         bulkApplied++
@@ -846,6 +855,15 @@ class TBRepo @Inject constructor(
             }
             applied += bulkApplied
             Timber.d("Feed diagnostic orders: applied $bulkApplied of ${bulk.size} in one transaction")
+            confirmedHouseholds.forEach { householdId ->
+                try {
+                    applyKnownTbContactRiskFactors(householdId)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to apply known-TB contact risk factors after feed diagnostic orders")
+                }
+            }
         }
         preferenceDao.removeFeedSkippedOrders(appliedSkipKeys)
 
