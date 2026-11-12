@@ -101,6 +101,10 @@ class NewBenRegViewModel @Inject constructor(
     // True when registering without an associated household
     val isStandalone: Boolean get() = hhId == 0L
 
+    // True when the location comes from the household: opened with an hhId, or an edit whose
+    // stored record is linked to a household that is on this tablet. Set in setUpPage().
+    private var usesHouseholdLocation = hhId > 0L
+
     // Location state — only used for standalone registrations
     private val _locationState = MutableStateFlow<LocationState>(LocationState.Idle)
     val locationState: StateFlow<LocationState> = _locationState.asStateFlow()
@@ -172,7 +176,14 @@ class NewBenRegViewModel @Inject constructor(
 
         user = preferenceDao.getLoggedInUser()!!
 
-        household = benRepo.getHousehold(hhId) ?: HouseholdCache(
+        // A list row can be stale right after the beneficiary was linked to a household, and
+        // then opens the form with hhId = 0. On edit, fall back to the household stored on the
+        // record so the location is restored from and saved as the household's (STOP-752).
+        val storedHhId = if (hhId == 0L && benIdFromArgs != 0L) {
+            benRepo.getBeneficiaryRecord(benIdFromArgs)?.householdId?.takeIf { storedId -> storedId > 0L } ?: 0L
+        } else 0L
+
+        household = benRepo.getHousehold(if (hhId > 0L) hhId else storedHhId) ?: HouseholdCache(
             householdId = 0,
             ashaId      = user.userId,
             processed   = "N",
@@ -185,6 +196,8 @@ class NewBenRegViewModel @Inject constructor(
                 village  = LocationEntity(0, "")
             )
         )
+
+        usesHouseholdLocation = hhId > 0L || (storedHhId > 0L && household.householdId > 0L)
 
         locationRecord = preferenceDao.getLocationRecord() ?: LocationRecord(
             country  = LocationEntity(1, "India"),
@@ -324,8 +337,7 @@ class NewBenRegViewModel @Inject constructor(
             )
         }
         // Restore/Inherit Location details
-        // Restore/Inherit Location details.
-// A saved beneficiary keeps its own location (it may have been updated separately from the household).
+        // A saved beneficiary keeps its own location (it may have been updated separately from the household).
         val benHasOwnLocation = benIdFromArgs != 0L &&
                 (ben.isGpsUnavailable ||
                         (ben.gpsLatitude != null && ben.gpsLongitude != null && ben.digipin != null))
@@ -342,7 +354,7 @@ class NewBenRegViewModel @Inject constructor(
                     timestamp = ben.gpsTimestamp.orEmpty()
                 )
             }
-        } else if (!isStandalone) {
+        } else if (usesHouseholdLocation) {
             if (household.isGpsUnavailable) {
                 _isGpsUnavailable.value = true
                 _gpsUnavailableReason.value = household.gpsUnavailableReason
@@ -581,7 +593,7 @@ class NewBenRegViewModel @Inject constructor(
                             ben.isGpsUnavailable = false
                             ben.gpsUnavailableReason = null
                         }
-                    } else if (!isStandalone) {
+                    } else if (usesHouseholdLocation) {
                         val hasOwnLocation = benIdFromArgs != 0L && (ben.isGpsUnavailable || ben.gpsLatitude != null)
                         if (!hasOwnLocation) {
                             ben.gpsLatitude = household.gpsLatitude

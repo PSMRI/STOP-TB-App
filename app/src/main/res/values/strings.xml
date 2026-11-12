@@ -1449,6 +1449,7 @@
     <string name="order_status_clinical_assessment_referred">Referred for Clinical Assessment &amp; Diagnosis</string>
     <string name="order_status_retry_referral">Retry Referral</string>
     <string name="order_status_checking">Checking…</string>
+    <string name="order_status_being_created">Order being created</string>
     <string name="diagnostic_manual_result_success">Result submitted successfully</string>
     <string name="diagnostic_order_creation_failed">Unable to submit result: order could not be created (%1$s)</string>
     <string name="error_beneficiary_not_found">Beneficiary not found</string>

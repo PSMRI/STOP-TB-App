@@ -80,7 +80,9 @@ interface TBDao {
                 "xrayOrderId, xrayOrderStatus, trueNatOrderId, trueNatOrderStatus, " +
                 "rifOrderId, rifOrderStatus, errorMsgXray, errorMsgTrueNat, errorMsgRif, " +
                 "xrayManualResultPendingSync, trueNatManualResultPendingSync, " +
-                "rifManualResultPendingSync FROM TB_DIAGNOSTICS"
+                "rifManualResultPendingSync, " +
+                "(SELECT MAX(s.visitDate) FROM TB_SCREENING s WHERE s.benId = TB_DIAGNOSTICS.benId) " +
+                "AS latestScreeningAt FROM TB_DIAGNOSTICS"
     )
     fun getAllTbDiagnosticsCardFields(): Flow<List<TbDiagnosticsCardFields>>
 

@@ -281,6 +281,15 @@ object WorkerUtils {
             Timber.d("Pull [$triggerSource] skipped: existing unique pull chain is already active")
             return activePullInfos.map { it.id }
         }
+        // A forced pull (Refresh) used to REPLACE the chain even while it was downloading, which
+        // cancelled the run in progress, so repeated presses during a long first download kept
+        // throwing work away. A running pull already reads the feed until it is caught up, so a
+        // press while it runs keeps it; force replaces only a queued or backing-off chain.
+        if (activePullInfos.any { it.state == WorkInfo.State.RUNNING }) {
+            Timber.d("Pull [$triggerSource] kept: a pull is already running")
+            return activePullInfos.map { it.id }
+        }
+        val policy = if (force) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP
 
         Timber.i("Pull [$triggerSource] enqueued")
         val pullRunData = Data.Builder()
@@ -302,7 +311,7 @@ object WorkerUtils {
 
         val afterFoundation = workManager.beginUniqueWork(
             pullWorkerUniqueName,
-            if (force) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
+            policy,
             pullWorkRequest
         )
 
@@ -354,15 +363,10 @@ object WorkerUtils {
         val now = SystemClock.elapsedRealtime()
         if (!force && now - lastCampQuickPullAt < campQuickPullDebounceMs) return
 
-        // Pull and push are safe to overlap, but a full pull competing with an
-        // upload slows both on the camp hub. The auto-pull loop retries shortly.
-        if (!force && getActiveUniqueWorkInfos(WorkManager.getInstance(context), pushWorkerUniqueName)
-                .any { it.state == WorkInfo.State.RUNNING }
-        ) {
-            Timber.d("Pull [AUTO_PULL] skipped: push chain is running")
-            return
-        }
-
+        // Pull and push are safe to overlap. This used to skip the pull while any upload ran, but
+        // with the changes feed a pull is a small delta, and with uploads running most of the time
+        // records from other tablets stopped arriving. The pull goes ahead; the unique pull chain
+        // still stops two pulls overlapping.
         lastCampQuickPullAt = now
         triggerAmritPullWorker(context, triggerSource = "AUTO_PULL")
     }
