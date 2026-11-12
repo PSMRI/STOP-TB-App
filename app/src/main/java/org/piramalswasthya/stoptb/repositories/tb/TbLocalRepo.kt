@@ -85,7 +85,8 @@ import timber.log.Timber
 class TbLocalRepo @Inject constructor(
     private val tbDao: TBDao,
     private val benDao: BenDao,
-    private val benIdLocks: BenIdLocks
+    private val benIdLocks: BenIdLocks,
+    private val database: InAppDb
 ) {
 
     /** Only rows with a PENDING order (the poll's working set). */
@@ -327,16 +328,23 @@ class TbLocalRepo @Inject constructor(
         withContext(Dispatchers.IO) {
             val screenings = tbDao.getScreeningsForKnownTbContacts(householdId?.takeIf { it > 0L } ?: 0L)
             var updated = 0
-            for (screening in screenings) {
-                val selection = KeyPopulationRiskFactorAutoSelect.addContactOfKnownTb(
-                    screening.keyPopulationRiskFactorIds,
-                    screening.keyPopulationRiskFactors
-                ) ?: continue
-                screening.keyPopulationRiskFactorIds = selection.ids
-                screening.keyPopulationRiskFactors = selection.codes
-                screening.syncState = SyncState.UNSYNCED
-                tbDao.saveTbScreening(screening)
-                updated++
+            for (candidate in screenings) {
+                // Re-read inside a transaction and change only the risk-factor fields: the list
+                // above is a snapshot, and a form save in between must not be undone by writing
+                // that older row back.
+                val changed = database.withTransaction {
+                    val screening = tbDao.getTbScreeningById(candidate.id) ?: return@withTransaction false
+                    val selection = KeyPopulationRiskFactorAutoSelect.addContactOfKnownTb(
+                        screening.keyPopulationRiskFactorIds,
+                        screening.keyPopulationRiskFactors
+                    ) ?: return@withTransaction false
+                    screening.keyPopulationRiskFactorIds = selection.ids
+                    screening.keyPopulationRiskFactors = selection.codes
+                    screening.syncState = SyncState.UNSYNCED
+                    tbDao.saveTbScreening(screening)
+                    true
+                }
+                if (changed) updated++
             }
             if (updated > 0) {
                 Timber.d("Selected Contact of Known TB Patients on $updated screening record(s)")

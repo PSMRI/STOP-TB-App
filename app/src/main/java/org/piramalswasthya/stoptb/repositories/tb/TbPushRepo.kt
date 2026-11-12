@@ -117,19 +117,42 @@ class TbPushRepo @Inject constructor(
     private val tbConfirmedPushMutex = Mutex()
 
     suspend fun pushUnSyncedRecords(): Boolean {
-        val screeningResult = pushUnSyncedRecordsTBScreening()
-        val generalOpdResult = pushUnSyncedRecordsGeneralOpd()
-        val diagnosticsResult = pushUnSyncedRecordsTBDiagnostics()
-        val suspectedResult = pushUnSyncedRecordsTBSuspected()
-        val confirmedResult = pushUnSyncedRecordsTBConfirmed()
-        Timber.d("TB push results: screening=$screeningResult, generalOpd=$generalOpdResult, diagnostics=$diagnosticsResult, suspected=$suspectedResult, confirmed=$confirmedResult")
-        val results = listOf(screeningResult, generalOpdResult, diagnosticsResult, suspectedResult, confirmedResult)
+        // Stops at the first module that hits a network error: with the hub unreachable, every
+        // later module with pending rows would only wait out its own timeout before failing too.
+        val modules: List<suspend () -> Int> = listOf(
+            { pushUnSyncedRecordsTBScreening() },
+            { pushUnSyncedRecordsGeneralOpd() },
+            { pushUnSyncedRecordsTBDiagnostics() },
+            { pushUnSyncedRecordsTBSuspected() },
+            { pushUnSyncedRecordsTBConfirmed() },
+        )
+        val results = mutableListOf<Int>()
+        for (pushModule in modules) {
+            val result = pushModule()
+            results += result
+            if (result == PUSH_NETWORK_ERROR) break
+        }
+        Timber.d("TB push results (screening, generalOpd, diagnostics, suspected, confirmed): $results")
         if (PUSH_NETWORK_ERROR in results) {
             // Lets PushTBToAmritWorker retry with backoff instead of reporting success.
             throw IOException("TB push interrupted by a network error")
         }
         // Records the server rejected stay UNSYNCED for the next cycle.
         return true
+    }
+
+    /**
+     * Marks rows the hub has already accepted. A local failure here must not reach the chunk's
+     * generic catch, which treats the chunk as rejected and re-sends each record on its own in
+     * the same run. The rows stay UNSYNCED and go out again on the next cycle instead.
+     */
+    private suspend fun markSyncedAfterAck(markSynced: suspend () -> Int): Int = try {
+        markSynced()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Timber.e(e, "Could not mark acknowledged TB records synced; they stay UNSYNCED for the next cycle")
+        0
     }
 
     suspend fun pushUnSyncedTBScreeningRecords(): Int {
@@ -213,7 +236,7 @@ class TbPushRepo @Inject constructor(
                                         Timber.w("TB Screening push: $notSent record(s) not sent (no server benRegId yet), stay UNSYNCED")
                                     }
                                     acknowledgedCount += sentRecords.size
-                                    successCount += updateSyncStatusScreening(sentRecords)
+                                    successCount += markSyncedAfterAck { updateSyncStatusScreening(sentRecords) }
                                     syncRetryStore.clear(SyncRetryStore.ENTITY_TB_SCREENING, sentRecords.map { it.id.toLong() })
                                 }
 
@@ -322,7 +345,7 @@ class TbPushRepo @Inject constructor(
                             when (val responseStatusCode = jsonObj.getInt("statusCode")) {
                                 200 -> {
                                     acknowledgedCount += prepared.size
-                                    markedSyncedCount += updateSyncStatusGeneralOpd(prepared)
+                                    markedSyncedCount += markSyncedAfterAck { updateSyncStatusGeneralOpd(prepared) }
                                     successCount += prepared.size
                                 }
 
@@ -440,7 +463,7 @@ class TbPushRepo @Inject constructor(
                                         Timber.w("TB Diagnostics push: benIds=$excludedBenIds were NOT sent (no server benRegId yet) and stay UNSYNCED for the next cycle")
                                     }
                                     acknowledgedCount += sentRecords.size
-                                    markedSyncedCount += updateSyncStatusDiagnostics(sentRecords)
+                                    markedSyncedCount += markSyncedAfterAck { updateSyncStatusDiagnostics(sentRecords) }
                                     syncRetryStore.clear(SyncRetryStore.ENTITY_TB_DIAGNOSTICS, sentRecords.map { it.id.toLong() })
                                     successCount += sentRecords.size
                                 }
@@ -574,7 +597,7 @@ class TbPushRepo @Inject constructor(
                                         Timber.w("SYNC_DIAG[$callTag] TB Suspected push: benIds=$excludedBenIds were NOT sent (benId resolution failed above) and stay UNSYNCED for the next cycle")
                                     }
                                     acknowledgedCount += sentRecords.size
-                                    markedSyncedCount += updateSyncStatusSuspected(sentRecords)
+                                    markedSyncedCount += markSyncedAfterAck { updateSyncStatusSuspected(sentRecords) }
                                     syncRetryStore.clear(SyncRetryStore.ENTITY_TB_SUSPECTED, sentRecords.map { it.id.toLong() })
                                     successCount += sentRecords.size
                                     Timber.d("SYNC_DIAG[$callTag] TB Suspected push: chunk marked SYNCED, benIds=${sentRecords.map { it.benId }}")
@@ -702,7 +725,7 @@ class TbPushRepo @Inject constructor(
                                         Timber.w("TB Confirmed push: benIds=$excludedBenIds were NOT sent (no local BENEFICIARY row) and stay UNSYNCED for the next cycle")
                                     }
                                     acknowledgedCount += sentRecords.size
-                                    markedSyncedCount += updateSyncStatusConfirmed(sentRecords)
+                                    markedSyncedCount += markSyncedAfterAck { updateSyncStatusConfirmed(sentRecords) }
                                     syncRetryStore.clear(SyncRetryStore.ENTITY_TB_CONFIRMED, sentRecords.map { it.id.toLong() })
                                     successCount += sentRecords.size
                                 }

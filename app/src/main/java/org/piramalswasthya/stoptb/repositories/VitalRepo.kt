@@ -1,7 +1,9 @@
 package org.piramalswasthya.stoptb.repositories
 
 import androidx.room.withTransaction
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
@@ -99,7 +101,19 @@ class VitalRepo @Inject constructor(
             // running, don't make the form wait for its whole queue: it (or the next cycle) sends
             // this row, which is already stored as UNSYNCED.
             if (!pushMutex.tryLock()) {
-                Timber.d("Vital push left to the running background push for benId=%s", localData.benId)
+                // The running push may have read its queue before this save, so queue one more
+                // pass behind it (pushUnSyncedVitals waits for the same mutex) instead of leaving
+                // the row for an unrelated later trigger.
+                Timber.d("Vital push for benId=%s queued behind the running background push", localData.benId)
+                appScope.launch(Dispatchers.IO) {
+                    try {
+                        pushUnSyncedVitals()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Timber.w(e, "Follow-up vitals push failed; the row stays UNSYNCED for the next sync")
+                    }
+                }
                 return@withContext false
             }
             try {

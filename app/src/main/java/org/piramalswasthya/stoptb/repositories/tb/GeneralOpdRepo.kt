@@ -151,6 +151,8 @@ class GeneralOpdRepo @Inject constructor(
                 )
             }
             true
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             Timber.e(e, "Visit category master refresh failed")
             false
@@ -182,6 +184,8 @@ class GeneralOpdRepo @Inject constructor(
                 )
             }
             true
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             Timber.e(e, "Chief complaint master refresh failed")
             false

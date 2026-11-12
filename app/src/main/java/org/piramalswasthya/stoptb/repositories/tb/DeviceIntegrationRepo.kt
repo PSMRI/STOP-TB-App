@@ -99,9 +99,13 @@ class DeviceIntegrationRepo @Inject constructor(
         // poll treat every order as not pending and stop rescheduling until something re-triggered it.
         if (xrayHealth is NetworkResponse.Success) preferenceDao.setXrayIntegrated(isIntegrated(xrayHealth))
         if (truenatHealth is NetworkResponse.Success) preferenceDao.setTruenatIntegrated(isIntegrated(truenatHealth))
-        // Cache only a real answer from the hub: a timeout or HTTP error is retried on the next
-        // poll cycle instead of reporting both devices as not integrated for the whole window.
-        if (xrayHealth is NetworkResponse.Success && truenatHealth is NetworkResponse.Success) {
+        // Cache only a real answer from the hub that both devices are integrated. A timeout or
+        // HTTP error, or a device reported disconnected, is checked again on the next poll cycle:
+        // caching "not integrated" for the whole window let a triggered poll stop at once on a
+        // stale answer, after the device had reconnected.
+        if (xrayHealth is NetworkResponse.Success && truenatHealth is NetworkResponse.Success &&
+            isIntegrated(xrayHealth) && isIntegrated(truenatHealth)
+        ) {
             lastRefreshAt = now
             lastRefreshHubUrl = hubUrl
         }

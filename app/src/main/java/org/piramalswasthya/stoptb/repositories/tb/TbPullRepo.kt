@@ -1067,6 +1067,10 @@ class TbPullRepo @Inject constructor(
         // One transaction per [pullWriteChunkSize] records instead of one per record. Nothing
         // inside the loop touches the network, so the write lock is only held for local work.
         requestDTO?.tbSuspectedList.orEmpty().chunked(pullWriteChunkSize).forEach { chunk ->
+            // Locks first, then the transaction, as the diagnostics pull does: markTbSuspectedConfirmed
+            // and the diagnostics -> suspected sync read and rewrite a row under its beneficiary's
+            // lock, and a pulled change committed between their read and write would be lost.
+            benIdLocks.withLocks(chunk.map { it.benId }.toSet()) {
             database.withTransaction {
                 chunk.forEach { tbSuspectedDTO ->
                     tbSuspectedDTO.visitDate?.let {
@@ -1136,6 +1140,7 @@ class TbPullRepo @Inject constructor(
                         }
                     }
                 }
+            }
             }
         }
         return tbSuspectedList

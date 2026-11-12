@@ -44,22 +44,22 @@ interface TbDiagnosticOrderQueries {
      */
     @Query(
         "SELECT benId FROM TB_DIAGNOSTICS WHERE benId IN (:benIds) " +
-                "AND xrayOrderId IS NOT NULL AND TRIM(xrayOrderId) <> '' " +
-                "AND UPPER(TRIM(xrayOrderId)) <> 'N/A'"
+                "AND xrayOrderId IS NOT NULL AND TRIM(xrayOrderId, char(32, 9, 10, 13)) <> '' " +
+                "AND UPPER(TRIM(xrayOrderId, char(32, 9, 10, 13))) <> 'N/A'"
     )
     suspend fun getBenIdsWithXrayOrderId(benIds: List<Long>): List<Long>
 
     @Query(
         "SELECT benId FROM TB_DIAGNOSTICS WHERE benId IN (:benIds) " +
-                "AND trueNatOrderId IS NOT NULL AND TRIM(trueNatOrderId) <> '' " +
-                "AND UPPER(TRIM(trueNatOrderId)) <> 'N/A'"
+                "AND trueNatOrderId IS NOT NULL AND TRIM(trueNatOrderId, char(32, 9, 10, 13)) <> '' " +
+                "AND UPPER(TRIM(trueNatOrderId, char(32, 9, 10, 13))) <> 'N/A'"
     )
     suspend fun getBenIdsWithTrueNatOrderId(benIds: List<Long>): List<Long>
 
     @Query(
         "SELECT benId FROM TB_DIAGNOSTICS WHERE benId IN (:benIds) " +
-                "AND rifOrderId IS NOT NULL AND TRIM(rifOrderId) <> '' " +
-                "AND UPPER(TRIM(rifOrderId)) <> 'N/A'"
+                "AND rifOrderId IS NOT NULL AND TRIM(rifOrderId, char(32, 9, 10, 13)) <> '' " +
+                "AND UPPER(TRIM(rifOrderId, char(32, 9, 10, 13))) <> 'N/A'"
     )
     suspend fun getBenIdsWithRifOrderId(benIds: List<Long>): List<Long>
 

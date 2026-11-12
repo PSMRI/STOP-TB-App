@@ -34,7 +34,7 @@ class StaleDiagnosticsSnapshotTest {
     fun setUp() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         db = Room.inMemoryDatabaseBuilder(context, InAppDb::class.java).build()
-        repo = TbLocalRepo(db.tbDao, db.benDao, BenIdLocks())
+        repo = TbLocalRepo(db.tbDao, db.benDao, BenIdLocks(), db)
         db.benDao.upsert(
             BenRegCache(
                 beneficiaryId = BEN_ID, isDeath = false, reasonOfDeathId = 0, placeOfDeathId = 0, ashaId = 1,
