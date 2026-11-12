@@ -7,6 +7,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.TbDiagnosticsCardFields
+import org.piramalswasthya.stoptb.ui.TbDiagnosticsSnapshot
 import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
 
 class BenPagingAdapter(
@@ -34,21 +35,24 @@ class BenPagingAdapter(
 ) :
     PagingDataAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenListAdapter.BenDiffUtilCallBack) {
 
-    private val benIds = mutableListOf<Long>()
-    private val tbScreeningBenIds = mutableListOf<Long>()
-    private val generalOpdBenIds = mutableListOf<Long>()
-    private val anthropometryBenIds = mutableListOf<Long>()
-    private val unsyncedVitalBenIds = mutableListOf<Long>()
-    private val unsyncedTbScreeningBenIds = mutableListOf<Long>()
-    private val unsyncedGeneralOpdBenIds = mutableListOf<Long>()
-    private val syncingVitalBenIds = mutableListOf<Long>()
-    private val syncingTbScreeningBenIds = mutableListOf<Long>()
-    private val syncingGeneralOpdBenIds = mutableListOf<Long>()
-    private val diagnosisIds = mutableListOf<Long>()
-    private val contactFollowUpDoneIds = mutableListOf<Long>()
-    private val tptFollowUpDoneIds = mutableListOf<Long>()
-    private val tptEligibleIds = mutableListOf<Long>()
-    private val tptRegistrationDoneIds = mutableListOf<Long>()
+    // Sets: bind() checks every row against each of these (~15 lookups per row); with lists each
+    // lookup was a linear scan. Each submit swaps in a new set (one pass over the list) and
+    // rebinds only loaded rows whose membership changed - no full-set copies or diffs on Main.
+    private var benIds: Set<Long> = emptySet()
+    private var tbScreeningBenIds: Set<Long> = emptySet()
+    private var generalOpdBenIds: Set<Long> = emptySet()
+    private var anthropometryBenIds: Set<Long> = emptySet()
+    private var unsyncedVitalBenIds: Set<Long> = emptySet()
+    private var unsyncedTbScreeningBenIds: Set<Long> = emptySet()
+    private var unsyncedGeneralOpdBenIds: Set<Long> = emptySet()
+    private var syncingVitalBenIds: Set<Long> = emptySet()
+    private var syncingTbScreeningBenIds: Set<Long> = emptySet()
+    private var syncingGeneralOpdBenIds: Set<Long> = emptySet()
+    private var diagnosisIds: Set<Long> = emptySet()
+    private var contactFollowUpDoneIds: Set<Long> = emptySet()
+    private var tptFollowUpDoneIds: Set<Long> = emptySet()
+    private var tptEligibleIds: Set<Long> = emptySet()
+    private var tptRegistrationDoneIds: Set<Long> = emptySet()
     private val childCountMap = mutableMapOf<Long, Int>()
     private val householdMemberCountMap = mutableMapOf<Long, Int>()
     private val householdHeadNameMap = mutableMapOf<Long, String>()
@@ -64,8 +68,29 @@ class BenPagingAdapter(
     /** Set by [submitTBDiagnostics]; until then a missing row means "not loaded yet". */
     private var tbDiagnosticsLoaded = false
 
-    private val tbScreeningMap = mutableMapOf<Long, TbScreeningSymptoms>()
-    private val retryingBenIds = mutableListOf<Long>()
+    /**
+     * The benIds the latest diagnostics snapshot was read for, when the screen reads them per
+     * loaded row ([LoadedRowBadges]); null for a whole-table list. A row outside it is "not
+     * loaded yet" even after the first snapshot - see [isTbDiagnosticsLoadedFor].
+     */
+    private var tbDiagnosticsCoveredBenIds: Set<Long>? = null
+
+    private fun isTbDiagnosticsLoadedFor(benId: Long): Boolean =
+        tbDiagnosticsLoaded && (tbDiagnosticsCoveredBenIds?.contains(benId) ?: true)
+
+    /**
+     * Per-row snapshot from [LoadedRowBadges]: rows whose benId the snapshot just started
+     * covering are rebound, so they leave the "Checking" placeholder even when they have no
+     * diagnostics row at all.
+     */
+    fun submitTBDiagnostics(snapshot: TbDiagnosticsSnapshot) {
+        val previouslyCovered = tbDiagnosticsCoveredBenIds.orEmpty()
+        tbDiagnosticsCoveredBenIds = snapshot.coveredBenIds
+        submitTBDiagnostics(snapshot.rows, newlyCovered = snapshot.coveredBenIds - previouslyCovered)
+    }
+
+    private var tbScreeningMap: Map<Long, TbScreeningSymptoms> = emptyMap()
+    private var retryingBenIds: Set<Long> = emptySet()
 
     override fun onCreateViewHolder(
         parent: ViewGroup, viewType: Int
@@ -106,7 +131,7 @@ class BenPagingAdapter(
             showAnthropometryButton = showAnthropometryButton,
             showExamineButton = showExamineButton,
             tbDiagnosticsByBenId = tbDiagnosticsByBenId,
-            tbDiagnosticsLoaded = tbDiagnosticsLoaded,
+            tbDiagnosticsLoaded = isTbDiagnosticsLoadedFor(item.benId),
             tbScreeningMap = tbScreeningMap,
             showScreeningStatus = showScreeningStatus,   // ADD THIS
             showRedesignedCard = showRedesignedCard,
@@ -120,7 +145,7 @@ class BenPagingAdapter(
         )
     }
 
-    fun submitTBDiagnostics(list: List<TbDiagnosticsCardFields>) {
+    fun submitTBDiagnostics(list: List<TbDiagnosticsCardFields>, newlyCovered: Set<Long> = emptySet()) {
         // Diff instead of notifyDataSetChanged(), same pattern as the submit*() functions below
         // — a blanket refresh here rebinds every visible row on every emission, which was the
         // root cause of cards needing multiple taps to register.
@@ -139,6 +164,7 @@ class BenPagingAdapter(
         tbDiagnosticsLoaded = true
         val changedBenIds = (oldByBenId.keys + newByBenId.keys)
             .filterTo(mutableSetOf()) { benId -> oldByBenId[benId] != newByBenId[benId] }
+        changedBenIds += newlyCovered
         if (changedBenIds.isNotEmpty() || firstLoad) {
             val items = snapshot()
             items.forEachIndexed { index, item ->
@@ -153,108 +179,51 @@ class BenPagingAdapter(
 
 
     fun submitTbScreeningList(list: List<TbScreeningSymptoms>) {
-        tbScreeningMap.clear()
-        tbScreeningMap.putAll(list.associateBy { it.benId })
-        notifyDataSetChanged()
+        // Rebind only loaded rows whose screening changed (was notifyDataSetChanged on every
+        // emission, i.e. every TB_SCREENING write rebound the whole visible list).
+        val oldMap = tbScreeningMap
+        val newMap = list.associateBy { screening -> screening.benId }
+        tbScreeningMap = newMap
+        notifyLoadedRowsWhere { benId -> oldMap[benId] != newMap[benId] }
     }
 
-    fun submitBenIds(list: List<Long>) {
-        val oldIds = benIds.toSet()
-        benIds.clear()
-        benIds.addAll(list)
-        val newIds = benIds.toSet()
-        val changed = (oldIds - newIds) + (newIds - oldIds)
-        if (changed.isNotEmpty()) {
-            val items = snapshot()
-            items.forEachIndexed { index, item ->
-                if (item != null && item.benId in changed) {
-                    notifyItemChanged(index)
-                }
-            }
+    fun submitBenIds(list: List<Long>) { benIds = swapIds(benIds, list) }
+    fun submitTbScreeningBenIds(list: List<Long>) { tbScreeningBenIds = swapIds(tbScreeningBenIds, list) }
+    fun submitGeneralOpdBenIds(list: List<Long>) { generalOpdBenIds = swapIds(generalOpdBenIds, list) }
+    fun submitAnthropometryBenIds(list: List<Long>) { anthropometryBenIds = swapIds(anthropometryBenIds, list) }
+    fun submitUnsyncedVitalBenIds(list: List<Long>) { unsyncedVitalBenIds = swapIds(unsyncedVitalBenIds, list) }
+    fun submitUnsyncedTbScreeningBenIds(list: List<Long>) { unsyncedTbScreeningBenIds = swapIds(unsyncedTbScreeningBenIds, list) }
+    fun submitUnsyncedGeneralOpdBenIds(list: List<Long>) { unsyncedGeneralOpdBenIds = swapIds(unsyncedGeneralOpdBenIds, list) }
+    fun submitSyncingVitalBenIds(list: List<Long>) { syncingVitalBenIds = swapIds(syncingVitalBenIds, list) }
+    fun submitSyncingTbScreeningBenIds(list: List<Long>) { syncingTbScreeningBenIds = swapIds(syncingTbScreeningBenIds, list) }
+    fun submitSyncingGeneralOpdBenIds(list: List<Long>) { syncingGeneralOpdBenIds = swapIds(syncingGeneralOpdBenIds, list) }
+    fun submitRetryingBenIds(list: List<Long>) { retryingBenIds = swapIds(retryingBenIds, list) }
+    fun submitDiagnosisBenIds(list: List<Long>) { diagnosisIds = swapIds(diagnosisIds, list) }
+    fun submitContactFollowUpDoneBenIds(ids: Collection<Long>) { contactFollowUpDoneIds = swapIds(contactFollowUpDoneIds, ids) }
+    fun submitTptFollowUpDoneBenIds(ids: Collection<Long>) { tptFollowUpDoneIds = swapIds(tptFollowUpDoneIds, ids) }
+    fun submitTptEligibleBenIds(ids: Collection<Long>) { tptEligibleIds = swapIds(tptEligibleIds, ids) }
+    fun submitTptRegistrationDoneBenIds(ids: Collection<Long>) { tptRegistrationDoneIds = swapIds(tptRegistrationDoneIds, ids) }
+
+    /**
+     * Returns the new id set for [ids] and rebinds the loaded rows whose membership changed.
+     * The caller assigns the result before the rebind runs (notifyItemChanged only schedules it).
+     * A Set is used as is (built off the main thread by the caller); a List is converted here.
+     */
+    private fun swapIds(old: Set<Long>, ids: Collection<Long>): Set<Long> {
+        val updated: Set<Long> = when {
+            ids.isEmpty() -> emptySet()
+            ids is Set<Long> -> ids
+            else -> ids.toHashSet()
         }
+        notifyLoadedRowsWhere { benId -> (benId in old) != (benId in updated) }
+        return updated
     }
 
-    fun submitTbScreeningBenIds(list: List<Long>) {
-        val oldIds = tbScreeningBenIds.toSet()
-        tbScreeningBenIds.clear()
-        tbScreeningBenIds.addAll(list)
-        notifyChangedIds(oldIds, tbScreeningBenIds.toSet())
-    }
-
-    fun submitGeneralOpdBenIds(list: List<Long>) {
-        val oldIds = generalOpdBenIds.toSet()
-        generalOpdBenIds.clear()
-        generalOpdBenIds.addAll(list)
-        notifyChangedIds(oldIds, generalOpdBenIds.toSet())
-    }
-
-    fun submitAnthropometryBenIds(list: List<Long>) {
-        val oldIds = anthropometryBenIds.toSet()
-        anthropometryBenIds.clear()
-        anthropometryBenIds.addAll(list)
-        notifyChangedIds(oldIds, anthropometryBenIds.toSet())
-    }
-
-    fun submitUnsyncedVitalBenIds(list: List<Long>) = submitStatusIds(unsyncedVitalBenIds, list)
-    fun submitUnsyncedTbScreeningBenIds(list: List<Long>) = submitStatusIds(unsyncedTbScreeningBenIds, list)
-    fun submitUnsyncedGeneralOpdBenIds(list: List<Long>) = submitStatusIds(unsyncedGeneralOpdBenIds, list)
-    fun submitSyncingVitalBenIds(list: List<Long>) = submitStatusIds(syncingVitalBenIds, list)
-    fun submitSyncingTbScreeningBenIds(list: List<Long>) = submitStatusIds(syncingTbScreeningBenIds, list)
-    fun submitSyncingGeneralOpdBenIds(list: List<Long>) = submitStatusIds(syncingGeneralOpdBenIds, list)
-    fun submitRetryingBenIds(list: List<Long>) = submitStatusIds(retryingBenIds, list)
-
-    fun submitDiagnosisBenIds(list: List<Long>) {
-        val oldIds = diagnosisIds.toSet()
-        diagnosisIds.clear()
-        diagnosisIds.addAll(list)
-        notifyChangedIds(oldIds, diagnosisIds.toSet())
-    }
-
-    fun submitContactFollowUpDoneBenIds(list: List<Long>) {
-        val oldIds = contactFollowUpDoneIds.toSet()
-        contactFollowUpDoneIds.clear()
-        contactFollowUpDoneIds.addAll(list)
-        notifyChangedIds(oldIds, contactFollowUpDoneIds.toSet())
-    }
-
-    fun submitTptFollowUpDoneBenIds(list: List<Long>) {
-        val oldIds = tptFollowUpDoneIds.toSet()
-        tptFollowUpDoneIds.clear()
-        tptFollowUpDoneIds.addAll(list)
-        notifyChangedIds(oldIds, tptFollowUpDoneIds.toSet())
-    }
-
-    fun submitTptEligibleBenIds(list: List<Long>) {
-        val oldIds = tptEligibleIds.toSet()
-        tptEligibleIds.clear()
-        tptEligibleIds.addAll(list)
-        notifyChangedIds(oldIds, tptEligibleIds.toSet())
-    }
-
-    fun submitTptRegistrationDoneBenIds(list: List<Long>) {
-        val oldIds = tptRegistrationDoneIds.toSet()
-        tptRegistrationDoneIds.clear()
-        tptRegistrationDoneIds.addAll(list)
-        notifyChangedIds(oldIds, tptRegistrationDoneIds.toSet())
-    }
-
-    private fun notifyChangedIds(oldIds: Set<Long>, newIds: Set<Long>) {
-        val changed = (oldIds - newIds) + (newIds - oldIds)
-        if (changed.isNotEmpty()) {
-            val items = snapshot()
-            items.forEachIndexed { index, item ->
-                if (item != null && item.benId in changed) {
-                    notifyItemChanged(index)
-                }
-            }
+    /** Rebinds loaded rows for which [changed] is true; cost is the number of loaded rows. */
+    private inline fun notifyLoadedRowsWhere(changed: (Long) -> Boolean) {
+        snapshot().forEachIndexed { index, item ->
+            if (item != null && changed(item.benId)) notifyItemChanged(index)
         }
-    }
-
-    private fun submitStatusIds(target: MutableList<Long>, list: List<Long>) {
-        val oldIds = target.toSet()
-        target.clear()
-        target.addAll(list)
-        notifyChangedIds(oldIds, target.toSet())
     }
 
     fun submitChildCounts(map: Map<Long, Int>) {

@@ -33,6 +33,8 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class TBSuspectedFragment : Fragment() {
 
+    private var formListJob: kotlinx.coroutines.Job? = null
+
     @Inject lateinit var preferenceDao: PreferenceDao
 
     private var _binding: FragmentNewFormBinding? = null
@@ -83,7 +85,10 @@ class TBSuspectedFragment : Fragment() {
                 binding.btnSubmit.isEnabled = !(recordExists || viewModel.viewOnly)
                 binding.btnSubmit.visibility = if (recordExists || viewModel.viewOnly) View.GONE else View.VISIBLE
                 binding.form.rvInputForm.adapter = adapter
-                lifecycleScope.launch {
+                // recordExists can emit more than once: replace the previous collector instead of
+                // stacking another one, and stop it with the view.
+                formListJob?.cancel()
+                formListJob = viewLifecycleOwner.lifecycleScope.launch {
                     viewModel.formList.collect {
                         if (it.isNotEmpty())
 
@@ -189,8 +194,9 @@ class TBSuspectedFragment : Fragment() {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
+    // Released with the view, not the fragment: on the back stack the fragment outlives its view.
+    override fun onDestroyView() {
+        super.onDestroyView()
         _binding = null
     }
 

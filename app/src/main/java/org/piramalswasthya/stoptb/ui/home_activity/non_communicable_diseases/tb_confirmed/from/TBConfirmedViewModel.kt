@@ -166,12 +166,9 @@ class TBConfirmedViewModel @Inject constructor(
                     if (tbConfirmedTreatmentCache?.treatmentCompleted == true) {
                         _isTreatmentCompleted.postValue(true)
                     }
-                    tbSuspected?.let {
-                        it.isConfirmed = true
-                        it.isTBConfirmed = true
-                        it.syncState = SyncState.UNSYNCED
-                        tbRepo.saveTBSuspected(it)
-                    }
+                    // Only the confirmation flags, on the record as it stands now: the copy loaded
+                    // when the screen opened can be older than a diagnostics sync since.
+                    tbSuspected?.let { loaded -> tbRepo.markTbSuspectedConfirmed(loaded.benId, createIfMissing = false) }
                     _state.postValue(State.SAVE_SUCCESS)
                 } catch (e: Exception) {
                     Timber.d("saving TB Suspected data failed due to $e")
