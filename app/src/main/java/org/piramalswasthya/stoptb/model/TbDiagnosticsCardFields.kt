@@ -52,5 +52,9 @@ data class TbDiagnosticsCardFields(
     // ── Manual result awaiting replay ────────────────────────────────────────
     val xrayManualResultPendingSync: Boolean? = null,
     val trueNatManualResultPendingSync: Boolean? = null,
-    val rifManualResultPendingSync: Boolean? = null
+    val rifManualResultPendingSync: Boolean? = null,
+    // ── When the latest TB screening was saved (TB_SCREENING.visitDate) ──────
+    // Lets the card tell a referral the camp hub is still turning into an order from one that
+    // needs Retry Referral.
+    val latestScreeningAt: Long? = null
 )

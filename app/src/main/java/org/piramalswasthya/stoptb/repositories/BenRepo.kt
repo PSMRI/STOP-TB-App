@@ -2166,15 +2166,22 @@ class BenRepo @Inject constructor(
                         ?: stopTBDetailsObj.optStringOrNull("nikshayId")
                         ?: stopTBDetailsObj.optStringOrNull("nikshayID")
 
-                    val benGpsLatitude = demographicsObj.optDoubleOrNull("latitude")
-                        ?: demographicsObj.optDoubleOrNull("gpsLatitude")
-                        ?: benDataObj.optDoubleOrNull("gpsLatitude")
-                        ?: jsonObject.optDoubleOrNull("gpsLatitude")
+                    val benGpsPairs = listOf(
+                        demographicsObj.optDoubleOrNull("latitude") to demographicsObj.optDoubleOrNull("longitude"),
+                        demographicsObj.optDoubleOrNull("gpsLatitude") to demographicsObj.optDoubleOrNull("gpsLongitude"),
+                        benDataObj.optDoubleOrNull("latitude") to benDataObj.optDoubleOrNull("longitude"),
+                        benDataObj.optDoubleOrNull("gpsLatitude") to benDataObj.optDoubleOrNull("gpsLongitude"),
+                        jsonObject.optDoubleOrNull("latitude") to jsonObject.optDoubleOrNull("longitude"),
+                        jsonObject.optDoubleOrNull("gpsLatitude") to jsonObject.optDoubleOrNull("gpsLongitude"),
+                    ).mapNotNull { (latitude, longitude) ->
+                        if (latitude != null && longitude != null) latitude to longitude else null
+                    }
+                    val benGpsPair = benGpsPairs.firstOrNull { (latitude, longitude) ->
+                        latitude != 0.0 || longitude != 0.0
+                    } ?: benGpsPairs.firstOrNull()
 
-                    val benGpsLongitude = demographicsObj.optDoubleOrNull("longitude")
-                        ?: demographicsObj.optDoubleOrNull("gpsLongitude")
-                        ?: benDataObj.optDoubleOrNull("gpsLongitude")
-                        ?: jsonObject.optDoubleOrNull("gpsLongitude")
+                    val benGpsLatitude = benGpsPair?.first
+                    val benGpsLongitude = benGpsPair?.second
 
                     val benDigipin = demographicsObj.optStringOrNull("digipin")
                         ?: benDataObj.optStringOrNull("digipin")
@@ -2218,14 +2225,17 @@ class BenRepo @Inject constructor(
 
                                 isNonHH = resolvedHouseholdId == null,
 
-                                placeOfCurrentLiving = if (jsonObject.has("placeOfCurrentLiving") && !jsonObject.isNull("placeOfCurrentLiving")) {
-                                    val code = jsonObject.optString("placeOfCurrentLiving", "")
-                                    getPlaceOfCurrentLivingIndex(code.takeIf { it.isNotEmpty() })
-                                } else null,
+                                placeOfCurrentLiving = getPlaceOfCurrentLivingIndex(
+                                    benDataObj.optStringOrNull("placeOfCurrentLiving")
+                                ) ?: getPlaceOfCurrentLivingIndex(
+                                    jsonObject.optStringOrNull("placeOfCurrentLiving")
+                                ),
 
-                                otherPlaceOfCurrentLiving = jsonObject.optStringOrNull("otherPlaceOfCurrentLiving"),
+                                otherPlaceOfCurrentLiving = benDataObj.optStringOrNull("otherPlaceOfCurrentLiving")
+                                    ?: jsonObject.optStringOrNull("otherPlaceOfCurrentLiving"),
 
-                                institutionName = jsonObject.optStringOrNull("institutionName"),
+                                institutionName = benDataObj.optStringOrNull("institutionName")
+                                    ?: jsonObject.optStringOrNull("institutionName"),
 
                                 beneficiaryId = jsonObject.getLong("benficieryid"),
 
@@ -2603,6 +2613,10 @@ class BenRepo @Inject constructor(
                             }
 
                             // The row exactly as it would be persisted, merge rules included.
+                            val serverHasLivingInfo = serverBen.placeOfCurrentLiving != null ||
+                                !serverBen.otherPlaceOfCurrentLiving.isNullOrBlank() ||
+                                !serverBen.institutionName.isNullOrBlank()
+                            val livingSource = if (serverHasLivingInfo) serverBen else existingBen
                             val mergedBen = serverBen.copy(
                                 userImage = serverBen.userImage ?: existingBen.userImage,
                                 healthIdDetails = serverBen.healthIdDetails ?: existingBen.healthIdDetails,
@@ -2610,6 +2624,9 @@ class BenRepo @Inject constructor(
                                 weight = serverBen.weight ?: existingBen.weight,
                                 bmi = serverBen.bmi ?: existingBen.bmi,
                                 temperature = serverBen.temperature ?: existingBen.temperature,
+                                placeOfCurrentLiving = livingSource.placeOfCurrentLiving,
+                                otherPlaceOfCurrentLiving = livingSource.otherPlaceOfCurrentLiving,
+                                institutionName = livingSource.institutionName,
                                 isConsent = serverBen.isConsent || existingBen.isConsent,
                                 syncState = SyncState.SYNCED,
                                 processed = "P"

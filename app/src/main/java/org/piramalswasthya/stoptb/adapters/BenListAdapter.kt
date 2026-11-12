@@ -51,6 +51,32 @@ data class ButtonConfig(
 private fun String?.isMissingOrderId(): Boolean =
     isNullOrBlank() || equals("N/A", ignoreCase = true)
 
+// How long after a screening is saved a camp hub that creates referral orders may still be
+// making them: it creates them as soon as the screening reaches it and re-checks every 2 minutes.
+internal const val HUB_ORDER_CREATION_WINDOW_MS = 5 * 60_000L
+
+/**
+ * On a camp hub that creates referral orders, a PENDING with no order id is a local placeholder
+ * the screening form wrote (before this tablet stopped writing it, or after a push whose failure
+ * was never recorded), not an order the hub holds: the card treats it as "no order yet". A Retry
+ * from there cannot duplicate an order, the hub returns any order it already has.
+ */
+internal fun String?.withoutHubPlaceholder(orderId: String?, pref: PreferenceDao?): String? =
+    if (equals("PENDING", ignoreCase = true) && orderId.isMissingOrderId() &&
+        pref?.isCampModeEnabled() == true && pref.hubCreatesReferralOrders()
+    ) null else this
+
+/**
+ * Milliseconds left in which the camp hub is still expected to create a referral order for the
+ * latest screening, or 0 when the tablet should offer Retry Referral instead.
+ */
+internal fun hubOrderWindowRemaining(tbDiag: TbDiagnosticsCardFields?, pref: PreferenceDao?): Long {
+    if (pref == null || !pref.isCampModeEnabled() || !pref.hubCreatesReferralOrders()) return 0L
+    val screenedAt = tbDiag?.latestScreeningAt ?: return 0L
+    return (screenedAt + HUB_ORDER_CREATION_WINDOW_MS - System.currentTimeMillis())
+        .coerceIn(0L, HUB_ORDER_CREATION_WINDOW_MS)
+}
+
 class BenListAdapter(
     private val clickListener: BenClickListener? = null,
     private val showBeneficiaries: Boolean = false,
@@ -85,6 +111,23 @@ class BenListAdapter(
 
     class BenViewHolder private constructor(private val binding: RvItemBenBinding) :
         RecyclerView.ViewHolder(binding.root) {
+
+        // Rebinds this card when an "Order being created" window ends, so it moves on to Retry
+        // Referral even if no data changes in the meantime. Posted on its own handler rather than
+        // the view, so it can still be cancelled when the holder is rebound while detached.
+        private val refreshHandler = android.os.Handler(android.os.Looper.getMainLooper())
+        private var hubOrderRefresh: Runnable? = null
+
+        private fun scheduleHubOrderRefresh(delayMs: Long) {
+            hubOrderRefresh?.let { refreshHandler.removeCallbacks(it) }
+            val refresh = Runnable {
+                hubOrderRefresh = null
+                val position = bindingAdapterPosition
+                if (position != RecyclerView.NO_POSITION) bindingAdapter?.notifyItemChanged(position)
+            }
+            hubOrderRefresh = refresh
+            refreshHandler.postDelayed(refresh, delayMs + 1_000L)
+        }
         companion object {
             fun from(parent: ViewGroup): BenViewHolder {
                 val layoutInflater = LayoutInflater.from(parent.context)
@@ -524,6 +567,8 @@ class BenListAdapter(
             householdHeadNameMap: Map<Long, String> = emptyMap(),
             showAddMemberButton: Boolean = false
         ) {
+            hubOrderRefresh?.let { refreshHandler.removeCallbacks(it) }
+            hubOrderRefresh = null
             binding.btnAbha.visibility = View.VISIBLE
             if (!showSyncIcon) item.syncState = null
             binding.ben = item
@@ -772,9 +817,10 @@ class BenListAdapter(
 //                    val canActOnReferral = isNurse || isCounsellingOfficer
                     val canActOnReferral = roleManager?.privilegesUnion()?.canActOnReferral == true
                     Timber.d("RoleManager: canActOnReferral=$canActOnReferral")
+                    val hubOrderWait = hubOrderWindowRemaining(tbDiag, pref)
                     val config = when (source) {
                         6 -> {
-                            val status = tbDiag?.xrayOrderStatus
+                            val status = tbDiag?.xrayOrderStatus.withoutHubPlaceholder(tbDiag?.xrayOrderId, pref)
                             val referred = tbDiag?.isReferredForDigitalChestXray
                             binding.btnVitalScreenSecondary.visibility = View.GONE
 
@@ -805,6 +851,12 @@ class BenListAdapter(
                                 // See the note in bindRifBlock: a backend-reported status means
                                 // the order exists, so a missing local id is "not fetched yet",
                                 // not "referral failed".
+                                // The camp hub creates this order from the screening; give it time
+                                // before offering Retry Referral.
+                                status.isNullOrBlank() && tbDiag?.xrayOrderId.isMissingOrderId() && hubOrderWait > 0 -> {
+                                    scheduleHubOrderRefresh(hubOrderWait)
+                                    ButtonConfig(context.getString(R.string.order_status_being_created), android.R.color.darker_gray, "NONE", "XRAY_CHEST")
+                                }
                                 status.isNullOrBlank() && tbDiag?.xrayOrderId.isMissingOrderId() -> {
                                     clickListener?.onClickOrderAction(item, "CHECK_PUSH_ACTIVE", "XRAY_CHEST")
                                     bindErrorMsg(tbDiag?.errorMsgXray)
@@ -828,7 +880,7 @@ class BenListAdapter(
                             }
                         }
                         7 -> {
-                            val status = tbDiag?.trueNatOrderStatus
+                            val status = tbDiag?.trueNatOrderStatus.withoutHubPlaceholder(tbDiag?.trueNatOrderId, pref)
                             val referredForSputum = tbDiag?.isReferredForSputum
                             binding.btnVitalScreenSecondary.visibility = View.GONE
                             binding.btnVitalScreen.visibility = View.VISIBLE
@@ -865,6 +917,10 @@ class BenListAdapter(
                                 // See the note in bindRifBlock: a backend-reported status means
                                 // the order exists, so a missing local id is "not fetched yet",
                                 // not "referral failed".
+                                status.isNullOrBlank() && tbDiag?.trueNatOrderId.isMissingOrderId() && hubOrderWait > 0 -> {
+                                    scheduleHubOrderRefresh(hubOrderWait)
+                                    ButtonConfig(context.getString(R.string.order_status_being_created), android.R.color.darker_gray, "NONE", "SPUTUM_TRUENAT")
+                                }
                                 status.isNullOrBlank() && tbDiag?.trueNatOrderId.isMissingOrderId() -> {
                                     clickListener?.onClickOrderAction(item, "CHECK_PUSH_ACTIVE", "SPUTUM_TRUENAT")
                                     bindErrorMsg(tbDiag?.errorMsgTrueNat)
