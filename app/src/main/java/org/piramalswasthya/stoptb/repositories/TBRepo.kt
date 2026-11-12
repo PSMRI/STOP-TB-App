@@ -235,6 +235,16 @@ class TBRepo @Inject constructor(
     suspend fun getAllFollowUpsForBeneficiary(benId: Long): List<TBConfirmedTreatmentCache> =
         tbLocalRepo.getAllFollowUpsForBeneficiary(benId)
 
+    suspend fun isContactOfKnownTbPatient(benId: Long, householdId: Long?): Boolean =
+        tbLocalRepo.isContactOfKnownTbPatient(benId, householdId)
+
+    /**
+     * Writes "Contact of Known TB Patients" onto household members' saved screenings.
+     * A null or non-positive [householdId] updates every household that has a confirmed case.
+     */
+    suspend fun applyKnownTbContactRiskFactors(householdId: Long? = null) =
+        tbLocalRepo.applyKnownTbContactRiskFactors(householdId)
+
     suspend fun getTBScreeningDetailsFromServer(): Int =
         tbPullRepo.getTBScreeningDetailsFromServer()
 

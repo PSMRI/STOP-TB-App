@@ -93,8 +93,20 @@ class TBScreeningFormFragment : Fragment() {
             notIt?.let { recordExists ->
                 val adapter = FormInputAdapter(
                     formValueListener = FormInputAdapter.FormValueListener { formId, index ->
-                        viewModel.updateListOnValueChanged(formId, index)
-                        hardCodedListUpdate(16)
+                        if (formId == 18) {
+                            viewLifecycleOwner.lifecycleScope.launch {
+                                viewModel.applyFormValueChange(formId, index)
+                                val riskIndex = viewModel.getIndexOfKeyPopulationRiskFactors()
+                                if (riskIndex >= 0) {
+                                    binding.form.rvInputForm.adapter?.notifyItemChanged(riskIndex)
+                                }
+                            }
+                        } else {
+                            viewModel.updateListOnValueChanged(formId, index)
+                            if (formId != 27)
+                            hardCodedListUpdate(16)
+
+                        }
                     }, isEnabled = !(recordExists || viewModel.viewOnly)
                 )
                 binding.btnSubmit.isEnabled = !(recordExists || viewModel.viewOnly)

@@ -31,11 +31,12 @@ data class TBConfirmedTreatmentCache(
     var expectedTreatmentCompletionDate: Long? = null,
     var followUpDate: Long? = null,
     var monthlyFollowUpDone: String? = null,
-    var adherenceToMedicines: String? = null,
     var anyDiscomfort: Boolean? = null,
+    var sideEffects: String? = null,
     var treatmentCompleted: Boolean? = null,
     var actualTreatmentCompletionDate: Long? = null,
     var treatmentOutcome: String? = null,
+    var remarks: String? = null,
     var dateOfDeath: Long? = null,
     var placeOfDeath: String? = null,
     var reasonForDeath: String = "Tuberculosis",
@@ -47,6 +48,7 @@ data class TBConfirmedTreatmentCache(
 ) : FormDataModel {
 
     fun toDTO(): TBConfirmedTreatmentDTO {
+        val isDied = treatmentOutcome == "Died" || treatmentOutcome == "Death"
         return TBConfirmedTreatmentDTO(
             id = 0,
             benId = benId,
@@ -55,14 +57,15 @@ data class TBConfirmedTreatmentCache(
             expectedTreatmentCompletionDate = getDateTimeStringFromLong(expectedTreatmentCompletionDate),
             followUpDate = getDateTimeStringFromLong(followUpDate),
             monthlyFollowUpDone = monthlyFollowUpDone,
-            adherenceToMedicines = adherenceToMedicines,
             anyDiscomfort = anyDiscomfort,
+            sideEffects = sideEffects?.split("|")?.filter { it.isNotBlank() },
             treatmentCompleted = treatmentCompleted,
             actualTreatmentCompletionDate = getDateTimeStringFromLong(actualTreatmentCompletionDate),
             treatmentOutcome = treatmentOutcome,
-            dateOfDeath = getDateTimeStringFromLong(dateOfDeath),
-            placeOfDeath = placeOfDeath,
-            reasonForDeath = reasonForDeath,
+            remarks = remarks,
+            dateOfDeath = if (isDied) getDateTimeStringFromLong(dateOfDeath) else null,
+            placeOfDeath = if (isDied) placeOfDeath else null,
+            reasonForDeath = if (isDied) reasonForDeath else null,
             reasonForNotCompleting = reasonForNotCompleting
         )
     }

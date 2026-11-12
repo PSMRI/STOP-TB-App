@@ -29,6 +29,10 @@ class SyncLogManager @Inject constructor(
     private var emitJob: Job? = null
     private val _logs = MutableStateFlow<List<SyncLogEntry>>(emptyList())
     val logs: StateFlow<List<SyncLogEntry>> = _logs.asStateFlow()
+    val interactiveLogs: StateFlow<List<SyncLogEntry>> = interactiveSyncLogSession.logs
+
+    internal fun interactiveSnapshot(sessionId: String): List<SyncLogEntry> =
+        interactiveSyncLogSession.snapshot(sessionId)
 
     fun addLog(level: LogLevel, tag: String, message: String) {
         synchronized(buffer) {
@@ -44,6 +48,7 @@ class SyncLogManager @Inject constructor(
                     message = message
                 )
             )
+            interactiveSyncLogSession.append(SyncHttpOrigins.current.get()?.sessionId, buffer.last())
             scheduleEmit()
         }
         fileWriter.writeLog(level, tag, message)
@@ -53,8 +58,11 @@ class SyncLogManager @Inject constructor(
         if (emitJob?.isActive == true) return
         emitJob = scope.launch {
             delay(EMIT_DELAY_MS)
-            val snapshot = synchronized(buffer) { buffer.toList() }
-            _logs.value = snapshot
+            synchronized(buffer) {
+                _logs.value = buffer.toList()
+                interactiveSyncLogSession.publish()
+                emitJob = null
+            }
         }
     }
 
@@ -62,6 +70,7 @@ class SyncLogManager @Inject constructor(
         synchronized(buffer) {
             emitJob?.cancel()
             buffer.clear()
+            interactiveSyncLogSession.clear()
             _logs.value = emptyList()
         }
     }

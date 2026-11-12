@@ -39,7 +39,6 @@ class VitalScreenFragment : Fragment() {
         get() = _binding!!
 
     private val viewModel: VitalScreenViewModel by viewModels()
-    private var referralAlert: AlertDialog? = null
     private var riskFactorOptions: List<CodedOption> = emptyList()
     private var selectedRiskFactors = BooleanArray(0)
     private val openedFromHousehold: Boolean
@@ -281,12 +280,6 @@ class VitalScreenFragment : Fragment() {
 
     private fun submitVitals() {
         if (!validateFields()) return
-        if (shouldShowReferralAlert()) {
-            showReferralAlert {
-                saveVitals()
-            }
-            return
-        }
         saveVitals()
     }
 
@@ -462,14 +455,6 @@ class VitalScreenFragment : Fragment() {
         }
         return parsed
     }
-
-    private fun shouldShowReferralAlert(): Boolean =
-        viewModel.shouldShowPulseReferral(binding.etPulseRate.text?.toString()) ||
-            viewModel.shouldShowBpReferral(
-                binding.etBpSystolic.text?.toString(),
-                binding.etBpDiastolic.text?.toString()
-            ) ||
-            viewModel.shouldShowRbsReferral(binding.etRbs.text?.toString())
 
     private fun clearErrors() {
         binding.tilPulseRate.error = null
@@ -750,23 +735,7 @@ class VitalScreenFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        referralAlert?.dismiss()
-        referralAlert = null
         _binding = null
-    }
-
-    private fun showReferralAlert(onConfirmed: () -> Unit) {
-        if (referralAlert?.isShowing == true) return
-        referralAlert = AlertDialog.Builder(requireContext())
-            .setMessage(getString(R.string.refer_to_hwc_alert))
-            .setPositiveButton(android.R.string.ok) { dialog, _ ->
-                dialog.dismiss()
-                onConfirmed()
-            }
-            .setOnDismissListener {
-                referralAlert = null
-            }
-            .show()
     }
 
     private fun Double.stripTrailingZeros(): String {

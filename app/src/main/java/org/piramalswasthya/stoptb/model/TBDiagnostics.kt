@@ -39,6 +39,7 @@ data class TBDiagnosticsCache(
     var reasonForDenialSputum: String? = null,          // pipe-sep English values
     var reasonForDenialSputumOther: String? = null,
     var sputumSubmittedAt: String? = null,
+    var sputumCollectionDate: Long? = null,
     // ── NAAT / TrueNAT ──────────────────────────────────────────────────────
     var isNaatConducted: Boolean? = null,
     var reasonNotConductedNaat: String? = null,
@@ -105,6 +106,7 @@ data class TBDiagnosticsCache(
         reasonForDenialSputum = reasonForDenialSputum,
         reasonForDenialSputumOther = reasonForDenialSputumOther,
         sputumSubmittedAt = sputumSubmittedAt,
+        sputumCollectionDate = sputumCollectionDate,
         isNaatConducted = isNaatConducted,
         reasonNotConductedNaat = reasonNotConductedNaat,
         reasonNotConductedNaatOther = reasonNotConductedNaatOther,

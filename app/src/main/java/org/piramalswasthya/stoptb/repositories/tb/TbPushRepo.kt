@@ -34,6 +34,9 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.database.shared_preferences.SyncRetryStore
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
+import org.piramalswasthya.stoptb.helpers.SyncDailyStore
+import org.piramalswasthya.stoptb.helpers.logSyncModule
+import org.piramalswasthya.stoptb.helpers.syncPushOutcome
 import org.piramalswasthya.stoptb.helpers.manualResultTextToStore
 import org.piramalswasthya.stoptb.helpers.serverResultOrNull
 import org.piramalswasthya.stoptb.model.BenRegCache
@@ -152,17 +155,23 @@ class TbPushRepo @Inject constructor(
 
             val tbsnList: List<TBScreeningCache> = tbDao.getTBScreening(SyncState.UNSYNCED)
 
-            if (tbsnList.isEmpty()) return@withContext 1
+            if (tbsnList.isEmpty()) {
+                logSyncModule("TB_SCREENING", "PUSH", "NO_PENDING_DATA", "pending" to 0)
+                return@withContext 1
+            }
 
             val queue = tbUploadQueue(tbsnList, TB_SCREENING_CHUNK_SIZE, SyncRetryStore.ENTITY_TB_SCREENING) { it.id.toLong() }
             val rejectedSingles = mutableListOf<TBScreeningCache>()
             var lastError = ""
             var successCount = 0
             var failCount = 0
+            var sentCount = 0
+            var acknowledgedCount = 0
             var networkFailed = false
 
             while (queue.isNotEmpty()) {
                 val chunk = queue.removeFirst()
+                val diagnosticSentIds = mutableSetOf<Int>()
                 try {
                     // Only what is sent may be marked SYNCED: a row whose beneficiary has no
                     // server benRegId yet stays UNSYNCED for the next cycle.
@@ -170,6 +179,7 @@ class TbPushRepo @Inject constructor(
                     val request = chunk.mapNotNull { screening ->
                         val beneficiaryRegID = benDao.getBen(screening.benId)?.benRegId?.takeIf { it > 0L }
                         if (beneficiaryRegID == null) {
+                            SyncDailyStore.record("TB_SCREENING", listOf(screening.id), "PUSH", "PENDING", "SERVER_REGISTRATION_ID_NOT_AVAILABLE")
                             null
                         } else {
                             sentRecords += screening
@@ -186,10 +196,12 @@ class TbPushRepo @Inject constructor(
                         failCount += chunk.size
                         continue
                     }
+                    diagnosticSentIds.addAll(sentRecords.map { it.id })
+                    sentCount += request.size
                     val response = tmcNetworkApiService.saveTBScreeningData(request)
                     val statusCode = response.code()
                     if (statusCode == 200) {
-                        val responseString = response.body()?.string()
+                        val responseString = SyncDailyStore.observedBody("TB_SCREENING", diagnosticSentIds, response)
                         if (responseString != null) {
                             val jsonObj = JSONObject(responseString)
                             val responseStatusCode = jsonObj.getInt("statusCode")
@@ -200,9 +212,9 @@ class TbPushRepo @Inject constructor(
                                         failCount += notSent
                                         Timber.w("TB Screening push: $notSent record(s) not sent (no server benRegId yet), stay UNSYNCED")
                                     }
-                                    updateSyncStatusScreening(sentRecords)
+                                    acknowledgedCount += sentRecords.size
+                                    successCount += updateSyncStatusScreening(sentRecords)
                                     syncRetryStore.clear(SyncRetryStore.ENTITY_TB_SCREENING, sentRecords.map { it.id.toLong() })
-                                    successCount += sentRecords.size
                                 }
 
                                 401, 5002 -> {
@@ -221,6 +233,7 @@ class TbPushRepo @Inject constructor(
                         }
                     } else {
                         Timber.e("TB Screening chunk HTTP error: $statusCode")
+                        SyncDailyStore.response("TB_SCREENING", diagnosticSentIds, statusCode, null)
                         lastError = "HTTP $statusCode"
                         failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                     }
@@ -230,10 +243,12 @@ class TbPushRepo @Inject constructor(
                 } catch (e: IOException) {
                     // Hub unreachable: stop this run and let the push worker retry with backoff.
                     Timber.e("TB Screening push stopped by network error: $e")
+                    SyncDailyStore.record("TB_SCREENING", diagnosticSentIds, "PUSH", "FAILURE", "NETWORK_${e.javaClass.simpleName}")
                     networkFailed = true
                     break
                 } catch (e: Exception) {
                     Timber.e(e, "TB Screening chunk push failed: ${chunk.size} records")
+                    SyncDailyStore.record("TB_SCREENING", diagnosticSentIds, "PUSH", "FAILURE", "EXCEPTION_${e.javaClass.simpleName}")
                     lastError = e.message ?: e.javaClass.simpleName
                     failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                 }
@@ -241,6 +256,10 @@ class TbPushRepo @Inject constructor(
 
             recordTbRejections(SyncRetryStore.ENTITY_TB_SCREENING, rejectedSingles, successCount > 0, lastError) { it.id.toLong() }
             Timber.d("TB Screening push complete: $successCount succeeded, $failCount failed out of ${tbsnList.size}")
+            logSyncModule("TB_SCREENING", "PUSH", syncPushOutcome(tbsnList.size, minOf(successCount, acknowledgedCount)),
+                "pending" to tbsnList.size, "sent" to sentCount,
+                "acknowledgedBatchItems" to acknowledgedCount, "locallyMarkedSynced" to successCount,
+                "remaining" to tbsnList.size - successCount)
             // Worker succeeds — failed records stay UNSYNCED for next cycle
             return@withContext if (networkFailed) PUSH_NETWORK_ERROR else 1
         }
@@ -253,25 +272,36 @@ class TbPushRepo @Inject constructor(
                     ?: throw IllegalStateException("No user logged in!!")
 
             val opdList: List<GeneralOpdCache> = tbDao.getGeneralOpd(SyncState.UNSYNCED)
-            if (opdList.isEmpty()) return@withContext 1
+            if (opdList.isEmpty()) {
+                logSyncModule("GENERAL_OPD", "PUSH", "NO_PENDING_DATA", "pending" to 0)
+                return@withContext 1
+            }
 
             // Keep the list-shaped endpoint, but acknowledge each OPD independently.
             val chunks = opdList.chunked(1)
             var successCount = 0
             var failCount = 0
+            var sentCount = 0
+            var acknowledgedCount = 0
+            var markedSyncedCount = 0
             var networkFailed = false
 
             for (chunk in chunks) {
+                val diagnosticSentIds = mutableSetOf<Int>()
                 try {
                     val prepared = chunk.mapNotNull { opd ->
                         val benRegId = benDao.getBen(opd.benId)?.benRegId?.takeIf { it > 0L }
-                        if (benRegId == null) return@mapNotNull null
+                        if (benRegId == null) {
+                            SyncDailyStore.record("GENERAL_OPD", listOf(opd.id), "PUSH", "PENDING", "SERVER_REGISTRATION_ID_NOT_AVAILABLE")
+                            return@mapNotNull null
+                        }
                         try {
                             generalOpdRepo.prepareGeneralOpdRequest(opd.id, benRegId, user.serviceMapId, user.userName)
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
                         } catch (e: IllegalArgumentException) {
                             Timber.w("General OPD id=%s remains pending: unresolved or incomplete prescription data", opd.id)
+                            SyncDailyStore.record("GENERAL_OPD", listOf(opd.id), "PUSH", "PENDING", "PRESCRIPTION_INCOMPLETE_OR_UNRESOLVED")
                             null
                         }
                     }
@@ -279,17 +309,20 @@ class TbPushRepo @Inject constructor(
                     if (prepared.isEmpty()) {
                         continue
                     }
+                    diagnosticSentIds.addAll(prepared.map { it.first.id })
+                    sentCount += prepared.size
                     val response = tmcNetworkApiService.saveGeneralOpdData(
                         prepared.map { it.second }
                     )
                     val statusCode = response.code()
                     if (statusCode == 200) {
-                        val responseString = response.body()?.string()
+                        val responseString = SyncDailyStore.observedBody("GENERAL_OPD", prepared.map { it.first.id }, response)
                         if (responseString != null) {
                             val jsonObj = JSONObject(responseString)
                             when (val responseStatusCode = jsonObj.getInt("statusCode")) {
                                 200 -> {
-                                    updateSyncStatusGeneralOpd(prepared)
+                                    acknowledgedCount += prepared.size
+                                    markedSyncedCount += updateSyncStatusGeneralOpd(prepared)
                                     successCount += prepared.size
                                 }
 
@@ -297,17 +330,20 @@ class TbPushRepo @Inject constructor(
                                     if (userRepo.refreshTokenTmc(user.userName, user.password)) {
                                         Timber.d("Token refreshed, General OPD chunk will retry next cycle")
                                     }
+                                    SyncDailyStore.response("GENERAL_OPD", prepared.map { it.first.id }, statusCode, responseString)
                                     failCount += prepared.size
                                 }
 
                                 else -> {
                                     Timber.e("General OPD chunk failed with statusCode: $responseStatusCode")
+                                    SyncDailyStore.response("GENERAL_OPD", prepared.map { it.first.id }, statusCode, responseString)
                                     failCount += prepared.size
                                 }
                             }
                         }
                     } else {
                         Timber.e("General OPD chunk HTTP error: $statusCode")
+                        SyncDailyStore.response("GENERAL_OPD", prepared.map { it.first.id }, statusCode, null)
                         failCount += prepared.size
                     }
                 } catch (e: kotlinx.coroutines.CancellationException) {
@@ -315,15 +351,21 @@ class TbPushRepo @Inject constructor(
                 } catch (e: IOException) {
                     // Hub unreachable: stop this run and let the push worker retry with backoff.
                     Timber.e("General OPD push stopped by network error: $e")
+                    SyncDailyStore.record("GENERAL_OPD", diagnosticSentIds, "PUSH", "FAILURE", "NETWORK_${e.javaClass.simpleName}")
                     networkFailed = true
                     break
                 } catch (e: Exception) {
                     Timber.e(e, "General OPD chunk push failed: ${chunk.size} records")
+                    SyncDailyStore.record("GENERAL_OPD", diagnosticSentIds, "PUSH", "FAILURE", "EXCEPTION_${e.javaClass.simpleName}")
                     failCount += chunk.size
                 }
             }
 
             Timber.d("General OPD push complete: $successCount succeeded, $failCount failed out of ${opdList.size}")
+            logSyncModule("GENERAL_OPD", "PUSH", syncPushOutcome(opdList.size, minOf(markedSyncedCount, acknowledgedCount)),
+                "pending" to opdList.size, "sent" to sentCount,
+                "acknowledgedBatchItems" to acknowledgedCount, "locallyMarkedSynced" to markedSyncedCount,
+                "remaining" to opdList.size - markedSyncedCount)
             return@withContext if (networkFailed) PUSH_NETWORK_ERROR else 1
         } }
     }
@@ -336,17 +378,24 @@ class TbPushRepo @Inject constructor(
 
             val diagnosticsList: List<TBDiagnosticsCache> =
                 tbDao.getTbDiagnostics(SyncState.UNSYNCED)
-            if (diagnosticsList.isEmpty()) return@withContext 1
+            if (diagnosticsList.isEmpty()) {
+                logSyncModule("TB_DIAGNOSTICS", "PUSH", "NO_PENDING_DATA", "pending" to 0)
+                return@withContext 1
+            }
 
             val queue = tbUploadQueue(diagnosticsList, 20, SyncRetryStore.ENTITY_TB_DIAGNOSTICS) { it.id.toLong() }
             val rejectedSingles = mutableListOf<TBDiagnosticsCache>()
             var lastError = ""
             var successCount = 0
             var failCount = 0
+            var sentCount = 0
+            var acknowledgedCount = 0
+            var markedSyncedCount = 0
             var networkFailed = false
 
             while (queue.isNotEmpty()) {
                 val chunk = queue.removeFirst()
+                val diagnosticSentIds = mutableSetOf<Int>()
                 try {
                     // See the TB Suspected push below: only what is actually sent may be
                     // marked SYNCED. A row whose beneficiary has no server benRegId yet is
@@ -354,6 +403,7 @@ class TbPushRepo @Inject constructor(
                     // unchanged against its snapshot and flip it to SYNCED regardless.
                     val excludedBenIds = mutableListOf<Long>()
                     val sentRecords = mutableListOf<TBDiagnosticsCache>()
+                    val sentIds = mutableSetOf<Int>()
                     val request = chunk.mapNotNull { diagnostics ->
                         val benRegId = benDao.getBen(diagnostics.benId)?.benRegId?.takeIf { it > 0L }
                         if (benRegId == null) {
@@ -366,19 +416,21 @@ class TbPushRepo @Inject constructor(
                                 benRegID = benRegId,
                                 providerServiceMapID = user.serviceMapId,
                                 createdBy = user.userName
-                            )
+                            ).also { sentIds.add(diagnostics.id) }
                         }
                     }
                     if (request.isEmpty()) {
                         failCount += chunk.size
                         continue
                     }
+                    diagnosticSentIds.addAll(sentRecords.map { it.id })
+                    sentCount += request.size
                     val response = tmcNetworkApiService.saveTBDiagnosticsData(
                         request
                     )
                     val statusCode = response.code()
                     if (statusCode == 200) {
-                        val responseString = response.body()?.string()
+                        val responseString = SyncDailyStore.observedBody("TB_DIAGNOSTICS", sentIds, response)
                         if (responseString != null) {
                             val jsonObj = JSONObject(responseString)
                             when (val responseStatusCode = jsonObj.getInt("statusCode")) {
@@ -387,7 +439,8 @@ class TbPushRepo @Inject constructor(
                                         failCount += excludedBenIds.size
                                         Timber.w("TB Diagnostics push: benIds=$excludedBenIds were NOT sent (no server benRegId yet) and stay UNSYNCED for the next cycle")
                                     }
-                                    updateSyncStatusDiagnostics(sentRecords)
+                                    acknowledgedCount += sentRecords.size
+                                    markedSyncedCount += updateSyncStatusDiagnostics(sentRecords)
                                     syncRetryStore.clear(SyncRetryStore.ENTITY_TB_DIAGNOSTICS, sentRecords.map { it.id.toLong() })
                                     successCount += sentRecords.size
                                 }
@@ -396,11 +449,13 @@ class TbPushRepo @Inject constructor(
                                     if (userRepo.refreshTokenTmc(user.userName, user.password)) {
                                         Timber.d("Token refreshed, TB Diagnostics chunk will retry next cycle")
                                     }
+                                    SyncDailyStore.response("TB_DIAGNOSTICS", sentIds, statusCode, responseString)
                                     failCount += chunk.size
                                 }
 
                                 else -> {
                                     Timber.e("TB Diagnostics chunk failed with statusCode: $responseStatusCode")
+                                    SyncDailyStore.response("TB_DIAGNOSTICS", sentIds, statusCode, responseString)
                                     lastError = "statusCode=$responseStatusCode"
                                     failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                                 }
@@ -408,6 +463,7 @@ class TbPushRepo @Inject constructor(
                         }
                     } else {
                         Timber.e("TB Diagnostics chunk HTTP error: $statusCode")
+                        SyncDailyStore.response("TB_DIAGNOSTICS", sentIds, statusCode, null)
                         lastError = "HTTP $statusCode"
                         failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                     }
@@ -417,10 +473,12 @@ class TbPushRepo @Inject constructor(
                 } catch (e: IOException) {
                     // Hub unreachable: stop this run and let the push worker retry with backoff.
                     Timber.e("TB Diagnostics push stopped by network error: $e")
+                    SyncDailyStore.record("TB_DIAGNOSTICS", diagnosticSentIds, "PUSH", "FAILURE", "NETWORK_${e.javaClass.simpleName}")
                     networkFailed = true
                     break
                 } catch (e: Exception) {
                     Timber.e(e, "TB Diagnostics chunk push failed: ${chunk.size} records")
+                    SyncDailyStore.record("TB_DIAGNOSTICS", diagnosticSentIds, "PUSH", "FAILURE", "EXCEPTION_${e.javaClass.simpleName}")
                     lastError = e.message ?: e.javaClass.simpleName
                     failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                 }
@@ -428,6 +486,10 @@ class TbPushRepo @Inject constructor(
 
             recordTbRejections(SyncRetryStore.ENTITY_TB_DIAGNOSTICS, rejectedSingles, successCount > 0, lastError) { it.id.toLong() }
             Timber.d("TB Diagnostics push complete: $successCount succeeded, $failCount failed out of ${diagnosticsList.size}")
+            logSyncModule("TB_DIAGNOSTICS", "PUSH", syncPushOutcome(diagnosticsList.size, minOf(markedSyncedCount, acknowledgedCount)),
+                "pending" to diagnosticsList.size, "sent" to sentCount,
+                "acknowledgedBatchItems" to acknowledgedCount, "locallyMarkedSynced" to markedSyncedCount,
+                "remaining" to diagnosticsList.size - markedSyncedCount)
             return@withContext if (networkFailed) PUSH_NETWORK_ERROR else 1
         }
     }
@@ -442,7 +504,10 @@ class TbPushRepo @Inject constructor(
 
             val tbspList: List<TBSuspectedCache> = tbDao.getTbSuspected(SyncState.UNSYNCED)
 
-            if (tbspList.isEmpty()) return@withContext 1
+            if (tbspList.isEmpty()) {
+                logSyncModule("TB_SUSPECTED", "PUSH", "NO_PENDING_DATA", "pending" to 0)
+                return@withContext 1
+            }
 
             val callTag = java.util.UUID.randomUUID().toString().take(6)
             Timber.d("SYNC_DIAG[$callTag] TB Suspected push: ${tbspList.size} unsynced records, benIds=${tbspList.map { it.benId }}")
@@ -453,10 +518,14 @@ class TbPushRepo @Inject constructor(
             var lastError = ""
             var successCount = 0
             var failCount = 0
+            var sentCount = 0
+            var acknowledgedCount = 0
+            var markedSyncedCount = 0
             var networkFailed = false
 
             while (queue.isNotEmpty()) {
                 val chunk = queue.removeFirst()
+                val diagnosticSentIds = mutableSetOf<Int>()
                 try {
                     val excludedBenIds = mutableListOf<Long>()
                     // Only the records that actually make it into the payload may be marked
@@ -483,6 +552,8 @@ class TbPushRepo @Inject constructor(
                         continue
                     }
 
+                    diagnosticSentIds.addAll(sentRecords.map { it.id })
+                    sentCount += chunkDtos.size
                     val response = tmcNetworkApiService.saveTBSuspectedData(
                         TBSuspectedRequestDTO(
                             userId = user.userId,
@@ -491,7 +562,7 @@ class TbPushRepo @Inject constructor(
                     )
                     val statusCode = response.code()
                     if (statusCode == 200) {
-                        val responseString = response.body()?.string()
+                        val responseString = SyncDailyStore.observedBody("TB_SUSPECTED", chunk.filter { it.benId !in excludedBenIds }.map { it.id }, response)
                         if (responseString != null) {
                             val jsonObj = JSONObject(responseString)
                             val responseStatusCode = jsonObj.getInt("statusCode")
@@ -502,7 +573,8 @@ class TbPushRepo @Inject constructor(
                                         failCount += excludedBenIds.size
                                         Timber.w("SYNC_DIAG[$callTag] TB Suspected push: benIds=$excludedBenIds were NOT sent (benId resolution failed above) and stay UNSYNCED for the next cycle")
                                     }
-                                    updateSyncStatusSuspected(sentRecords)
+                                    acknowledgedCount += sentRecords.size
+                                    markedSyncedCount += updateSyncStatusSuspected(sentRecords)
                                     syncRetryStore.clear(SyncRetryStore.ENTITY_TB_SUSPECTED, sentRecords.map { it.id.toLong() })
                                     successCount += sentRecords.size
                                     Timber.d("SYNC_DIAG[$callTag] TB Suspected push: chunk marked SYNCED, benIds=${sentRecords.map { it.benId }}")
@@ -514,10 +586,12 @@ class TbPushRepo @Inject constructor(
                                     }
                                     failCount += chunk.size
                                     Timber.w("SYNC_DIAG[$callTag] TB Suspected push: token issue, benIds=${chunk.map { it.benId }}")
+                                    SyncDailyStore.response("TB_SUSPECTED", chunk.filter { it.benId !in excludedBenIds }.map { it.id }, statusCode, responseString)
                                 }
 
                                 else -> {
                                     Timber.e("SYNC_DIAG[$callTag] TB Suspected chunk failed with statusCode: $responseStatusCode, benIds=${chunk.map { it.benId }}, body=$responseString")
+                                    SyncDailyStore.response("TB_SUSPECTED", chunk.filter { it.benId !in excludedBenIds }.map { it.id }, statusCode, responseString)
                                     lastError = "statusCode=$responseStatusCode"
                                     failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                                 }
@@ -525,6 +599,7 @@ class TbPushRepo @Inject constructor(
                         }
                     } else {
                         Timber.e("SYNC_DIAG[$callTag] TB Suspected chunk HTTP error: $statusCode, benIds=${chunk.map { it.benId }}")
+                        SyncDailyStore.response("TB_SUSPECTED", chunk.filter { it.benId !in excludedBenIds }.map { it.id }, statusCode, null)
                         lastError = "HTTP $statusCode"
                         failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                     }
@@ -534,10 +609,12 @@ class TbPushRepo @Inject constructor(
                 } catch (e: IOException) {
                     // Hub unreachable: stop this run and let the push worker retry with backoff.
                     Timber.e("TB Suspected push stopped by network error: $e")
+                    SyncDailyStore.record("TB_SUSPECTED", diagnosticSentIds, "PUSH", "FAILURE", "NETWORK_${e.javaClass.simpleName}")
                     networkFailed = true
                     break
                 } catch (e: Exception) {
                     Timber.e(e, "SYNC_DIAG[$callTag] TB Suspected chunk push failed: ${chunk.size} records, benIds=${chunk.map { it.benId }}")
+                    SyncDailyStore.record("TB_SUSPECTED", diagnosticSentIds, "PUSH", "FAILURE", "EXCEPTION_${e.javaClass.simpleName}")
                     lastError = e.message ?: e.javaClass.simpleName
                     failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                 }
@@ -545,6 +622,10 @@ class TbPushRepo @Inject constructor(
 
             recordTbRejections(SyncRetryStore.ENTITY_TB_SUSPECTED, rejectedSingles, successCount > 0, lastError) { it.id.toLong() }
             Timber.d("SYNC_DIAG[$callTag] TB Suspected push complete: $successCount succeeded, $failCount failed out of ${tbspList.size}")
+            logSyncModule("TB_SUSPECTED", "PUSH", syncPushOutcome(tbspList.size, minOf(markedSyncedCount, acknowledgedCount)),
+                "pending" to tbspList.size, "sent" to sentCount,
+                "acknowledgedBatchItems" to acknowledgedCount, "locallyMarkedSynced" to markedSyncedCount,
+                "remaining" to tbspList.size - markedSyncedCount)
             return@withContext if (networkFailed) PUSH_NETWORK_ERROR else 1
         }
     }
@@ -559,18 +640,25 @@ class TbPushRepo @Inject constructor(
 
             val tbspList: List<TBConfirmedTreatmentCache> = tbDao.getTbConfirmed(SyncState.UNSYNCED)
 
-            if (tbspList.isEmpty()) return@withContext 1
+            if (tbspList.isEmpty()) {
+                logSyncModule("TB_CONFIRMED", "PUSH", "NO_PENDING_DATA", "pending" to 0)
+                return@withContext 1
+            }
 
             val CHUNK_SIZE = 20
             val queue = tbUploadQueue(tbspList, CHUNK_SIZE, SyncRetryStore.ENTITY_TB_CONFIRMED) { it.id.toLong() }
             val rejectedSingles = mutableListOf<TBConfirmedTreatmentCache>()
             var lastError = ""
             var successCount = 0
+            var markedSyncedCount = 0
             var failCount = 0
+            var sentCount = 0
+            var acknowledgedCount = 0
             var networkFailed = false
 
             while (queue.isNotEmpty()) {
                 val chunk = queue.removeFirst()
+                val diagnosticSentIds = mutableSetOf<Int>()
                 try {
                     // See the TB Suspected push above: only what is actually sent may be
                     // marked SYNCED, or a record whose BENEFICIARY has not been pulled yet is
@@ -592,6 +680,8 @@ class TbPushRepo @Inject constructor(
                         continue
                     }
 
+                    diagnosticSentIds.addAll(sentRecords.map { it.id })
+                    sentCount += chunkDtos.size
                     val response = tmcNetworkApiService.saveTBConfirmedData(
                         TBConfirmedRequestDTO(
                             userId = user.userId,
@@ -600,7 +690,7 @@ class TbPushRepo @Inject constructor(
                     )
                     val statusCode = response.code()
                     if (statusCode == 200) {
-                        val responseString = response.body()?.string()
+                        val responseString = SyncDailyStore.observedBody("TB_CONFIRMED", chunk.filter { item -> chunkDtos.any { it.benId == item.benId } }.map { it.id }, response)
                         if (responseString != null) {
                             val jsonObj = JSONObject(responseString)
                             val responseStatusCode = jsonObj.getInt("statusCode")
@@ -611,7 +701,8 @@ class TbPushRepo @Inject constructor(
                                         failCount += excludedBenIds.size
                                         Timber.w("TB Confirmed push: benIds=$excludedBenIds were NOT sent (no local BENEFICIARY row) and stay UNSYNCED for the next cycle")
                                     }
-                                    updateSyncStatusConfirmed(sentRecords)
+                                    acknowledgedCount += sentRecords.size
+                                    markedSyncedCount += updateSyncStatusConfirmed(sentRecords)
                                     syncRetryStore.clear(SyncRetryStore.ENTITY_TB_CONFIRMED, sentRecords.map { it.id.toLong() })
                                     successCount += sentRecords.size
                                 }
@@ -620,11 +711,13 @@ class TbPushRepo @Inject constructor(
                                     if (userRepo.refreshTokenTmc(user.userName, user.password)) {
                                         Timber.d("Token refreshed, TB Confirmed chunk will retry next cycle")
                                     }
+                                    SyncDailyStore.response("TB_CONFIRMED", diagnosticSentIds, statusCode, responseString)
                                     failCount += chunk.size
                                 }
 
                                 else -> {
                                     Timber.e("TB Confirmed chunk failed with statusCode: $responseStatusCode")
+                                    SyncDailyStore.response("TB_CONFIRMED", diagnosticSentIds, statusCode, responseString)
                                     lastError = "statusCode=$responseStatusCode"
                                     failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                                 }
@@ -632,6 +725,7 @@ class TbPushRepo @Inject constructor(
                         }
                     } else {
                         Timber.e("TB Confirmed chunk HTTP error: $statusCode")
+                        SyncDailyStore.response("TB_CONFIRMED", diagnosticSentIds, statusCode, null)
                         lastError = "HTTP $statusCode"
                         failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                     }
@@ -641,10 +735,12 @@ class TbPushRepo @Inject constructor(
                 } catch (e: IOException) {
                     // Hub unreachable: stop this run and let the push worker retry with backoff.
                     Timber.e("TB Confirmed push stopped by network error: $e")
+                    SyncDailyStore.record("TB_CONFIRMED", diagnosticSentIds, "PUSH", "FAILURE", "NETWORK_${e.javaClass.simpleName}")
                     networkFailed = true
                     break
                 } catch (e: Exception) {
                     Timber.e(e, "TB Confirmed chunk push failed: ${chunk.size} records")
+                    SyncDailyStore.record("TB_CONFIRMED", diagnosticSentIds, "PUSH", "FAILURE", "EXCEPTION_${e.javaClass.simpleName}")
                     lastError = e.message ?: e.javaClass.simpleName
                     failCount += rejectTbChunk(chunk, queue, rejectedSingles)
                 }
@@ -652,6 +748,10 @@ class TbPushRepo @Inject constructor(
 
             recordTbRejections(SyncRetryStore.ENTITY_TB_CONFIRMED, rejectedSingles, successCount > 0, lastError) { it.id.toLong() }
             Timber.d("TB Confirmed push complete: $successCount succeeded, $failCount failed out of ${tbspList.size}")
+            logSyncModule("TB_CONFIRMED", "PUSH", syncPushOutcome(tbspList.size, minOf(markedSyncedCount, acknowledgedCount)),
+                "pending" to tbspList.size, "sent" to sentCount,
+                "acknowledgedBatchItems" to acknowledgedCount, "locallyMarkedSynced" to markedSyncedCount,
+                "remaining" to tbspList.size - markedSyncedCount)
             return@withContext if (networkFailed) PUSH_NETWORK_ERROR else 1
         }
     }
@@ -667,19 +767,25 @@ class TbPushRepo @Inject constructor(
     // 54ms - the list never settled. One transaction per chunk makes that one invalidation.
     // Each row is re-read inside that transaction and marked SYNCED only if it is unchanged since it
     // was pushed, so an edit saved while the push was in flight stays UNSYNCED and goes next push.
-    private suspend fun updateSyncStatusScreening(tbsnList: List<TBScreeningCache>) {
-        if (tbsnList.isEmpty()) return
+    private suspend fun updateSyncStatusScreening(tbsnList: List<TBScreeningCache>): Int {
+        if (tbsnList.isEmpty()) return 0
+        val markedIds = mutableListOf<Int>()
         database.withTransaction {
             tbsnList.forEach { pushed ->
                 val fresh = tbDao.getTbScreeningById(pushed.id) ?: return@forEach
                 if (fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)) {
                     tbDao.saveTbScreening(fresh.copy(syncState = SyncState.SYNCED))
+                    markedIds.add(fresh.id)
                 }
             }
         }
+        SyncDailyStore.record("TB_SCREENING", markedIds, "PUSH", "SUCCESS")
+        return markedIds.size
     }
 
-    private suspend fun updateSyncStatusGeneralOpd(opdList: List<Pair<GeneralOpdCache, GeneralOpdSaveRequest>>) {
+    private suspend fun updateSyncStatusGeneralOpd(opdList: List<Pair<GeneralOpdCache, GeneralOpdSaveRequest>>): Int {
+        var marked = 0
+        val markedIds = mutableListOf<Int>()
         database.withTransaction {
             opdList.forEach { (pushed, request) ->
                 val current = tbDao.getGeneralOpdById(pushed.id)
@@ -688,10 +794,16 @@ class TbPushRepo @Inject constructor(
                         GeneralOpdSaveRequest.from(current, tbDao.getGeneralOpdPrescriptions(current.id),
                             request.beneficiaryRegID, request.providerServiceMapID, request.createdBy)
                     }.getOrNull()
-                    if (currentPayload == request) tbDao.updateGeneralOpd(current.copy(syncState = SyncState.SYNCED))
+                    if (currentPayload == request) {
+                        tbDao.updateGeneralOpd(current.copy(syncState = SyncState.SYNCED))
+                        marked++
+                        markedIds.add(current.id)
+                    }
                 }
             }
         }
+        SyncDailyStore.record("GENERAL_OPD", markedIds, "PUSH", "SUCCESS")
+        return marked
     }
 
     // pushUnSyncedRecordsTBDiagnostics() snapshots UNSYNCED rows once, then pushes them over the
@@ -701,8 +813,9 @@ class TbPushRepo @Inject constructor(
     // hiding it from future push cycles. Re-read fresh under the row's lock and only flip
     // syncState if nothing else changed since the snapshot was pushed; otherwise leave it
     // UNSYNCED so the next sync cycle picks up and pushes the newer state instead.
-    private suspend fun updateSyncStatusDiagnostics(diagnosticsList: List<TBDiagnosticsCache>) {
-        if (diagnosticsList.isEmpty()) return
+    private suspend fun updateSyncStatusDiagnostics(diagnosticsList: List<TBDiagnosticsCache>): Int {
+        if (diagnosticsList.isEmpty()) return 0
+        val markedIds = mutableListOf<Int>()
         // Locks first, then the transaction - the one global ordering withBenIdLocks documents.
         benIdLocks.withLocks(diagnosticsList.map { it.benId }) {
             database.withTransaction {
@@ -711,15 +824,19 @@ class TbPushRepo @Inject constructor(
                     val unchanged = fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)
                     if (unchanged) {
                         tbDao.saveTbDiagnostics(fresh.copy(syncState = SyncState.SYNCED))
+                        markedIds.add(fresh.id)
                     }
                 }
             }
         }
+        SyncDailyStore.record("TB_DIAGNOSTICS", markedIds, "PUSH", "SUCCESS")
+        return markedIds.size
     }
 
     // Same stale-snapshot race as updateSyncStatusDiagnostics() above, for TB_SUSPECTED.
-    private suspend fun updateSyncStatusSuspected(tbspList: List<TBSuspectedCache>) {
-        if (tbspList.isEmpty()) return
+    private suspend fun updateSyncStatusSuspected(tbspList: List<TBSuspectedCache>): Int {
+        if (tbspList.isEmpty()) return 0
+        val markedIds = mutableListOf<Int>()
         benIdLocks.withLocks(tbspList.map { it.benId }) {
             database.withTransaction {
                 tbspList.forEach perRecord@ { pushed ->
@@ -729,24 +846,31 @@ class TbPushRepo @Inject constructor(
                     val unchanged = fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)
                     if (unchanged) {
                         tbDao.saveTbSuspected(fresh.copy(syncState = SyncState.SYNCED))
+                        markedIds.add(fresh.id)
                     }
                 }
             }
         }
+        SyncDailyStore.record("TB_SUSPECTED", markedIds, "PUSH", "SUCCESS")
+        return markedIds.size
     }
 
     // Same as updateSyncStatusScreening: one transaction per chunk, and only rows unchanged since
     // they were pushed become SYNCED.
-    private suspend fun updateSyncStatusConfirmed(tbcList: List<TBConfirmedTreatmentCache>) {
-        if (tbcList.isEmpty()) return
+    private suspend fun updateSyncStatusConfirmed(tbcList: List<TBConfirmedTreatmentCache>): Int {
+        if (tbcList.isEmpty()) return 0
+        val markedIds = mutableListOf<Int>()
         database.withTransaction {
             tbcList.forEach { pushed ->
                 val fresh = tbDao.getTbConfirmedById(pushed.id) ?: return@forEach
                 if (fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)) {
                     tbDao.saveTbConfirmed(fresh.copy(syncState = SyncState.SYNCED))
+                    markedIds.add(fresh.id)
                 }
             }
         }
+        SyncDailyStore.record("TB_CONFIRMED", markedIds, "PUSH", "SUCCESS")
+        return markedIds.size
     }
 
     // Upload order for a chunked TB push: records the server rejected before are

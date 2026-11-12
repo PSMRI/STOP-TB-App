@@ -61,9 +61,11 @@ class GeneralOpdRepo @Inject constructor(
     suspend fun saveGeneralOpdWithPrescriptions(cache: GeneralOpdCache, medicines: List<OpdMedicineDraft>) =
         withContext(Dispatchers.IO) {
             val masters = drugMasterRepo.getCachedMasters()
+            var diagnosticSavedId = 0
             database.withTransaction {
                 val complaints = resolveChiefComplaintIds(cache)
                 val opdId = tbDao.saveGeneralOpd(cache.copy(chiefComplaintIds = complaints)).toInt()
+                diagnosticSavedId = opdId
                 tbDao.ensureGeneralOpdSubmissionId(opdId)
                 tbDao.deleteGeneralOpdPrescriptions(opdId)
                 tbDao.insertGeneralOpdPrescriptions(medicines.mapIndexed { index, medicine ->
@@ -72,6 +74,7 @@ class GeneralOpdRepo @Inject constructor(
                         medicine.drugId, medicine.drugName, medicine.itemFormId, medicine.drugForm).resolveDrug(masters)
                 })
             }
+            org.piramalswasthya.stoptb.helpers.SyncDailyStore.record("GENERAL_OPD", listOf(diagnosticSavedId), "SAVE", "SUCCESS")
         }
 
     internal suspend fun resolveChiefComplaintIds(cache: GeneralOpdCache): List<Int>? {

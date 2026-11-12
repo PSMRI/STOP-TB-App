@@ -153,11 +153,13 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.benList.collect { list ->
-                    binding.flEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+                    // Hide the beneficiary whose "View Member" was tapped; counts still use the full household
+                    val displayList = list.filter { it.benId != args.excludeBenId }
+                    binding.flEmpty.visibility = if (displayList.isEmpty()) View.VISIBLE else View.GONE
                     benAdapter.submitHouseholdMemberCounts(
                         list.groupingBy { it.hhId }.eachCount()
                     )
-                    benAdapter.submitList(list)
+                    benAdapter.submitList(displayList)
                 }
             }
         }
@@ -231,6 +233,11 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.tptEligibleBenIds.collect { benAdapter.submitTptEligibleBenIds(it) }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.tptRegistrationDoneBenIds.collect { benAdapter.submitTptRegistrationDoneBenIds(it) }
             }
         }
         viewLifecycleOwner.lifecycleScope.launch {

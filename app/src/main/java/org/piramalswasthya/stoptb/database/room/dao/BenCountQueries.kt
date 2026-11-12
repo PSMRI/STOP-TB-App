@@ -205,13 +205,7 @@ interface BenCountQueries {
             WHERE b2.temperature IS NOT NULL AND b2.temperature >= 100.0
             UNION
             SELECT v.benId FROM BEN_VITALS v
-            WHERE (v.pulseRate IS NOT NULL AND v.pulseRate < 60)
-               OR (v.pulseRate IS NOT NULL AND v.pulseRate > 90)
-               OR (v.bpSystolic IS NOT NULL AND v.bpSystolic < 90)
-               OR (v.bpSystolic IS NOT NULL AND v.bpSystolic >= 140)
-               OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
-               OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
-               OR (v.rbs IS NOT NULL AND v.rbs >= 100)
+            WHERE ${ABNORMAL_VITALS_CONDITION}
             UNION
             SELECT ts.benId FROM TB_SUSPECTED ts
             WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
@@ -301,18 +295,7 @@ interface BenCountQueries {
           AND isDeactivate = 0
           AND isDeath = 0
           AND (
-            benId IN (
-              SELECT ts.benId FROM TB_SUSPECTED ts
-              WHERE ts.isLiquidCultureConducted IS NOT NULL
-            )
-            OR benId IN (
-              SELECT td.benId FROM TB_DIAGNOSTICS td
-              WHERE td.isLiquidCultureConducted IS NOT NULL
-            )
-            OR benId IN (
-              SELECT tbs.benId FROM TB_SCREENING tbs
-              WHERE tbs.recommendedForLiquidCultureTest = 1
-            )
+            ${LIQUID_CULTURE_REFERRAL_CONDITION}
           )
     """)
     fun getLiquidCultureBenCount(selectedVillage: Int): Flow<Int>

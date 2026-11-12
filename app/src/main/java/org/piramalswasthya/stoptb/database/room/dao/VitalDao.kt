@@ -24,11 +24,13 @@ interface VitalDao {
     // Marks the pushed vital SYNCED only if the stored row is unchanged since it
     // was read for push; a newer edit stays UNSYNCED for the next push.
     @Transaction
-    suspend fun markSyncedIfUnchanged(pushed: VitalCache) {
-        val fresh = getVitals(pushed.benId) ?: return
+    suspend fun markSyncedIfUnchanged(pushed: VitalCache): Boolean {
+        val fresh = getVitals(pushed.benId) ?: return false
         if (fresh.copy(syncState = SyncState.SYNCED) == pushed.copy(syncState = SyncState.SYNCED)) {
             saveVitals(fresh.copy(syncState = SyncState.SYNCED))
+            return true
         }
+        return false
     }
 
     @Query("SELECT benId FROM BEN_VITALS")

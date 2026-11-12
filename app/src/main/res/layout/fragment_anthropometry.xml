@@ -70,36 +70,17 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/tilWeight"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            <include
+                android:id="@+id/weightPicker"
+                layout="@layout/rv_item_form_number_picker"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="@string/weight_kgs">
+                android:layout_height="wrap_content" />
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etWeight"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="numberDecimal"
-                    android:maxLines="1" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/tilHeight"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            <include
+                android:id="@+id/heightPicker"
+                layout="@layout/rv_item_form_number_picker"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:hint="@string/height_cms">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etHeight"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="numberDecimal"
-                    android:maxLines="1" />
-            </com.google.android.material.textfield.TextInputLayout>
+                android:layout_height="wrap_content" />
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/tilBmi"

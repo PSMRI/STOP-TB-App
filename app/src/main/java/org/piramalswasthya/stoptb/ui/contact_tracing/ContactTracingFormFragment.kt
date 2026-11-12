@@ -98,27 +98,10 @@ class ContactTracingFormFragment : Fragment() {
                 val (current, total) = viewModel.progress.value ?: (1 to 1)
                 val isLastSection = current >= total
 
-                val showContinueTpt = !editable && viewModel.showContinueTpt.value == true
-                val tptAlreadySubmitted = viewModel.tptPreSubmitAlreadySubmitted.value == true
-                val resolvingContinueTpt = viewModel.resolvingContinueTpt.value == true
-
-//                btnCtNext.visibility = if (editable || showContinueTpt ) View.VISIBLE else View.GONE
                 btnCtNext.visibility = if (!editable && formType in SINGLE_SECTION_FORMS) View.GONE else View.VISIBLE
-                btnCtNext.text = when {
-                    showContinueTpt && tptAlreadySubmitted -> getString(R.string.view_tpt_follow_up)
-                    showContinueTpt -> getString(R.string.tpt_follow_up)
-                    isLastSection -> getString(R.string.btn_submit)
-                    else -> getString(R.string.next)
-                }
-                // Disabled pending TPT Follow-Up routing determination; slow connections can lag isEditable and cause a tap to close the form before the redirect.
-                btnCtNext.isEnabled = !resolvingContinueTpt
-                pbCtNextResolving.visibility = if (resolvingContinueTpt) View.VISIBLE else View.GONE
+                btnCtNext.text = if (isLastSection) getString(R.string.btn_submit) else getString(R.string.next)
                 btnCtNext.setOnClickListener {
-                    when {
-                        showContinueTpt -> viewModel.continueToTpt()
-                        isLastSection -> viewModel.onSubmit()
-                        else -> viewModel.onNext()
-                    }
+                    if (isLastSection) viewModel.onSubmit() else viewModel.onNext()
                 }
             }
 
@@ -161,18 +144,6 @@ class ContactTracingFormFragment : Fragment() {
 
             fabEdit.setOnClickListener {
                 viewModel.enterEditMode()
-            }
-
-            viewModel.showContinueTpt.observe(viewLifecycleOwner) {
-                updateNextButton()
-            }
-
-            viewModel.tptPreSubmitAlreadySubmitted.observe(viewLifecycleOwner) {
-                updateNextButton()
-            }
-
-            viewModel.resolvingContinueTpt.observe(viewLifecycleOwner) {
-                updateNextButton()
             }
 
             viewModel.alertMessage.observe(viewLifecycleOwner) { message ->

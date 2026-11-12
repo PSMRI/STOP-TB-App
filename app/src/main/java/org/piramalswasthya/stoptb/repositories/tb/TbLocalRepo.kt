@@ -26,6 +26,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.configuration.GeneralOpdMasterConfig
+import org.piramalswasthya.stoptb.configuration.KeyPopulationRiskFactorAutoSelect
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
@@ -34,6 +35,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.database.shared_preferences.SyncRetryStore
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
+import org.piramalswasthya.stoptb.helpers.SyncDailyStore
 import org.piramalswasthya.stoptb.helpers.manualResultTextToStore
 import org.piramalswasthya.stoptb.helpers.serverResultOrNull
 import org.piramalswasthya.stoptb.model.BenRegCache
@@ -126,14 +128,16 @@ class TbLocalRepo @Inject constructor(
                 ben.gpsLatitude?.let { tbScreeningCache.latitude = it }
                 ben.gpsLongitude?.let { tbScreeningCache.longitude = it }
             }
-            tbDao.saveTbScreening(tbScreeningCache)
+            val savedId = tbDao.saveTbScreening(tbScreeningCache)
             benDao.updateScreeningStatus(tbScreeningCache.benId,"SCREENED")   // NEW
+            SyncDailyStore.record("TB_SCREENING", listOf(savedId), "SAVE", "SUCCESS")
         }
     }
 
     suspend fun saveGeneralOpd(generalOpdCache: GeneralOpdCache) {
         withContext(Dispatchers.IO) {
-            tbDao.saveGeneralOpd(generalOpdCache)
+            val savedId = tbDao.saveGeneralOpd(generalOpdCache)
+            SyncDailyStore.record("GENERAL_OPD", listOf(savedId), "SAVE", "SUCCESS")
         }
     }
 
@@ -163,6 +167,7 @@ class TbLocalRepo @Inject constructor(
                 ben.gpsLatitude?.let { tbDiagnosticsCache.latitude = it }
                 ben.gpsLongitude?.let { tbDiagnosticsCache.longitude = it }
             }
+            var knownTbHouseholdId: Long? = null
             benIdLocks.withLock(tbDiagnosticsCache.benId) {
                 val fresh = tbDao.getTbDiagnosticsByBenId(tbDiagnosticsCache.benId)
                 // id is a val (Room primary key) — .copy() to retarget the existing row instead
@@ -207,8 +212,14 @@ class TbLocalRepo @Inject constructor(
                         cache.trueNatRifResult = cache.trueNatRifResult ?: fresh.trueNatRifResult
                     }
                 }
-                tbDao.saveTbDiagnostics(cache)
+                val savedId = tbDao.saveTbDiagnostics(cache)
+                if (cache.isKnownTbCase()) {
+                    knownTbHouseholdId = benDao.getBen(cache.benId)?.householdId
+                }
+                SyncDailyStore.record("TB_DIAGNOSTICS", listOf(savedId), "SAVE", "SUCCESS")
             }
+            // Outside the lock: it only rewrites other members' TB_SCREENING rows.
+            knownTbHouseholdId?.takeIf { it > 0L }?.let { applyKnownTbContactRiskFactors(it) }
             if (tbDiagnosticsCache.isChestXRayDone == true) benDao.updateScreeningStatus(tbDiagnosticsCache.benId,"SCREENED")   // NEW
 
             if (tbDiagnosticsCache.isNaatConducted == true) benDao.updateScreeningStatus(tbDiagnosticsCache.benId,"SCREENED")   // NEW
@@ -232,7 +243,8 @@ class TbLocalRepo @Inject constructor(
      * so that sync can't write a row derived from a read taken before this save.
      */
     suspend fun saveTBSuspected(tbSuspectedCache: TBSuspectedCache) {
-        benIdLocks.withLock(tbSuspectedCache.benId) { saveTBSuspectedLocked(tbSuspectedCache) }
+        val confirmed = benIdLocks.withLock(tbSuspectedCache.benId) { saveTBSuspectedLocked(tbSuspectedCache) }
+        if (confirmed) applyKnownTbContactRiskFactorsForBen(tbSuspectedCache.benId)
     }
 
     /**
@@ -241,8 +253,8 @@ class TbLocalRepo @Inject constructor(
      * kept. Creates the record when [createIfMissing] and there is none. Returns false when
      * there is none and none was created.
      */
-    suspend fun markTbSuspectedConfirmed(benId: Long, createIfMissing: Boolean): Boolean =
-        benIdLocks.withLock(benId) {
+    suspend fun markTbSuspectedConfirmed(benId: Long, createIfMissing: Boolean): Boolean {
+        val saved = benIdLocks.withLock(benId) {
             val current = withContext(Dispatchers.IO) { tbDao.getTbSuspected(benId) }
                 ?: if (createIfMissing) TBSuspectedCache(benId = benId) else return@withLock false
             current.isConfirmed = true
@@ -251,17 +263,25 @@ class TbLocalRepo @Inject constructor(
             saveTBSuspectedLocked(current)
             true
         }
+        if (saved) applyKnownTbContactRiskFactorsForBen(benId)
+        return saved
+    }
 
-    /** [saveTBSuspected] for a caller that already holds this beneficiary's lock (Mutex isn't reentrant). */
-    internal suspend fun saveTBSuspectedLocked(tbSuspectedCache: TBSuspectedCache) {
+    /**
+     * [saveTBSuspected] for a caller that already holds this beneficiary's lock (Mutex isn't
+     * reentrant). Returns whether the saved record is a confirmed case; the caller then runs
+     * [applyKnownTbContactRiskFactorsForBen] once the lock is released.
+     */
+    internal suspend fun saveTBSuspectedLocked(tbSuspectedCache: TBSuspectedCache): Boolean =
         withContext(Dispatchers.IO) {
             benDao.getBen(tbSuspectedCache.benId)?.let { ben ->
                 ben.gpsLatitude?.let { tbSuspectedCache.latitude = it }
                 ben.gpsLongitude?.let { tbSuspectedCache.longitude = it }
             }
-            tbDao.saveTbSuspected(tbSuspectedCache)
+            val savedId = tbDao.saveTbSuspected(tbSuspectedCache)
+            SyncDailyStore.record("TB_SUSPECTED", listOf(savedId), "SAVE", "SUCCESS")
+            tbSuspectedCache.isTBConfirmed == true || tbSuspectedCache.isConfirmed
         }
-    }
 
     suspend fun getTBConfirmed(benId: Long): TBConfirmedTreatmentCache? {
         return withContext(Dispatchers.IO) {
@@ -272,8 +292,63 @@ class TbLocalRepo @Inject constructor(
     suspend fun saveTBConfirmed(tbConfirmedTreatmentCache: TBConfirmedTreatmentCache) {
         withContext(Dispatchers.IO)
         {
-            tbDao.saveTbConfirmed(tbConfirmedTreatmentCache)
+            val savedId = tbDao.saveTbConfirmed(tbConfirmedTreatmentCache)
+            SyncDailyStore.record("TB_CONFIRMED", listOf(savedId), "SAVE", "SUCCESS")
+            benDao.getBen(tbConfirmedTreatmentCache.benId)?.householdId
+                ?.takeIf { it > 0L }
+                ?.let { applyKnownTbContactRiskFactors(it) }
         }
+    }
+
+    suspend fun isContactOfKnownTbPatient(benId: Long, householdId: Long?): Boolean {
+        val hhId = householdId?.takeIf { it > 0L } ?: return false
+        return withContext(Dispatchers.IO) {
+            tbDao.householdHasOtherConfirmedTbCase(hhId, benId)
+        }
+    }
+
+    /** Runs [applyKnownTbContactRiskFactors] for [benId]'s household, if it has one. */
+    internal suspend fun applyKnownTbContactRiskFactorsForBen(benId: Long) {
+        withContext(Dispatchers.IO) {
+            benDao.getBen(benId)?.householdId
+                ?.takeIf { it > 0L }
+                ?.let { applyKnownTbContactRiskFactors(it) }
+        }
+    }
+
+    /**
+     * Writes "Contact of Known TB Patients" onto household members' saved screenings.
+     * A null or non-positive [householdId] updates every household that has a confirmed case.
+     * Members who were screened before the confirmation are included.
+     * Takes no beneficiary lock (TB_SCREENING writes don't use one), so callers holding a
+     * BenIdLocks lock may call it, but the save paths here call it after releasing theirs.
+     */
+    suspend fun applyKnownTbContactRiskFactors(householdId: Long? = null) {
+        withContext(Dispatchers.IO) {
+            val screenings = tbDao.getScreeningsForKnownTbContacts(householdId?.takeIf { it > 0L } ?: 0L)
+            var updated = 0
+            for (screening in screenings) {
+                val selection = KeyPopulationRiskFactorAutoSelect.addContactOfKnownTb(
+                    screening.keyPopulationRiskFactorIds,
+                    screening.keyPopulationRiskFactors
+                ) ?: continue
+                screening.keyPopulationRiskFactorIds = selection.ids
+                screening.keyPopulationRiskFactors = selection.codes
+                screening.syncState = SyncState.UNSYNCED
+                tbDao.saveTbScreening(screening)
+                updated++
+            }
+            if (updated > 0) {
+                Timber.d("Selected Contact of Known TB Patients on $updated screening record(s)")
+            }
+        }
+    }
+
+    private fun TBDiagnosticsCache.isKnownTbCase(): Boolean {
+        if (isTBConfirmed == true || isConfirmed) return true
+        val naat = naatResult?.trim()?.uppercase().orEmpty()
+        if (naat == "POSITIVE" || naat == "MTB DETECTED" || naat == "TB POSITIVE") return true
+        return liquidCultureResult?.trim()?.equals("POSITIVE", ignoreCase = true) == true
     }
 
     suspend fun getAllFollowUpsForBeneficiary(benId: Long): List<TBConfirmedTreatmentCache> {
