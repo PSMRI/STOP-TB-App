@@ -312,7 +312,10 @@ class ManualResultRepo @Inject constructor(
                 // A CLOSED response from order/manualResult (Not Conducted) is treated as
                 // success — see isXrayNotConducted above.
                 if (isXrayNotConducted) {
+                    val (reason, other) = keptOrSplitReason(it.reasonNotConductedChestXray, it.reasonNotConductedChestXrayOther, reasonForRefusal)
                     it.copy(
+                        reasonNotConductedChestXray = reason,
+                        reasonNotConductedChestXrayOther = other,
                         xrayOrderId = fetchedOrderId ?: it.xrayOrderId,
                         xrayOrderStatus = OrderStatus.CLOSED.name,
                         isChestXRayDone = false,
@@ -335,7 +338,10 @@ class ManualResultRepo @Inject constructor(
                 // is treated as success, mirroring Chest X-Ray's isXrayNotConducted handling
                 // above.
                 if (isRifNotConducted) {
+                    val (reason, other) = keptOrSplitReason(it.reasonNotConductedRif, it.reasonNotConductedRifOther, reasonForRefusal)
                     it.copy(
+                        reasonNotConductedRif = reason,
+                        reasonNotConductedRifOther = other,
                         rifOrderId = fetchedOrderId ?: it.rifOrderId,
                         rifOrderStatus = OrderStatus.CLOSED.name,
                         trueNatRifResult = null,
@@ -369,7 +375,10 @@ class ManualResultRepo @Inject constructor(
             } else {
                 // TrueNat/MTB's own "Not Conducted" closure — same convention as above.
                 if (isMtbNotConducted) {
+                    val (reason, other) = keptOrSplitReason(it.reasonNotConductedNaat, it.reasonNotConductedNaatOther, reasonForRefusal)
                     it.copy(
+                        reasonNotConductedNaat = reason,
+                        reasonNotConductedNaatOther = other,
                         trueNatOrderId = fetchedOrderId ?: it.trueNatOrderId,
                         trueNatOrderStatus = OrderStatus.CLOSED.name,
                         isNaatConducted = false,
@@ -405,6 +414,17 @@ class ManualResultRepo @Inject constructor(
                 }
             }
         }
+    }
+
+    /**
+     * The not-conducted reason to store with a queued closure: the row's own (the form saves it
+     * right after this) when it has one, else [sent] split back into the form's two fields, so
+     * the replay still has it if the app stops before the form's save.
+     */
+    private fun keptOrSplitReason(current: String?, currentOther: String?, sent: String?): Pair<String?, String?> {
+        if (!current.isNullOrBlank() || sent.isNullOrBlank()) return current to currentOther
+        val otherPrefix = "Other: "
+        return if (sent.startsWith(otherPrefix)) "Other" to sent.removePrefix(otherPrefix) else sent to null
     }
 
     private fun formatNotConductedReason(reason: String?, other: String?): String? {
