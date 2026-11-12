@@ -15,6 +15,7 @@ import org.piramalswasthya.stoptb.model.RifResult
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.VitalCache
+import org.piramalswasthya.stoptb.model.OrderAction
 
 class TBSuspectedQuickDataset(
     context: Context,
@@ -32,7 +33,7 @@ class TBSuspectedQuickDataset(
     private var referralMode = false
     private var referralType = 0
     private var diagnosticsCache: TBDiagnosticsCache? = null
-    // "COMPLETE" or "NOT_CONDUCTED" — which action button was tapped on the beneficiary card to
+    // OrderAction.COMPLETE / OrderAction.NOT_CONDUCTED name — which action button was tapped on the beneficiary card to
     // reach this screen, so the corresponding Conducted field can be pre-set and locked instead
     // of asking the user to re-decide something they already told us. Null for any other entry
     // path (e.g. the first-time REFER flow, or a read-only VIEW), where Conducted stays as-is.
@@ -342,7 +343,7 @@ class TBSuspectedQuickDataset(
         if (!saved?.chestXRayResult.isNullOrBlank()) {
             digitalChestXrayResult.inputType = InputType.TEXT_VIEW
             digitalChestXrayResult.value = getLocalValueInArray(R.array.tb_digital_xray_result, saved?.chestXRayResult) ?: saved?.chestXRayResult
-        } else if (isXrayDeviceIntegrated && referralType == 6 && isYes(digitalChestXrayConducted) && manualEntryAction != "COMPLETE") {
+        } else if (isXrayDeviceIntegrated && referralType == 6 && isYes(digitalChestXrayConducted) && manualEntryAction != OrderAction.COMPLETE.name) {
             digitalChestXrayResult.inputType = InputType.TEXT_VIEW
             digitalChestXrayResult.value = "Waiting for Result"
         } else {
@@ -381,7 +382,7 @@ class TBSuspectedQuickDataset(
         if (!saved?.naatResult.isNullOrBlank()) {
             trueNatResult.inputType = InputType.TEXT_VIEW
             trueNatResult.value = getLocalValueInArray(R.array.tb_truenat_mtb_result, mapMtbResultForUi(saved?.naatResult)) ?: mapMtbResultForUi(saved?.naatResult)
-        } else if (isTruenatDeviceIntegrated && referralType == 7 && isYes(trueNatConducted) && manualEntryAction != "COMPLETE") {
+        } else if (isTruenatDeviceIntegrated && referralType == 7 && isYes(trueNatConducted) && manualEntryAction != OrderAction.COMPLETE.name) {
             trueNatResult.inputType = InputType.TEXT_VIEW
             trueNatResult.value = "Waiting for Result"
         } else {
@@ -410,7 +411,7 @@ class TBSuspectedQuickDataset(
         if (!saved?.trueNatRifResult.isNullOrBlank()) {
             trueNatRifResult.inputType = InputType.TEXT_VIEW
             trueNatRifResult.value = getLocalValueInArray(R.array.tb_truenat_rif_result, mapRifResultForUi(saved?.trueNatRifResult)) ?: mapRifResultForUi(saved?.trueNatRifResult)
-        } else if (isTruenatDeviceIntegrated && referralType == 7 && isYes(rifConducted) && manualEntryAction != "COMPLETE") {
+        } else if (isTruenatDeviceIntegrated && referralType == 7 && isYes(rifConducted) && manualEntryAction != OrderAction.COMPLETE.name) {
             trueNatRifResult.inputType = InputType.TEXT_VIEW
             trueNatRifResult.value = "Waiting for Result"
         } else {
@@ -1204,7 +1205,7 @@ class TBSuspectedQuickDataset(
         // Conducted
         val canForceXrayConducted = manualEntryAction != null && shouldShowDigitalChestXray() && !lockDigitalChestXray && !isXrayFailed
         if (canForceXrayConducted) {
-            digitalChestXrayConducted.value = if (manualEntryAction == "COMPLETE") yesValue else noValue
+            digitalChestXrayConducted.value = if (manualEntryAction == OrderAction.COMPLETE.name) yesValue else noValue
         }
         digitalChestXrayConducted.isEnabled = shouldShowDigitalChestXray() && !lockDigitalChestXray && !isXrayFailed && !canForceXrayConducted
         digitalChestXrayConducted.required = shouldShowDigitalChestXray() && !lockDigitalChestXray && !isXrayFailed
@@ -1343,7 +1344,7 @@ class TBSuspectedQuickDataset(
         val isMtbFailed = mtbStatus.equals("FAILED", ignoreCase = true)
         val canForceTrueNatConducted = manualEntryAction != null && shouldShowTrueNatConducted() && !lockTrueNat && !isMtbFailed
         if (canForceTrueNatConducted) {
-            trueNatConducted.value = if (manualEntryAction == "COMPLETE") yesValue else noValue
+            trueNatConducted.value = if (manualEntryAction == OrderAction.COMPLETE.name) yesValue else noValue
         }
         trueNatConducted.isEnabled = shouldShowTrueNatConducted() && !lockTrueNat && !isMtbFailed && !canForceTrueNatConducted
         trueNatConducted.required = shouldShowTrueNatConducted() && !lockTrueNat && !isMtbFailed
@@ -1373,7 +1374,7 @@ class TBSuspectedQuickDataset(
         }
 
         val isMtbCompleted = mtbStatus.equals("COMPLETED", ignoreCase = true) || !diagnosticsCache?.naatResult.isNullOrBlank()
-        // manualEntryAction == "COMPLETE" means the user explicitly tapped "Enter Result
+        // manualEntryAction == OrderAction.COMPLETE.name means the user explicitly tapped "Enter Result
         // Manually" for this order — that's a standing action regardless of device
         // integration/camp-hub state, so it must not be overridden back into a locked
         // "Waiting for Result" view here.
@@ -1381,7 +1382,7 @@ class TBSuspectedQuickDataset(
             !mtbStatus.equals("FAILED", ignoreCase = true) &&
             !mtbStatus.equals("MANUAL_ENTRY", ignoreCase = true) &&
             !isMtbCompleted &&
-            manualEntryAction != "COMPLETE"
+            manualEntryAction != OrderAction.COMPLETE.name
 
         if (isMtbWaiting || isMtbCompleted || isMtbFailed) {
             trueNatResult.inputType = InputType.TEXT_VIEW
@@ -1424,7 +1425,7 @@ class TBSuspectedQuickDataset(
         val isRifFailed = rifStatus.equals("FAILED", ignoreCase = true)
         val canForceRifConducted = manualEntryAction != null && showRif && !lockRif && !isRifFailed
         if (canForceRifConducted) {
-            rifConducted.value = if (manualEntryAction == "COMPLETE") yesValue else noValue
+            rifConducted.value = if (manualEntryAction == OrderAction.COMPLETE.name) yesValue else noValue
         }
         rifConducted.isEnabled = showRif && !lockRif && !isRifFailed && !canForceRifConducted
         rifConducted.required = showRif && !lockRif && !isRifFailed
@@ -1452,7 +1453,7 @@ class TBSuspectedQuickDataset(
             !rifStatus.equals("FAILED", ignoreCase = true) &&
             !rifStatus.equals("MANUAL_ENTRY", ignoreCase = true) &&
             !isRifCompleted &&
-            manualEntryAction != "COMPLETE"
+            manualEntryAction != OrderAction.COMPLETE.name
 
         if (isRifWaiting || isRifCompleted || isRifFailed) {
             trueNatRifResult.inputType = InputType.TEXT_VIEW

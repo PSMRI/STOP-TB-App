@@ -164,7 +164,7 @@ interface CounsellingFormResponseDao {
     @Query(
         """
         SELECT sq.questionUuid AS questionUuid, qr.questionId AS questionId, qr.optionId AS optionId,
-               qo.optionValue AS optionValue, qr.answerText AS answerText
+               qo.optionValue AS optionValue, qr.answerText AS answerText, qo.optionUuid AS optionUuid
         FROM t_question_response qr
         JOIN t_section_response sr ON sr.sectionResponseId = qr.sectionResponseId
         JOIN t_section_question sq ON sq.questionId = qr.questionId
@@ -177,6 +177,26 @@ interface CounsellingFormResponseDao {
 
     @Query("DELETE FROM t_section_response WHERE formResponseId = :formResponseId")
     suspend fun deleteSectionResponsesForResponse(formResponseId: Long)
+
+    @Query("DELETE FROM t_section_response WHERE sectionResponseId = :sectionResponseId")
+    suspend fun deleteSectionResponse(sectionResponseId: Long)
+
+    // Every response (live and history snapshot) of formType still stored under a version other
+    // than activeVersionId — see ContactTracingRepositoryImpl.migrateTptResponsesToVersion.
+    @Transaction
+    @Query(
+        """
+        SELECT r.* FROM t_form_response r
+        JOIN t_form_version v ON r.formVersionId = v.versionId
+        JOIN t_dynamic_form f ON v.formId = f.formId
+        WHERE r.beneficiaryId = :beneficiaryId AND f.formType = :formType AND r.formVersionId != :activeVersionId
+        """
+    )
+    suspend fun getOlderVersionResponsesForFormType(
+        beneficiaryId: Long,
+        formType: String,
+        activeVersionId: Int
+    ): List<CompleteFormResponse>
 
     // Phase-scoped status observer for TPT_FOLLOW_UP PRE_SUBMIT, avoiding newer POST_SUBMIT rows masking the submitted PRE_SUBMIT status.
     @Query(

@@ -28,6 +28,8 @@ import org.piramalswasthya.stoptb.helpers.dynamicMapper.FormVersionAnswerMapper
 import org.piramalswasthya.stoptb.model.dynamicEntity.SectionQuestionEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.SectionQuestionWithDetails
 import org.piramalswasthya.stoptb.database.room.SyncState
+import org.piramalswasthya.stoptb.model.ChestXrayResult
+import org.piramalswasthya.stoptb.model.MtbResult
 import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.repositories.TBRepo
@@ -46,8 +48,36 @@ import java.util.Locale
 import javax.inject.Inject
 
 private const val QUESTION_UUID_TFU_REGISTRATION_DATE = "TFU_REGISTRATION_DATE"
+private const val QUESTION_UUID_CFU_FOLLOW_UP_DATE = "CFU_FOLLOW_UP_DATE"
+private const val QUESTION_UUID_CFU_CAMP_XRAY_RESULT = "CFU_CAMP_XRAY_RESULT"
+private const val QUESTION_UUID_CFU_CAMP_NAAT_RESULT = "CFU_CAMP_NAAT_RESULT"
+private const val QUESTION_UUID_CFU_XRAY_CONDUCTED = "CFU_XRAY_CONDUCTED"
+private const val QUESTION_UUID_CFU_XRAY_RESULT = "CFU_XRAY_RESULT"
+private const val QUESTION_UUID_CFU_NAAT_CONDUCTED = "CFU_NAAT_CONDUCTED"
+private const val QUESTION_UUID_CFU_NAAT_RESULT = "CFU_NAAT_RESULT"
 
-private val VERSION_COMPATIBLE_FORMS = setOf(FormType.COMMUNITY_CONTACT_TRACING, FormType.OCCUPATION_CONTACT_TRACING)
+// "Recommend for ATT" needs an abnormal X-ray or MTB detected, from this form's options or the
+// camp's stored text (TB_DIAGNOSTICS) — compared upper-cased.
+private val CFU_ATT_XRAY_RESULTS = setOf(
+    "TB_PRESUMPTIVE", "ABNORMAL_NOT_TB_PRESUMPTIVE",
+    "TB PRESUMPTIVE", "ABNORMAL BUT NOT TB PRESUMPTIVE"
+)
+private val CFU_ATT_NAAT_RESULTS = setOf("MTB_DETECTED", "MTB DETECTED", "MTB POSITIVE")
+
+// Forms whose section is re-evaluated (conditions + hidden answers) right before Next/Submit validate.
+private val REFRESH_BEFORE_SAVE_FORMS = setOf(
+    FormType.CONTACT_FOLLOW_UP,
+    FormType.COMMUNITY_CONTACT_TRACING,
+    FormType.OCCUPATION_CONTACT_TRACING
+)
+
+// TPT_FOLLOW_UP isn't listed: its older-version rows are migrated up front instead
+// (see IContactTracingRepository.migrateTptResponsesToVersion).
+private val VERSION_COMPATIBLE_FORMS = setOf(
+    FormType.COMMUNITY_CONTACT_TRACING,
+    FormType.OCCUPATION_CONTACT_TRACING,
+    FormType.CONTACT_FOLLOW_UP
+)
 
 @HiltViewModel
 class ContactTracingFormViewModel @Inject constructor(
@@ -91,6 +121,15 @@ class ContactTracingFormViewModel @Inject constructor(
     private var legacyRemovedQuestions: List<SectionQuestionWithDetails> = emptyList()
     private var activeVersionSections: List<FormSectionWithQuestions> = emptyList()
 
+    // Identifies previously answered questions that are compatible with the active form version,
+    // so they remain locked during editing while incompatible or unanswered questions can be updated.
+    private var lockedQuestionUuids: Set<String>? = null
+
+    // Stores the beneficiary's camp X-ray / NAAT result for display in the Contact Follow-Up form.
+    // Null if the respective test was not performed at the camp.
+    private var campXrayResult: String? = null
+    private var campNaatResult: String? = null
+
     private val _activeQuestions = MutableLiveData<List<CounsellingQuestionDto>>()
     val activeQuestions: LiveData<List<CounsellingQuestionDto>> get() = _activeQuestions
 
@@ -118,15 +157,6 @@ class ContactTracingFormViewModel @Inject constructor(
     private val _isEditable = MutableLiveData<Boolean>(true)
     val isEditable: LiveData<Boolean> get() = _isEditable
 
-    private val _showContinueTpt = MutableLiveData(false)
-    val showContinueTpt: LiveData<Boolean> get() = _showContinueTpt
-    private val _tptPreSubmitAlreadySubmitted = MutableLiveData(false)
-    val tptPreSubmitAlreadySubmitted: LiveData<Boolean> get() = _tptPreSubmitAlreadySubmitted
-
-    // Tracks pending TPT Follow-Up resolution; disable submit while network calls determine whether this already-submitted CONTACT_FOLLOW_UP should continue to TPT_FOLLOW_UP.
-    private val _resolvingContinueTpt = MutableLiveData(false)
-    val resolvingContinueTpt: LiveData<Boolean> get() = _resolvingContinueTpt
-
     fun open(
         formType: FormType,
         indexCaseBenId: Long,
@@ -142,6 +172,9 @@ class ContactTracingFormViewModel @Inject constructor(
         isHistoryMode = viewHistory
         legacyAnswersByUuid = null
         legacyRemovedQuestions = emptyList()
+        lockedQuestionUuids = null
+        campXrayResult = null
+        campNaatResult = null
         _formSchemaState.value = NetworkResponse.Loading()
         viewModelScope.launch {
             val response = repository.getFormSchema(formType)
@@ -172,6 +205,12 @@ class ContactTracingFormViewModel @Inject constructor(
 
             pendingIndexCaseBenId = indexCaseBenId
             pendingFormVersionId = activeVersion.version.versionId
+
+            if (formType == FormType.CONTACT_FOLLOW_UP) loadCampResults(indexCaseBenId)
+
+            if (formType == FormType.TPT_FOLLOW_UP) {
+                repository.migrateTptResponsesToVersion(indexCaseBenId, activeVersion.version.versionId)
+            }
 
             if (viewHistory) {
                 historyResponses = repository.getTptHistory(indexCaseBenId, activeVersion.version.versionId).first()
@@ -225,6 +264,9 @@ class ContactTracingFormViewModel @Inject constructor(
                 responseId = current.responseId
                 persistedStatus = current.status
                 _isEditable.value = !followUpTargetReached && isEditableFor(current.status, sectionPhase)
+                if (_isEditable.value != true && locksSavedAnswers(formType, sectionPhase)) {
+                    lockedQuestionUuids = compatibleAnsweredUuids()
+                }
             } else {
                 responseId = 0L
                 persistedStatus = null
@@ -233,23 +275,176 @@ class ContactTracingFormViewModel @Inject constructor(
 
             currentSectionIndex = 0
             loadSection(currentSectionIndex)
-
-            if (formType == FormType.CONTACT_FOLLOW_UP && persistedStatus == "SUBMITTED") {
-                _resolvingContinueTpt.value = true
-                try {
-                    val (eligible, alreadySubmitted) = resolveContinueTptState(indexCaseBenId, responseId)
-                    _showContinueTpt.value = eligible
-                    _tptPreSubmitAlreadySubmitted.value = alreadySubmitted
-                } finally {
-                    _resolvingContinueTpt.value = false
-                }
-            }
         }
     }
     private fun isEditableFor(status: String?, phase: SectionPhase?): Boolean = when (phase) {
         SectionPhase.PRE_SUBMIT -> status == null || status == "DRAFT"
         SectionPhase.POST_SUBMIT -> status == null || status == "DRAFT" || status == "SUBMITTED"
         else -> status != "SUBMITTED" && status != "COMPLETE" && status != "COMPLETED" && status != "REFUSED"
+    }
+
+    /** Forms whose submitted responses lock compatible saved answers instead of opening fully
+     * read-only (see [lockedQuestionUuids]). */
+    private fun locksSavedAnswers(formType: FormType, phase: SectionPhase?): Boolean =
+        formType == FormType.CONTACT_FOLLOW_UP ||
+            (formType == FormType.TPT_FOLLOW_UP && phase == SectionPhase.PRE_SUBMIT)
+
+    /** questionUuids of the active version that the saved response (responseId) answers compatibly:
+     * the question exists, an answer is saved and, for choice questions, every selected option is
+     * still offered. Older-version responses go through the carried-over answers; active-version
+     * ones (including TPT rows already moved by migrateTptResponsesToVersion, which drops answers
+     * to removed options) are read as stored. */
+    private suspend fun compatibleAnsweredUuids(): Set<String> {
+        val legacyAnswers = legacyAnswersByUuid
+        if (legacyAnswers != null) {
+            val questions = sections.flatMap { s -> s.questions.map { it.toCounsellingQuestionDto(isHindi) } }
+            return FormVersionAnswerMapper.compatibleAnswerUuids(questions, legacyAnswers)
+        }
+        val existing = repository.getCompleteResponse(responseId) ?: return emptySet()
+        return sections.flatMap { s ->
+            val questions = s.questions.map { it.toCounsellingQuestionDto(isHindi) }
+            populateAnswers(questions, s.section.sectionId, existing)
+            questions.filter { q ->
+                when (val v = q.value) {
+                    null -> false
+                    is List<*> -> v.isNotEmpty()
+                    else -> v.toString().isNotBlank()
+                }
+            }.map { it.questionUuid }
+        }.toSet()
+    }
+
+    /** CFU_FOLLOW_UP_DATE is captured once, on the day the form is first submitted, and is never
+     * editable: today until then, the saved date after that. */
+    private fun ensureContactFollowUpDate(questions: List<CounsellingQuestionDto>) {
+        if (currentFormType != FormType.CONTACT_FOLLOW_UP) return
+        val dateQuestion = questions.firstOrNull { it.questionUuid == QUESTION_UUID_CFU_FOLLOW_UP_DATE } ?: return
+        if (!isCfuSubmitted() || dateQuestion.value == null) {
+            dateQuestion.value = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH).format(Date())
+        }
+        dateQuestion.lockedAnswer = true
+    }
+
+    /** The open CFU response is already submitted; a server copy can be stored as COMPLETE/COMPLETED. */
+    private fun isCfuSubmitted(): Boolean =
+        persistedStatus == "SUBMITTED" || persistedStatus == "COMPLETE" || persistedStatus == "COMPLETED"
+
+    /** Camp X-ray / NAAT results for the CONTACT_FOLLOW_UP beneficiary, from the latest TB_DIAGNOSTICS row. */
+    private suspend fun loadCampResults(benId: Long) {
+        val diagnostics = tbRepo.getTBDiagnosticsById(benId)
+        campXrayResult = diagnostics?.chestXRayResult?.takeIf { it.isNotBlank() }
+        campNaatResult = diagnostics?.naatResult?.takeIf { it.isNotBlank() }
+    }
+
+    /** CONTACT_FOLLOW_UP rules the schema can't express; run after every evaluateAllConditions. */
+    private fun applyContactFollowUpRules(questions: List<CounsellingQuestionDto>) {
+        if (currentFormType != FormType.CONTACT_FOLLOW_UP) return
+        val byUuid = questions.associateBy { it.questionUuid }
+        applyCampResult(
+            byUuid, QUESTION_UUID_CFU_CAMP_XRAY_RESULT, campXrayResult,
+            QUESTION_UUID_CFU_XRAY_CONDUCTED, QUESTION_UUID_CFU_XRAY_RESULT
+        )
+        applyCampResult(
+            byUuid, QUESTION_UUID_CFU_CAMP_NAAT_RESULT, campNaatResult,
+            QUESTION_UUID_CFU_NAAT_CONDUCTED, QUESTION_UUID_CFU_NAAT_RESULT
+        )
+        applyAttEligibility(byUuid)
+    }
+
+    /** A test done at the camp shows its result (read-only, saved as text) and never asks the
+     * manual "conducted?" / result pair. Not done at camp — no result, or an invalid one
+     * ("AI Invalid Result" / "Invalid/Error") — hides and clears the camp field and asks the PHI pair. */
+    private fun applyCampResult(
+        byUuid: Map<String, CounsellingQuestionDto>,
+        campUuid: String,
+        campValue: String?,
+        conductedUuid: String,
+        resultUuid: String
+    ) {
+        val campQuestion = byUuid[campUuid] ?: return
+        // Unsubmitted: always mirror the current diagnostics, so a result cleared by a new order clears
+        // here too. Submitted: keep the saved result; only an empty one (e.g. an older-version response
+        // without this field) is filled.
+        if (!isCfuSubmitted() || campQuestion.value?.toString().isNullOrBlank()) campQuestion.value = campValue
+        if (isInvalidCampResult(campUuid, campQuestion.value?.toString())) campQuestion.value = null
+        val doneAtCamp = !campQuestion.value?.toString().isNullOrBlank()
+        campQuestion.visible = doneAtCamp
+        if (doneAtCamp) {
+            byUuid[conductedUuid]?.visible = false
+            byUuid[resultUuid]?.visible = false
+        }
+    }
+
+    /** Uses the app's own result parsers, so every stored spelling ("AI Invalid Result", "invalid",
+     * "Invalid/Error", "error", …) and the AI_INVALID / INVALID_ERROR wire values are recognised. */
+    private fun isInvalidCampResult(campUuid: String, value: String?): Boolean {
+        if (value.isNullOrBlank()) return false
+        return when (campUuid) {
+            QUESTION_UUID_CFU_CAMP_XRAY_RESULT ->
+                ChestXrayResult.fromResultText(value) == ChestXrayResult.AI_INVALID ||
+                    value.trim().equals(ChestXrayResult.AI_INVALID.wireValue, ignoreCase = true)
+            QUESTION_UUID_CFU_CAMP_NAAT_RESULT ->
+                MtbResult.fromResultText(value) == MtbResult.INVALID_ERROR ||
+                    value.trim().equals(MtbResult.INVALID_ERROR.wireValue, ignoreCase = true)
+            else -> false
+        }
+    }
+
+    /** "Recommend for ATT" is selectable only with an abnormal X-ray or MTB detected (camp or this
+     * form). An ATT answer that no longer qualifies — including a locked saved one — is cleared. */
+    private fun applyAttEligibility(byUuid: Map<String, CounsellingQuestionDto>) {
+        val statusQuestion = byUuid[QUESTION_UUID_CLINICAL_SCREENING_STATUS] ?: return
+        fun shownValue(uuid: String) =
+            byUuid[uuid]?.takeIf { it.visible }?.value?.toString()?.trim()?.uppercase(Locale.ENGLISH)
+        val eligible =
+            listOf(QUESTION_UUID_CFU_CAMP_XRAY_RESULT, QUESTION_UUID_CFU_XRAY_RESULT)
+                .any { shownValue(it) in CFU_ATT_XRAY_RESULTS } ||
+            listOf(QUESTION_UUID_CFU_CAMP_NAAT_RESULT, QUESTION_UUID_CFU_NAAT_RESULT)
+                .any { shownValue(it) in CFU_ATT_NAAT_RESULTS }
+
+        statusQuestion.options.orEmpty()
+            .filter { ClinicalScreeningStatus.fromValue(it.optionValue) == ClinicalScreeningStatus.FULL_TREATMENT }
+            .forEach { it.enabled = eligible }
+        if (!eligible &&
+            ClinicalScreeningStatus.fromValue(statusQuestion.value?.toString()) == ClinicalScreeningStatus.FULL_TREATMENT
+        ) {
+            statusQuestion.value = null
+            statusQuestion.lockedAnswer = false
+        }
+    }
+
+    /** CONTACT_FOLLOW_UP: a question hidden by a parent's change loses its answer and reopens
+     * empty and editable. Repeats so grandchildren (e.g. #5 → #6 → #7) are cleared too. */
+    private fun clearHiddenContactFollowUpAnswers(questions: List<CounsellingQuestionDto>) {
+        if (currentFormType != FormType.CONTACT_FOLLOW_UP) return
+        repeat(questions.size) {
+            val hidden = questions.filter {
+                !it.visible && it.value != null && it.questionType != QuestionType.AUTO_FILL.value
+            }
+            if (hidden.isEmpty()) return
+            hidden.forEach {
+                it.value = null
+                it.lockedAnswer = false
+                it.errorMessage = null
+            }
+            evaluateAllConditions(questions)
+            applyContactFollowUpRules(questions)
+        }
+    }
+
+    /** CFU / Community / Occupational, before Next/Submit validate: a TEXT edit skips condition
+     * reevaluation, so re-run it over the whole section (same order as onQuestionValueChanged) and, for
+     * CFU, clear answers that became hidden. Returns the now-visible questions to validate and save, so
+     * a newly shown field is validated and a newly hidden one isn't saved; other forms get [current] back. */
+    private fun refreshSectionBeforeSave(current: List<CounsellingQuestionDto>): List<CounsellingQuestionDto> {
+        if (currentFormType !in REFRESH_BEFORE_SAVE_FORMS) return current
+        val allSectionQuestions = sections.getOrNull(currentSectionIndex)?.questions
+            ?.mapNotNull { questionsByUuid[it.question.questionUuid ?: it.question.questionId.toString()] }
+            ?: return current
+        evaluateAllConditions(allSectionQuestions)
+        applyContactFollowUpRules(allSectionQuestions)        // CFU only (guarded inside)
+        clearHiddenContactFollowUpAnswers(allSectionQuestions) // CFU only (guarded inside)
+        return allSectionQuestions.filter { it.visible }
     }
 
     fun enterEditMode() {
@@ -298,7 +493,8 @@ class ContactTracingFormViewModel @Inject constructor(
         sectionIndex: Int
     ): List<CounsellingQuestionDto> {
         val answered = built.filter { it.questionUuid in populatedUuids }.onEach { it.visible = true }
-        if (sectionIndex != sections.lastIndex) return answered
+        // CONTACT_FOLLOW_UP doesn't show answers to questions the active version has removed.
+        if (sectionIndex != sections.lastIndex || currentFormType == FormType.CONTACT_FOLLOW_UP) return answered
         val removed = legacyRemovedQuestions.map { it.toCounsellingQuestionDto(isHindi) }
             .onEach { q ->
                 q.value = FormVersionAnswerMapper.resolveValue(q, answersByUuid[q.questionUuid].orEmpty())
@@ -311,42 +507,8 @@ class ContactTracingFormViewModel @Inject constructor(
         val formType = currentFormType ?: return
         open(formType, lastIndexCaseBenId, lastContactType, currentSectionPhase, lastViewHistory)
     }
-    fun continueToTpt() {
-        _navigateToFormUuid.value = "TPT_FOLLOW_UP"
-    }
-
     fun loadResultForm(benId : Long){
 
-    }
-
-    private suspend fun resolveContinueTptState(benId: Long, cfuResponseId: Long): Pair<Boolean, Boolean> {
-        val screeningQuestion = rawQuestionsByUuid[QUESTION_UUID_CLINICAL_SCREENING_STATUS] ?: return false to false
-        val complete = repository.getCompleteResponse(cfuResponseId) ?: return false to false
-        val answerRow = complete.sectionResponses.flatMap { it.questionResponses }
-            .firstOrNull { it.questionId == screeningQuestion.questionId } ?: return false to false
-        val optionValue = answerRow.optionId?.let { oid ->
-            sections.flatMap { it.questions }
-                .firstOrNull { it.question.questionId == screeningQuestion.questionId }
-                ?.options?.firstOrNull { it.option.optionId == oid }?.option?.optionValue
-        } ?: answerRow.answerText
-        if (ClinicalScreeningStatus.fromValue(optionValue) != ClinicalScreeningStatus.TPT_ELIGIBLE) return false to false
-
-        val tptDefinition = (repository.getFormSchema(FormType.TPT_FOLLOW_UP) as? NetworkResponse.Success)?.data
-            ?: return true to false
-        val tptVersion = tptDefinition.versions.firstOrNull { it.version.isActive }
-            ?: tptDefinition.versions.maxByOrNull { it.version.versionNumber } ?: return true to false
-
-        var preSubmitResponse = repository.getExistingContactResponseForPhase(
-            benId, tptVersion.version.versionId, SectionPhase.PRE_SUBMIT
-        )
-        if (preSubmitResponse == null) {
-
-            repository.fetchAndRefreshTptHistory(benId, tptVersion.version.versionId)
-            preSubmitResponse = repository.getExistingContactResponseForPhase(
-                benId, tptVersion.version.versionId, SectionPhase.PRE_SUBMIT
-            )
-        }
-        return true to (preSubmitResponse?.status == "SUBMITTED")
     }
 
     /** Moves to the next visit within the current history response, or into the next response
@@ -413,6 +575,20 @@ class ContactTracingFormViewModel @Inject constructor(
             }
             questionsByUuid = questionsByUuid + builtQuestions.associateBy { it.questionUuid }
             evaluateAllConditions(builtQuestions)
+            lockedQuestionUuids?.let { locked ->
+                // editableAfterSubmit fields stay open even with a compatible saved answer.
+                builtQuestions.forEach { it.lockedAnswer = it.questionUuid in locked && !it.editableAfterSubmit }
+            }
+            applyContactFollowUpRules(builtQuestions)
+            ensureContactFollowUpDate(builtQuestions)
+            // Submit only reopens when something on screen can still be filled in.
+            if (lockedQuestionUuids != null && builtQuestions.any {
+                    it.visible && !it.lockedAnswer && it.questionType != QuestionType.AUTO_FILL.value
+                }
+            ) _isEditable.value = true
+            // The adapter keeps "remarks" fields (uuid contains REMARK) editable on a read-only form —
+            // a TB Counselling rule. TPT History visits are fully read-only, remarks included.
+            if (isHistoryMode) builtQuestions.forEach { it.lockedAnswer = true }
             ensureTptRegistrationDate(builtQuestions, sectionWithQuestions.section.sectionId)
             ensureDateNotBeforeScreening(builtQuestions, sectionWithQuestions.section.sectionId)
             ensureExpectedCompletionDate(builtQuestions, sectionWithQuestions.section.sectionId)
@@ -458,6 +634,8 @@ class ContactTracingFormViewModel @Inject constructor(
             ?: return
         val allSectionQuestions = fullSection.mapNotNull { questionsByUuid[it] }
         evaluateAllConditions(allSectionQuestions)
+        applyContactFollowUpRules(allSectionQuestions)
+        clearHiddenContactFollowUpAnswers(allSectionQuestions)
 
         updateExpectedCompletionDateIfNeeded(question)
         allSectionQuestions.filter { it.visible }.forEach { q -> refreshErrorIfNeeded(q) }
@@ -530,7 +708,7 @@ class ContactTracingFormViewModel @Inject constructor(
             return
         }
 
-        val current = _activeQuestions.value ?: return
+        val current = refreshSectionBeforeSave(_activeQuestions.value ?: return)
         if (!validateSection(current)) {
             _activeQuestions.value = current
             return
@@ -546,13 +724,12 @@ class ContactTracingFormViewModel @Inject constructor(
     fun onSubmit() {
         if (_isEditable.value != true || isSubmitting) {
             if(currentFormType == FormType.CONTACT_FOLLOW_UP || currentFormType == FormType.TPT_FOLLOW_UP){
-                _showContinueTpt.value = false
                 _formCompleted.value = true
                 return
             }
             return
         }
-        val current = _activeQuestions.value ?: return
+        val current = refreshSectionBeforeSave(_activeQuestions.value ?: return)
         if (!validateSection(current)) {
             _activeQuestions.value = current
             return
@@ -594,11 +771,9 @@ class ContactTracingFormViewModel @Inject constructor(
                 _formCompleted.value = true
             }
 
-            ClinicalScreeningStatus.TPT_ELIGIBLE -> {
-                _navigateToFormUuid.value = "TPT_FOLLOW_UP"
-            }
-
-            ClinicalScreeningStatus.NO_TREATMENT, null -> {
+            // TPT_ELIGIBLE no longer chains into TPT_FOLLOW_UP — its registration is the Examine
+            // sheet's separate "Start TPT" row (see ExamineViewModel.isContactFollowUpTptEligible).
+            ClinicalScreeningStatus.TPT_ELIGIBLE, ClinicalScreeningStatus.NO_TREATMENT, null -> {
                 _formCompleted.value = true
             }
         }
@@ -622,7 +797,9 @@ class ContactTracingFormViewModel @Inject constructor(
         val current = _activeQuestions.value
         val editable = _isEditable.value == true
         viewModelScope.launch {
-            if (editable && current != null) saveCurrentSection(current)
+            // A reopened submitted response (lockedQuestionUuids set) is only saved on Submit, so
+            // half-filled fields aren't stored — and locked on the next open — without submitting.
+            if (editable && current != null && lockedQuestionUuids == null) saveCurrentSection(current)
             if (currentSectionIndex > 0) {
                 currentSectionIndex--
                 loadSection(currentSectionIndex)
@@ -719,12 +896,22 @@ class ContactTracingFormViewModel @Inject constructor(
             q.value = if (isMultiSelect) {
                 rows.mapNotNull { row ->
                     q.options?.firstOrNull { it.optionId == row.optionId }?.optionValue
+                        ?: row.answerText?.let { at ->
+                            q.options?.firstOrNull {
+                                it.optionValue.equals(at, ignoreCase = true) || it.optionLabel.equals(at, ignoreCase = true)
+                            }?.optionValue
+                        }
                 }
             } else {
                 val row = rows.first()
-                row.optionId?.let { oid ->
-                    q.options?.firstOrNull { it.optionId == oid }?.optionValue ?: row.answerText
-                } ?: row.answerText
+                val matchedOpt = row.optionId?.let { oid ->
+                    q.options?.firstOrNull { it.optionId == oid }
+                } ?: row.answerText?.let { at ->
+                    q.options?.firstOrNull {
+                        it.optionValue.equals(at, ignoreCase = true) || it.optionLabel.equals(at, ignoreCase = true)
+                    }
+                }
+                matchedOpt?.optionValue ?: row.answerText
             }
         }
     }
@@ -981,6 +1168,8 @@ private fun SectionQuestionWithDetails.toCounsellingQuestionDto(isHindi: Boolean
         defaultValue = null,
         containsPii = q.containsPii,
         visibleByDefault = q.visibleByDefault,
+        requiresBackFill = q.requiresBackFill,
+        editableAfterSubmit = q.editableAfterSubmit,
         validations = validations.map {
             CounsellingValidationDto(
                 validationId = it.validationId,
@@ -1005,6 +1194,7 @@ private fun SectionQuestionWithDetails.toCounsellingQuestionDto(isHindi: Boolean
                 optionLabel = localized(owc.option.optionText, owc.option.optionTextHindi, isHindi),
                 optionValue = owc.option.optionValue,
                 displayOrder = owc.option.optionOrder,
+                optionUuid = owc.option.optionUuid,
                 conditions = owc.conditions.map { c ->
                     CounsellingConditionDto(
                         conditionId = c.conditionId,

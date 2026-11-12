@@ -17,6 +17,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.widget.doAfterTextChanged
 import org.piramalswasthya.stoptb.R
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.EntryPoint
@@ -28,6 +29,7 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.ActivityServiceTypeBinding
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
 import org.piramalswasthya.stoptb.helpers.TapjackingProtectionHelper
+import org.piramalswasthya.stoptb.model.VillageDefaults
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import timber.log.Timber
 
@@ -36,6 +38,7 @@ class ServiceLocationActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_FROM_HOME_SWITCH = "fromHomeSwitch"
+        private const val PIN_CODE_LENGTH = 6
     }
 
     @EntryPoint
@@ -49,6 +52,9 @@ class ServiceLocationActivity : AppCompatActivity() {
         get() = _binding!!
 
     private val viewModel: ServiceTypeViewModel by viewModels()
+    private val residentialAreaEntries: Array<String> by lazy {
+        resources.getStringArray(R.array.nbr_residential_area_array)
+    }
     private val onBackPressedCallback by lazy {
         object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -125,12 +131,21 @@ class ServiceLocationActivity : AppCompatActivity() {
         )
 
         binding.btnContinue.setOnClickListener {
-            if (dataValid()) {
-                viewModel.saveCurrentLocation()
-                finish()
-                startActivity(Intent(this@ServiceLocationActivity, VolunteerActivity::class.java))
-            } else
+            if (!dataValid()) {
                 incompleteLocationAlert.show()
+                return@setOnClickListener
+            }
+            if (!villageDefaultsValid()) return@setOnClickListener
+            viewModel.saveCurrentLocation(
+                pinCode = binding.etPincode.text.toString().trim(),
+                residentialAreaId = getSelectedResidentialAreaId()
+            )
+            finish()
+            startActivity(Intent(this@ServiceLocationActivity, VolunteerActivity::class.java))
+        }
+        binding.etPincode.doAfterTextChanged { binding.tilPincode.error = null }
+        binding.actvResidentialAreaDropdown.setOnItemClickListener { _, _, _, _ ->
+            binding.tilResidentialAreaDropdown.error = null
         }
         viewModel.state.observe(this) {
             it?.let {
@@ -179,6 +194,7 @@ class ServiceLocationActivity : AppCompatActivity() {
                                 setText(viewModel.selectedVillageName.orEmpty())
                             }
                         }
+                        showSelectedVillageDefaults()
                         val showVillageDialog = View.OnClickListener {
                             showSearchableVillageDialog()
                         }
@@ -237,6 +253,8 @@ class ServiceLocationActivity : AppCompatActivity() {
             val originalIndex = filteredIndices[position]
             viewModel.setVillage(originalIndex)
             binding.actvVillageDropdown.setText(labels[originalIndex])
+            // A different village has its own Pincode / Residential Area — reset to what's saved for it
+            showSelectedVillageDefaults()
             dialog.dismiss()
         }
 
@@ -278,6 +296,39 @@ class ServiceLocationActivity : AppCompatActivity() {
 //                (viewModel.isHealthFacilityRequired() && binding.actvHealthFacilityDropdown.text.isNullOrBlank()) ||
                 binding.actvVillageDropdown.text.isNullOrBlank())
 
+    }
+
+    private fun showSelectedVillageDefaults() {
+        val villageDefaults = viewModel.selectedVillageDefaults
+        binding.etPincode.setText(villageDefaults?.pinCode.orEmpty())
+        binding.actvResidentialAreaDropdown.setText(
+            villageDefaults?.residentialAreaId?.let { residentialAreaEntries.getOrNull(it - 1) }.orEmpty(),
+            false
+        )
+        binding.tilPincode.error = null
+        binding.tilResidentialAreaDropdown.error = null
+        // Values from the backend are master data: shown but not editable
+        val masterDefaults = viewModel.selectedVillageMasterDefaults
+        binding.tilPincode.isEnabled = masterDefaults?.hasPinCode != true
+        binding.tilResidentialAreaDropdown.isEnabled = masterDefaults?.hasResidentialArea != true
+    }
+
+    // 1-based, matching how the registration forms store residentialAreaId
+    private fun getSelectedResidentialAreaId(): Int =
+        residentialAreaEntries.indexOf(binding.actvResidentialAreaDropdown.text?.toString()) + 1
+
+    private fun villageDefaultsValid(): Boolean {
+        val pinCode = binding.etPincode.text?.toString()?.trim().orEmpty()
+        binding.tilPincode.error = when {
+            pinCode.isEmpty() -> getString(R.string.form_input_empty_error)
+            pinCode.any { !it.isDigit() } -> getString(R.string.form_input_digit_only_error)
+            pinCode.length != PIN_CODE_LENGTH -> getString(R.string.form_input_missing_entry_error, PIN_CODE_LENGTH)
+            !VillageDefaults.isValidPinCode(pinCode) -> getString(R.string.form_input_invalid_pincode)
+            else -> null
+        }
+        binding.tilResidentialAreaDropdown.error =
+            if (getSelectedResidentialAreaId() <= 0) getString(R.string.form_input_empty_error) else null
+        return binding.tilPincode.error == null && binding.tilResidentialAreaDropdown.error == null
     }
 
     override fun onDestroy() {

@@ -162,6 +162,7 @@ class TBScreeningDataset(
         required = false,
         isEnabled = false,
         etMaxLength = 200,
+        showCharacterCounter = true,
         isAlphanumeric = true
     )
 

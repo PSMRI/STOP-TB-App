@@ -68,7 +68,8 @@ class ContactTracingTypeBottomSheetFragment : BottomSheetDialogFragment() {
                 TBConfirmedListFragmentDirections
                     .actionTBConfirmedListFragmentToHouseholdMembersFragment(
                         hhId = hhId,
-                        fromContactTracing = true
+                        fromContactTracing = true,
+                        excludeBenId = indexCaseBenId
                     )
             )
             dismiss()

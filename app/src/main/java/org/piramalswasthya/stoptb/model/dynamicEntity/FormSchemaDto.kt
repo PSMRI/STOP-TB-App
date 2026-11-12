@@ -25,7 +25,11 @@ data class FormSchemaDto(
     val sections: List<FormSectionDto> = emptyList(),
 
     @SerializedName("followUpDelayDays")
-    val followUpDelayDays: Int = 0
+    val followUpDelayDays: Int = 0,
+
+    // Every published version of this form (older ones included), each a full schema.
+    @SerializedName("versions")
+    val versions: List<FormSchemaDto>? = null
 ) {
     val versionNumber: Int
         get() = version
@@ -124,6 +128,12 @@ data class FormFieldDto(
     @SerializedName("visibleByDefault")
     val visibleByDefault: Boolean = true,
 
+    @SerializedName("requiresBackFill")
+    val requiresBackFill: Boolean = false,
+
+    @SerializedName("editableAfterSubmit")
+    val editableAfterSubmit: Boolean = false,
+
     @SerializedName("enabledIf")
     val enabledIf: ConditionRefDto? = null,
 
@@ -181,7 +191,8 @@ data class FormFieldDto(
                         optionLabelHindi = labelHindiFallback,
                         optionValue = valueFallback.toString(),
                         displayOrder = (it["displayOrder"] as? Number)?.toInt() ?: (index + 1),
-                        conditions = conds
+                        conditions = conds,
+                        optionUuid = it["optionUuid"]?.toString()
                     )
                 }
                 else -> {
@@ -255,7 +266,9 @@ data class OptionItemDto(
     val optionLabelHindi: String? = null,
     val optionValue: String,
     val displayOrder: Int,
-    val conditions: List<ConditionDto>
+    val conditions: List<ConditionDto>,
+    // Stable across form versions even if optionValue/label change — see FormVersionAnswerMapper.
+    val optionUuid: String? = null
 )
 
 data class ConditionDto(

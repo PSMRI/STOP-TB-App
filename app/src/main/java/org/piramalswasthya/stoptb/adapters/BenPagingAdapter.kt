@@ -48,6 +48,7 @@ class BenPagingAdapter(
     private val contactFollowUpDoneIds = mutableListOf<Long>()
     private val tptFollowUpDoneIds = mutableListOf<Long>()
     private val tptEligibleIds = mutableListOf<Long>()
+    private val tptRegistrationDoneIds = mutableListOf<Long>()
     private val childCountMap = mutableMapOf<Long, Int>()
     private val householdMemberCountMap = mutableMapOf<Long, Int>()
     private val householdHeadNameMap = mutableMapOf<Long, String>()
@@ -99,6 +100,7 @@ class BenPagingAdapter(
             tptFollowUpDoneIds,
             tptEligibleIds,
             childCountMap,
+            tptRegistrationDoneBenIds = tptRegistrationDoneIds,
             showActionButtons = showActionButtons,
             showResultButton = showResultButton,
             showAnthropometryButton = showAnthropometryButton,
@@ -227,6 +229,13 @@ class BenPagingAdapter(
         tptEligibleIds.clear()
         tptEligibleIds.addAll(list)
         notifyChangedIds(oldIds, tptEligibleIds.toSet())
+    }
+
+    fun submitTptRegistrationDoneBenIds(list: List<Long>) {
+        val oldIds = tptRegistrationDoneIds.toSet()
+        tptRegistrationDoneIds.clear()
+        tptRegistrationDoneIds.addAll(list)
+        notifyChangedIds(oldIds, tptRegistrationDoneIds.toSet())
     }
 
     private fun notifyChangedIds(oldIds: Set<Long>, newIds: Set<Long>) {

@@ -55,6 +55,13 @@ interface DynamicFormMetadataDao {
     @Query("UPDATE t_form_version SET isActive = 0 WHERE formId = :formId AND versionId != :activeVersionId")
     suspend fun deactivateOtherVersions(formId: Int, activeVersionId: Int)
 
+    // Makes exactly one stored version of the form active (higher or lower than the current one).
+    @Query("UPDATE t_form_version SET isActive = CASE WHEN versionNumber = :versionNumber THEN 1 ELSE 0 END WHERE formId = :formId")
+    suspend fun setActiveVersion(formId: Int, versionNumber: Int)
+
+    @Query("SELECT EXISTS(SELECT 1 FROM t_form_version WHERE formId = :formId AND versionNumber = :versionNumber)")
+    suspend fun hasVersion(formId: Int, versionNumber: Int): Boolean
+
     @Query("DELETE FROM t_option_condition WHERE optionId IN (:optionIds)")
     suspend fun deleteConditionsForOptions(optionIds: List<Int>)
 

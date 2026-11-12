@@ -7,5 +7,6 @@ data class SavedAnswerByUuid(
     val questionId: Int,
     val optionId: Int?,
     val optionValue: String?,
-    val answerText: String?
+    val answerText: String?,
+    val optionUuid: String? = null
 )

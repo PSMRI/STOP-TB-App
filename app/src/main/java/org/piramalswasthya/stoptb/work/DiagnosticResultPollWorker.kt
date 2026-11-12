@@ -20,6 +20,7 @@ import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.database.room.SyncState
+import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.model.OrderStatus
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
@@ -61,12 +62,31 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 tbRepo.refreshDeviceIntegrationConfig()
 
                 var hasInProgress = false
+                // The changes feed already brings every order's status on each pull, so the
+                // village-wide status sweeps and per-order result calls are only needed when the
+                // hub has no feed.
+                val feedActive = preferenceDao.isChangesFeedActive()
+
+                // The feed skips a row for an order this tablet created moments ago and moves past
+                // it, so a result that arrived then has to be asked for directly. Runs whether or
+                // not a device is integrated or any order still looks pending (an order saved
+                // without an order id is not in pendingOrders). A pair is cleared only once its
+                // fetch succeeds; the worker keeps rescheduling while any remain.
+                var hasSkippedFeedOrders = false
+                if (feedActive) {
+                    val skipped = tbRepo.feedSkippedOrdersPastGrace()
+                    skipped.forEach { (benId, type) ->
+                        Timber.d("Polling $type result for benId=$benId skipped by the feed")
+                        if (tbRepo.fetchOrderResult(benId, type) is NetworkResponse.Success) {
+                            tbRepo.ackFeedSkippedOrder(benId, type)
+                        }
+                    }
+                    hasSkippedFeedOrders = preferenceDao.getFeedSkippedOrders().isNotEmpty()
+                }
+
                 if (!tbRepo.isXrayIntegrated() && !tbRepo.isTruenatIntegrated()) {
                     Timber.d("Skipping automated result polling: no diagnostic devices are integrated")
                 } else {
-                // The changes feed already brings every order's status on each pull, so the
-                // village-wide status sweeps are only needed when the hub has no feed.
-                val feedActive = preferenceDao.isChangesFeedActive()
                 if (!feedActive && tbRepo.isXrayIntegrated()) {
                     tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST")
                 }
@@ -106,13 +126,29 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 }
                 hasInProgress = pendingOrders.isNotEmpty()
 
+
                 // Fetch results with bounded parallelism instead of one-by-one sequential awaits
                 // — a busy camp with many orders in flight no longer makes this cycle's
                 // wall-clock time grow linearly with beneficiary count. Each fetchOrderResult
                 // call already catches its own exceptions and returns NetworkResponse.Error
                 // (never throws), so one beneficiary's failure can't cancel the others under
                 // coroutineScope's structured concurrency.
-                if (hasInProgress) {
+                if (hasInProgress && feedActive) {
+                    // The server polls the X-ray and TrueNat vendors itself and every result change
+                    // reaches the tablet through the changes feed (applyFeedDiagnosticOrders runs the
+                    // same applyOrderResult as fetchOrderResult). Calling order/result per pending
+                    // order on top of that only duplicated the feed, and the TB suspected re-uploads
+                    // it set off kept the push chain busy and the feed pull waiting. Ask for a quick
+                    // delta pull instead; it is debounced and costs one small request.
+                    Timber.d("Pending diagnostic orders: ${pendingOrders.size}, results come from the changes feed")
+                    WorkerUtils.triggerCampQuickPullIfConnected(appContext, preferenceDao)
+                    // Keeps the "Last checked" caption current, as the per-order path does.
+                    pendingOrders.forEach { order ->
+                        if (order.xray) preferenceDao.setLastCheckedTime(order.benId, "XRAY_CHEST", now)
+                        if (order.trueNat) preferenceDao.setLastCheckedTime(order.benId, "SPUTUM_TRUENAT", now)
+                        if (order.rif) preferenceDao.setLastCheckedTime(order.benId, "MDR_RIF", now)
+                    }
+                } else if (hasInProgress) {
                     val pollSemaphore = Semaphore(MAX_CONCURRENT_POLLS)
                     coroutineScope {
                         pendingOrders.forEach { order ->
@@ -151,7 +187,7 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 // Reschedule while there's still an active automated order OR a manual-result
                 // sync still pending (e.g. the hub only just reconnected and the retry above
                 // hasn't caught up yet).
-                if (hasInProgress || hasPendingManualResultSync) {
+                if (hasInProgress || hasPendingManualResultSync || hasSkippedFeedOrders) {
                     val pollDelaySec = 60L
                     Timber.d("Scheduling next DiagnosticResultPollWorker run in ${pollDelaySec}s")
                     val pollRequest = OneTimeWorkRequestBuilder<DiagnosticResultPollWorker>()

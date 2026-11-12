@@ -119,6 +119,7 @@ class SignInViewModel @Inject constructor(
         if (enabled) {
             checkCampHubConnection()
         } else {
+            org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.observe(context, pref.getCampHubUrl(), false, "USER_DISABLED", "USER_ACTION")
             pref.setCampHubConnected(false)
             _campHubStatus.value = CampHubStatus.IDLE
         }
@@ -175,7 +176,7 @@ class SignInViewModel @Inject constructor(
     }
 
     private suspend fun pingCampHub(rawUrl: String): Boolean = withContext(Dispatchers.IO) {
-        CampHubReachability.isReachable(rawUrl)
+        org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.checkReachability(context, rawUrl, "LOGIN_HEALTH")
     }
 
     /**

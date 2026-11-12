@@ -1046,6 +1046,27 @@ class FormInputAdapter(
 
             var filteredIndices = labels.indices.toList()
 
+            // Rows can wrap to several lines, so measure them rather than assuming rowHeightPx each.
+            fun fitListHeight() {
+                val adapter = listView.adapter ?: return
+                val listHeight = if (listView.width > 0) {
+                    val widthSpec = View.MeasureSpec.makeMeasureSpec(listView.width, View.MeasureSpec.EXACTLY)
+                    val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+                    var total = listView.dividerHeight * maxOf(adapter.count - 1, 0)
+                    for (i in 0 until adapter.count) {
+                        val row = adapter.getView(i, null, listView)
+                        row.measure(widthSpec, heightSpec)
+                        total += row.measuredHeight
+                    }
+                    total
+                } else {
+                    adapter.count * rowHeightPx
+                }
+                listView.layoutParams = listView.layoutParams.apply {
+                    height = minOf(listHeight, maxListHeightPx)
+                }
+            }
+
             fun refreshFilteredList(query: String) {
                 filteredIndices = labels.indices.filter { labels[it].contains(query, ignoreCase = true) }
                 val adapter = object : ArrayAdapter<String>(context, 0, filteredIndices.map { labels[it] }) {
@@ -1055,17 +1076,19 @@ class FormInputAdapter(
                             gravity = Gravity.CENTER_VERTICAL
                             minimumHeight = rowHeightPx
                             val horizontalPadding = (16 * density).toInt()
-                            setPadding(horizontalPadding, 0, horizontalPadding, 0)
+                            val verticalPadding = (8 * density).toInt()
+                            setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding)
 
                             addView(CheckBox(context).apply {
                                 isClickable = false
                                 isFocusable = false
                             })
+                            // WRAP_CONTENT so long labels grow the row instead of being clipped.
                             addView(TextView(context).apply {
                                 gravity = Gravity.CENTER_VERTICAL or Gravity.LEFT
                                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
                                 setPadding((12 * density).toInt(), 0, 0, 0)
-                            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
+                            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                         }
                         val originalIndex = filteredIndices[position]
                         val checkbox = row.getChildAt(0) as CheckBox
@@ -1080,19 +1103,23 @@ class FormInputAdapter(
                     listView.setItemChecked(position, checkedItems[originalIndex])
                 }
                 // Keep the native button panel below the scrollable list on every screen size.
-                listView.layoutParams = listView.layoutParams.apply {
-                    height = minOf(filteredIndices.size * rowHeightPx, maxListHeightPx)
-                }
+                fitListHeight()
             }
 
             refreshFilteredList("")
+            // First pass runs before layout (width 0); re-measure once the real width is known.
+            listView.post { fitListHeight() }
 
             listView.setOnItemClickListener { _, _, position, _ ->
                 val originalIndex = filteredIndices[position]
                 val newCheckedState = listView.isItemChecked(position)
                 checkedItems[originalIndex] = newCheckedState
                 applyExclusiveSelection(item, checkedItems, originalIndex, newCheckedState)
-                refreshFilteredList(searchInput.text?.toString().orEmpty())
+                // Update rows in place; setting a new adapter would reset the scroll to the top.
+                filteredIndices.forEachIndexed { pos, idx ->
+                    listView.setItemChecked(pos, checkedItems[idx])
+                }
+                (listView.adapter as? ArrayAdapter<*>)?.notifyDataSetChanged()
             }
 
             searchInput.addTextChangedListener(object : TextWatcher {

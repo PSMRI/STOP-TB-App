@@ -137,6 +137,7 @@ import org.piramalswasthya.stoptb.model.MissingDataInfoStatusConverter
     MissingDataInfoStatusConverter::class
 )
 abstract class InAppDb : RoomDatabase() {
+    abstract fun syncVillageCountsDao(): org.piramalswasthya.stoptb.database.room.dao.SyncVillageCountsDao
 
     abstract val benIdGenDao: BeneficiaryIdsAvailDao
     abstract val householdDao: HouseholdDao
@@ -1848,8 +1849,125 @@ abstract class InAppDb : RoomDatabase() {
                 }
             }
         }
-
+        // TB confirmed treatment form: "Adherence to Medicines" removed and "Side Effects" added.
+        // minSdk 25 has no ALTER TABLE ... DROP COLUMN, so rebuild TB_CONFIRMED_TREATMENT.
         private val MIGRATION_64_65 = object : Migration(64, 65) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!tableExists(database, "TB_CONFIRMED_TREATMENT")) return
+
+                val hasAdherenceColumn =
+                    columnExists(database, "TB_CONFIRMED_TREATMENT", "adherenceToMedicines")
+                val hasSideEffectsColumn =
+                    columnExists(database, "TB_CONFIRMED_TREATMENT", "sideEffects")
+                // Added by MIGRATION_63_64; the rebuild must keep it or Room's schema check fails.
+                val hasRemarksColumn =
+                    columnExists(database, "TB_CONFIRMED_TREATMENT", "remarks")
+
+                if (!hasAdherenceColumn) {
+                    if (!hasSideEffectsColumn) {
+                        database.execSQL(
+                            "ALTER TABLE TB_CONFIRMED_TREATMENT ADD COLUMN sideEffects TEXT"
+                        )
+                    }
+                    return
+                }
+
+                database.execSQL(
+                    """
+            CREATE TABLE IF NOT EXISTS `TB_CONFIRMED_TREATMENT_new` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `benId` INTEGER NOT NULL,
+                `regimenType` TEXT,
+                `treatmentStartDate` INTEGER NOT NULL,
+                `expectedTreatmentCompletionDate` INTEGER,
+                `followUpDate` INTEGER,
+                `monthlyFollowUpDone` TEXT,
+                `anyDiscomfort` INTEGER,
+                `sideEffects` TEXT,
+                `treatmentCompleted` INTEGER,
+                `actualTreatmentCompletionDate` INTEGER,
+                `treatmentOutcome` TEXT,
+                `remarks` TEXT,
+                `dateOfDeath` INTEGER,
+                `placeOfDeath` TEXT,
+                `reasonForDeath` TEXT NOT NULL,
+                `reasonForNotCompleting` TEXT,
+                `syncState` INTEGER NOT NULL,
+                `createdAt` INTEGER NOT NULL,
+                `updatedAt` INTEGER NOT NULL,
+                `serverUpdatedDate` INTEGER,
+                FOREIGN KEY(`benId`) REFERENCES `BENEFICIARY`(`beneficiaryId`)
+                    ON UPDATE CASCADE ON DELETE CASCADE
+            )
+            """.trimIndent()
+                )
+
+                val columns = """
+            `id`, `benId`, `regimenType`, `treatmentStartDate`,
+            `expectedTreatmentCompletionDate`, `followUpDate`,
+            `monthlyFollowUpDone`, `anyDiscomfort`,
+            ${if (hasSideEffectsColumn) "`sideEffects`" else "NULL"},
+            `treatmentCompleted`, `actualTreatmentCompletionDate`,
+            `treatmentOutcome`,
+            ${if (hasRemarksColumn) "`remarks`" else "NULL"},
+            `dateOfDeath`, `placeOfDeath`,
+            `reasonForDeath`, `reasonForNotCompleting`,
+            `syncState`, `createdAt`, `updatedAt`, `serverUpdatedDate`
+        """.trimIndent().replace("\n", " ")
+
+                database.execSQL(
+                    """
+            INSERT INTO `TB_CONFIRMED_TREATMENT_new` (
+                `id`, `benId`, `regimenType`, `treatmentStartDate`,
+                `expectedTreatmentCompletionDate`, `followUpDate`,
+                `monthlyFollowUpDone`, `anyDiscomfort`, `sideEffects`,
+                `treatmentCompleted`, `actualTreatmentCompletionDate`,
+                `treatmentOutcome`, `remarks`, `dateOfDeath`, `placeOfDeath`,
+                `reasonForDeath`, `reasonForNotCompleting`,
+                `syncState`, `createdAt`, `updatedAt`, `serverUpdatedDate`
+            )
+            SELECT $columns FROM `TB_CONFIRMED_TREATMENT`
+            """.trimIndent()
+                )
+
+                database.execSQL("DROP TABLE `TB_CONFIRMED_TREATMENT`")
+
+                database.execSQL(
+                    "ALTER TABLE `TB_CONFIRMED_TREATMENT_new` RENAME TO `TB_CONFIRMED_TREATMENT`"
+                )
+
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `ind_tb_confirmed` ON `TB_CONFIRMED_TREATMENT` (`benId`)"
+                )
+            }
+        }
+
+        // Dynamic forms: option's stable optionUuid, used to carry answers across form versions
+        // even when an option's optionValue is renamed. Filled on the next schema store.
+        private val MIGRATION_65_66 = object : Migration(65, 66) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (tableExists(database, "t_question_option") &&
+                    !columnExists(database, "t_question_option", "optionUuid")
+                ) {
+                    database.execSQL("ALTER TABLE t_question_option ADD COLUMN optionUuid TEXT")
+                }
+            }
+        }
+
+        // Dynamic forms: requiresBackFill and editableAfterSubmit flags in t_section_question
+        private val MIGRATION_66_67 = object : Migration(66,67) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!tableExists(database, "t_section_question")) return
+                if (!columnExists(database, "t_section_question", "requiresBackFill")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN requiresBackFill INTEGER NOT NULL DEFAULT 0")
+                }
+                if (!columnExists(database, "t_section_question", "editableAfterSubmit")) {
+                    database.execSQL("ALTER TABLE t_section_question ADD COLUMN editableAfterSubmit INTEGER NOT NULL DEFAULT 0")
+                }
+            }
+        }
+
+        private val MIGRATION_67_68 = object : Migration(67, 68) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     """
@@ -2070,7 +2188,7 @@ abstract class InAppDb : RoomDatabase() {
 
 
         // Bump together with a new MIGRATION_x_y added to MIGRATIONS below.
-        const val DB_VERSION = 65
+        const val DB_VERSION = 68
 
         // Oldest schema version that can be migrated in place.
         const val OLDEST_MIGRATABLE_VERSION = 2
@@ -2140,7 +2258,10 @@ abstract class InAppDb : RoomDatabase() {
             MIGRATION_61_62,
             MIGRATION_62_63,
             MIGRATION_63_64,
-            MIGRATION_64_65
+            MIGRATION_64_65,
+            MIGRATION_65_66,
+            MIGRATION_66_67,
+            MIGRATION_67_68
         )
 
         fun getInstance(appContext: Context): InAppDb {

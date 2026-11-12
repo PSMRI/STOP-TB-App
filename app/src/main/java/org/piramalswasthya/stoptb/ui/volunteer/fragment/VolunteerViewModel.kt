@@ -28,7 +28,12 @@ class VolunteerViewModel @Inject constructor(
         if (formVersionCheckJob?.isActive == true) return
         formVersionCheckJob = viewModelScope.launch(Dispatchers.IO) {
             counsellingRepository.refreshFormsIfOutdated(
-                listOf(FormType.COMMUNITY_CONTACT_TRACING, FormType.OCCUPATION_CONTACT_TRACING)
+                listOf(
+                    FormType.COMMUNITY_CONTACT_TRACING,
+                    FormType.OCCUPATION_CONTACT_TRACING,
+                    FormType.CONTACT_FOLLOW_UP,
+                    FormType.TPT_FOLLOW_UP
+                )
             )
         }
     }

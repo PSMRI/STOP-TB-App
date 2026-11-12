@@ -8,6 +8,9 @@ import android.widget.LinearLayout
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.asFlow
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.work.WorkInfo
 import dagger.hilt.android.AndroidEntryPoint
@@ -42,12 +45,14 @@ class SyncStatusTabFragment : Fragment() {
 
         val adapter = SyncDashboardStatusAdapter()
         binding.rvSyncStatus.adapter = adapter
+        binding.rvSyncStatus.itemAnimator = null
         binding.rvSyncStatus.addItemDecoration(
             DividerItemDecoration(context, LinearLayout.VERTICAL)
         )
 
         failedWorkerAdapter = FailedWorkerAdapter()
         binding.rvFailedWorkers.adapter = failedWorkerAdapter
+        binding.rvFailedWorkers.itemAnimator = null
 
         needsAttentionAdapter = FailedWorkerAdapter()
         binding.rvNeedsAttention.adapter = needsAttentionAdapter
@@ -68,6 +73,7 @@ class SyncStatusTabFragment : Fragment() {
 
         // Collect sync status
         viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             viewModel.syncStatus.collect { statusList ->
                 val list = statusList.asDomainModel(localNames, englishNames)
 
@@ -86,10 +92,12 @@ class SyncStatusTabFragment : Fragment() {
                     }
                 )
             }
+            }
         }
 
         // Collect overall progress
         viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             viewModel.overallProgress.collect { (synced, total) ->
                 binding.tvProgressText.text = getString(
                     R.string.sync_dashboard_records_synced, synced, total
@@ -97,17 +105,24 @@ class SyncStatusTabFragment : Fragment() {
                 binding.progressOverall.max = if (total > 0) total else 1
                 binding.progressOverall.progress = synced
             }
+            }
         }
 
-        // Observe worker states; a finished sync may have changed what needs attention.
-        viewModel.workerStates.observe(viewLifecycleOwner) { workInfoList ->
-            updateWorkerStatus(workInfoList)
-            viewModel.refreshNeedsAttention(requireContext())
+        // Refresh attention details only while this tab is visible.
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                viewModel.workerStates.asFlow().collect { workInfoList ->
+                    updateWorkerStatus(workInfoList)
+                    viewModel.refreshNeedsAttention(requireContext())
+                }
+            }
         }
 
         // Observe failed worker details
-        viewModel.failedWorkerDetails.observe(viewLifecycleOwner) { failedList ->
-            failedWorkerAdapter.submitList(failedList)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                viewModel.failedWorkerDetails.asFlow().collect { failedList -> failedWorkerAdapter.submitList(failedList) }
+            }
         }
 
         // Toggle expand/collapse on tap

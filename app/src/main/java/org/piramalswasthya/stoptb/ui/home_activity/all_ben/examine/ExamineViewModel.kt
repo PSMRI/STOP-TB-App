@@ -7,11 +7,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.repositories.BenRepo
@@ -99,7 +101,8 @@ class ExamineViewModel @Inject constructor(
     private val tptPreSubmitStatus: Flow<String?> =
         contactTracingRepo.observePreSubmitResponseStatus(benId, FormType.TPT_FOLLOW_UP)
 
-    /** Drives the "TPT Followup" row's visibility — true once PRE_SUBMIT has been submitted. */
+    /** Drives the "Start TPT" row's Fill/View state and the "TPT Followup" row's visibility —
+     * true once PRE_SUBMIT (registration/regimen) has been submitted. */
     val isTptFollowUpPreSubmitDone: Flow<Boolean> =
         tptPreSubmitStatus.map { it == "SUBMITTED" || it == "COMPLETE" }
 
@@ -120,34 +123,35 @@ class ExamineViewModel @Inject constructor(
     private val contactFollowUpResponseVersionId: Flow<Int?> =
         contactTracingRepo.observeResponseFormVersionId(benId, FormType.CONTACT_FOLLOW_UP)
 
-    /**
-     * Drives the "Contact Followup" row's Fill/View state.
-     * Full Treatment and No Treatment complete as soon as CONTACT_FOLLOW_UP itself is submitted.
-     * Tpt Eligible additionally requires the follow-on TPT_FOLLOW_UP PRE_SUBMIT to be submitted,
-     * since selecting it only redirects to that next form rather than finishing the flow.
-     */
-    val isContactFollowUpDone: Flow<Boolean> =
+    /** CONTACT_FOLLOW_UP submitted? plus its clinical screening answer. Shared so the two rows
+     * below don't each re-run contactFollowUpFormVersionId's server fetch. */
+    private val contactFollowUpState: Flow<Pair<Boolean, ClinicalScreeningStatus?>> =
         combine(
             contactFollowUpStatus,
             contactFollowUpFormVersionId,
-            contactFollowUpResponseVersionId,
-            tptPreSubmitStatus
-        ) { cfuStatus, schemaVersionId, responseVersionId, tptStatus ->
+            contactFollowUpResponseVersionId
+        ) { cfuStatus, schemaVersionId, responseVersionId ->
             val cfuSubmitted = cfuStatus == "SUBMITTED" || cfuStatus == "COMPLETE"
             if (!cfuSubmitted || schemaVersionId == null || responseVersionId == null) {
-                false
+                false to null
             } else {
                 // Query against the version the response is actually stored under, not the
                 // schema's active version — those can disagree (e.g. right after reinstall,
                 // before a version migration has synced), and querying the wrong version
-                // silently returns null, which must NOT be treated as "not TPT eligible".
-                when (contactTracingRepo.getClinicalScreeningStatus(benId, responseVersionId)) {
-                    ClinicalScreeningStatus.TPT_ELIGIBLE -> tptStatus == "SUBMITTED" || tptStatus == "COMPLETE"
-                    ClinicalScreeningStatus.FULL_TREATMENT, ClinicalScreeningStatus.NO_TREATMENT -> true
-                    null -> false
-                }
+                // silently returns null.
+                true to contactTracingRepo.getClinicalScreeningStatus(benId, responseVersionId)
             }
-        }
+        }.shareIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), replay = 1)
+
+    /** Drives the "Contact Followup" row's Fill/View state — done as soon as CONTACT_FOLLOW_UP
+     * itself is submitted; TPT registration is the separate "Start TPT" row. */
+    val isContactFollowUpDone: Flow<Boolean> = contactFollowUpState.map { (submitted, _) -> submitted }
+
+    /** Drives the "Start TPT" row's visibility — only once CONTACT_FOLLOW_UP is submitted with
+     * Status of Clinical Screening = TPT_ELIGIBLE. */
+    val isContactFollowUpTptEligible: Flow<Boolean> = contactFollowUpState.map { (submitted, status) ->
+        submitted && status == ClinicalScreeningStatus.TPT_ELIGIBLE
+    }
 
     private val tptFormVersionId: Flow<Int?> = flow {
         val definition = (contactTracingRepo.getFormSchema(FormType.TPT_FOLLOW_UP) as? NetworkResponse.Success)?.data

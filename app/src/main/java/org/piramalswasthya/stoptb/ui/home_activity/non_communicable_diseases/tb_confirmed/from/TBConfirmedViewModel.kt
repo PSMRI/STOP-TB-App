@@ -181,6 +181,8 @@ class TBConfirmedViewModel @Inject constructor(
         }
     }
 
+    fun isFollowUpDoneForCurrentMonth(): Boolean = dataset.isFollowUpDoneForCurrentMonth()
+
     fun resetState() {
         _state.value = State.IDLE
     }

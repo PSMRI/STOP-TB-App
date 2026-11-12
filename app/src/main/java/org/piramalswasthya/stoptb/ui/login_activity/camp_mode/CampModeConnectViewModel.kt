@@ -80,6 +80,6 @@ class CampModeConnectViewModel @Inject constructor(
             ?.let { runCatching { java.net.URI(it).host }.getOrNull() }
 
     private suspend fun pingCampHub(rawUrl: String): Boolean = withContext(Dispatchers.IO) {
-        CampHubReachability.isReachable(rawUrl)
+        org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.checkReachability(context, rawUrl, "CONNECT_HEALTH")
     }
 }

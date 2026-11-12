@@ -132,6 +132,93 @@ class ContactTracingRepositoryImpl @Inject constructor(
         }
     }
 
+    // Migrates older TPT follow-up visits to the active form version while preserving visit history,
+    // sync state and existing answers wherever the questions and options remain compatible.
+    override suspend fun migrateTptResponsesToVersion(beneficiaryId: Long, activeVersionId: Int) {
+        db.withTransaction {
+            val olderResponses = responseDao.getOlderVersionResponsesForFormType(
+                beneficiaryId, FormType.TPT_FOLLOW_UP.name, activeVersionId
+            )
+            if (olderResponses.isEmpty()) return@withTransaction
+
+            val formDef = metadataDao.getFormDefinition(FormType.TPT_FOLLOW_UP) ?: return@withTransaction
+            val activeVersion = formDef.versions.find { it.version.versionId == activeVersionId }
+                ?: return@withTransaction
+            val activeQuestionsByUuid = activeVersion.sections.flatMap { it.questions }
+                .mapNotNull { q -> q.question.questionUuid?.let { it to q } }
+                .toMap()
+            val activeSectionIdByUuid = activeVersion.sections
+                .mapNotNull { s -> s.section.sectionUuid?.let { it to s.section.sectionId } }
+                .toMap()
+            val versionIds = formDef.versions.map { it.version.versionId }.toSet()
+            val sectionsById = formDef.versions.flatMap { it.sections }.associateBy { it.section.sectionId }
+            val questionsById = formDef.versions.flatMap { it.sections }.flatMap { it.questions }
+                .associateBy { it.question.questionId }
+
+            olderResponses.forEach { resp ->
+                // Without the older version's schema rows its answers can't be resolved to a uuid — leave it as is.
+                if (resp.formResponse.formVersionId !in versionIds) {
+                    Timber.w("migrateTptResponsesToVersion: no schema for versionId=${resp.formResponse.formVersionId}, skipping responseId=${resp.formResponse.responseId}")
+                    return@forEach
+                }
+                // A submitted follow-up visit already on the server is read-only history and is never
+                // pushed again: answers the active version can't show are kept as stored (their old
+                // question/option ids match no active field, so they simply don't display) rather than
+                // deleted. Rows still to be pushed keep only active-version answers, as before.
+                val keepUnmapped = resp.formResponse.syncStatus == "SYNCED" &&
+                    (resp.formResponse.isHistorySnapshot || resp.formResponse.status == "COMPLETE")
+                resp.sectionResponses.forEach { sr ->
+                    val sectionResponseId = sr.sectionResponse.sectionResponseId
+                    val mappedAnswers = mutableListOf<Pair<Int, QuestionResponseEntity>>()
+                    val keptAnswers = mutableListOf<QuestionResponseEntity>()
+                    sr.questionResponses.forEach { qr ->
+                        val mapped = mapAnswerToVersion(qr, questionsById, activeQuestionsByUuid)
+                        if (mapped != null) mappedAnswers += mapped
+                        else if (keepUnmapped) keptAnswers += qr.copy(questionResponseId = 0)
+                    }
+                    val targetSectionId = sectionsById[sr.sectionResponse.sectionId]?.section?.sectionUuid
+                        ?.let { activeSectionIdByUuid[it] }
+                        ?: mappedAnswers.firstOrNull()?.first
+
+                    // No active-version section for it: a history visit's section is left untouched.
+                    if (targetSectionId == null && keepUnmapped) return@forEach
+                    responseDao.deleteQuestionResponsesForSection(sectionResponseId)
+                    if (targetSectionId == null) {
+                        responseDao.deleteSectionResponse(sectionResponseId)
+                    } else {
+                        responseDao.updateSectionResponse(
+                            sr.sectionResponse.copy(sectionId = targetSectionId, updatedAt = System.currentTimeMillis())
+                        )
+                        val rows = mappedAnswers.map { it.second } + keptAnswers
+                        if (rows.isNotEmpty()) responseDao.insertQuestionResponses(rows)
+                    }
+                }
+                responseDao.updateFormResponse(resp.formResponse.copy(formVersionId = activeVersionId))
+            }
+        }
+    }
+
+    /** An older-version answer re-keyed to the active version's question (by questionUuid) and
+     * option (by optionUuid), paired with that question's sectionId; null when the question or the
+     * selected option no longer exists. */
+    private fun mapAnswerToVersion(
+        qr: QuestionResponseEntity,
+        questionsById: Map<Int, SectionQuestionWithDetails>,
+        activeQuestionsByUuid: Map<String, SectionQuestionWithDetails>
+    ): Pair<Int, QuestionResponseEntity>? {
+        val oldQuestion = questionsById[qr.questionId] ?: return null
+        val newQuestion = oldQuestion.question.questionUuid?.let { activeQuestionsByUuid[it] } ?: return null
+        val newOptionId = qr.optionId?.let { oid ->
+            val oldOption = oldQuestion.options.firstOrNull { it.option.optionId == oid }?.option ?: return null
+            findTargetOptionId(newQuestion, oldOption.optionUuid, oldOption.optionValue) ?: return null
+        }
+        return newQuestion.question.sectionId to qr.copy(
+            questionResponseId = 0,
+            questionId = newQuestion.question.questionId,
+            optionId = newOptionId
+        )
+    }
+
 
     @RequiresApi(Build.VERSION_CODES.O)
     override suspend fun fetchAndStoreContactResponse(
@@ -469,6 +556,10 @@ class ContactTracingRepositoryImpl @Inject constructor(
         responseDao.getTptHistory(beneficiaryId, formVersionId)
 
     override suspend fun fetchAndRefreshTptHistory(beneficiaryId: Long, formVersionId: Int): Boolean {
+        // Runs before the network call so it also applies offline; older-version local rows must be on
+        // the active version for the live PRE_SUBMIT check and history dedupe (backendSectionResponseId) below.
+        migrateTptResponsesToVersion(beneficiaryId, formVersionId)
+
         val authHeader = preferenceDao.getJWTAmritToken() ?: ""
 
         val apiRecords: List<ServerCounsellingResponseDto> = try {
@@ -502,19 +593,6 @@ class ContactTracingRepositoryImpl @Inject constructor(
 
         val allQuestions = activeVersion.sections.flatMap { it.questions }
 
-        fun findQuestionDetails(serverQId: Int): SectionQuestionWithDetails? {
-            return allQuestions.firstOrNull {
-                it.question.serverQuestionId == serverQId || it.question.questionId == serverQId
-            }
-        }
-
-        fun findOptionId(qDetails: SectionQuestionWithDetails, serverOptId: Int?): Int? {
-            if (serverOptId == null) return null
-            return qDetails.options.firstOrNull {
-                it.option.serverOptionId == serverOptId || it.option.optionId == serverOptId
-            }?.option?.optionId
-        }
-
         val sectionByIdMap = activeVersion.sections.associateBy { it.section.sectionId }
         val sectionByUuidMap = activeVersion.sections.mapNotNull { sec ->
             sec.section.sectionUuid?.let { uuid -> uuid to sec }
@@ -525,6 +603,8 @@ class ContactTracingRepositoryImpl @Inject constructor(
                 ?: sectionDto.sectionUuid.let { sectionByUuidMap[it] }
         }
 
+        // Answers are mapped by questionUuid/optionUuid (TPT_FOLLOW_UP is in UUID_MAPPED_FORMS), so a
+        // record saved on an older version still lands on the active version's questions.
         suspend fun insertSingleSectionResponse(formResponseId: Long, sectionDto: ServerSectionResponseDto) {
             val localSection = getLocalSection(sectionDto) ?: return
             val sectionId = localSection.section.sectionId
@@ -536,18 +616,12 @@ class ContactTracingRepositoryImpl @Inject constructor(
                 )
             )
             val questionResponses = sectionDto.answers.mapNotNull { a ->
-                val qDetails = findQuestionDetails(a.questionId)
+                val qDetails = findQuestionForAnswer(allQuestions, a)
                 if (qDetails == null) {
-                    Timber.w("fetchAndRefreshTptHistory: No local question found for serverQuestionId=${a.questionId}")
+                    Timber.w("fetchAndRefreshTptHistory: No local question found for serverQuestionId=${a.questionId}, questionUuid=${a.questionUuid}")
                     return@mapNotNull null
                 }
-                val localOptId = findOptionId(qDetails, a.optionId)
-                QuestionResponseEntity(
-                    sectionResponseId = sectionResponseId,
-                    questionId = qDetails.question.questionId,
-                    optionId = localOptId,
-                    answerText = a.answerText
-                )
+                toLocalAnswer(qDetails, a, sectionResponseId)
             }
             if (questionResponses.isNotEmpty()) {
                 responseDao.insertQuestionResponses(questionResponses)
@@ -669,19 +743,6 @@ class ContactTracingRepositoryImpl @Inject constructor(
 
         val allQuestions = activeVersion.sections.flatMap { it.questions }
 
-        fun findQuestionDetails(serverQId: Int): SectionQuestionWithDetails? {
-            return allQuestions.firstOrNull {
-                it.question.serverQuestionId == serverQId || it.question.questionId == serverQId
-            }
-        }
-
-        fun findOptionId(qDetails: SectionQuestionWithDetails, serverOptId: Int?): Int? {
-            if (serverOptId == null) return null
-            return qDetails.options.firstOrNull {
-                it.option.serverOptionId == serverOptId || it.option.optionId == serverOptId
-            }?.option?.optionId
-        }
-
         val sectionByIdMap = activeVersion.sections.associateBy { it.section.sectionId }
         val sectionByUuidMap = activeVersion.sections.mapNotNull { sec ->
             sec.section.sectionUuid?.let { uuid -> uuid to sec }
@@ -703,14 +764,8 @@ class ContactTracingRepositoryImpl @Inject constructor(
                 )
             )
             val questionResponses = sectionDto.answers.mapNotNull { a ->
-                val qDetails = findQuestionDetails(a.questionId) ?: return@mapNotNull null
-                val localOptId = findOptionId(qDetails, a.optionId)
-                QuestionResponseEntity(
-                    sectionResponseId = sectionResponseId,
-                    questionId = qDetails.question.questionId,
-                    optionId = localOptId,
-                    answerText = a.answerText
-                )
+                val qDetails = findQuestionForAnswer(allQuestions, a) ?: return@mapNotNull null
+                toLocalAnswer(qDetails, a, sectionResponseId)
             }
             if (questionResponses.isNotEmpty()) {
                 responseDao.insertQuestionResponses(questionResponses)
@@ -720,6 +775,8 @@ class ContactTracingRepositoryImpl @Inject constructor(
         db.withTransaction {
             val recordsByBen = apiRecords.groupBy { it.beneficiaryId }
             for ((benId, records) in recordsByBen) {
+                // Same as fetchAndRefreshTptHistory: re-key older-version local rows before deduping.
+                migrateTptResponsesToVersion(benId, formVersionId)
                 val postSubmitSectionDtos = records.flatMap { record ->
                     record.sections.filter { sectionDto ->
                         getLocalSection(sectionDto)?.section?.sectionPhase == SectionPhase.POST_SUBMIT.value
@@ -915,13 +972,10 @@ class ContactTracingRepositoryImpl @Inject constructor(
 
 
     override fun observeContactFollowUpDoneBenIds(): Flow<List<Long>> =
-        combine(
-            responseDao.getFormDoneBenIds(FormType.CONTACT_FOLLOW_UP.name),
-            observeTptEligibleBenIds(),
-            responseDao.getPreSubmitDoneBenIds(FormType.TPT_FOLLOW_UP.name)
-        ) { cfuDoneBenIds, tptEligibleBenIds, tptPreSubmitDoneBenIds ->
-            cfuDoneBenIds.filter { benId -> benId !in tptEligibleBenIds || benId in tptPreSubmitDoneBenIds }
-        }
+        responseDao.getFormDoneBenIds(FormType.CONTACT_FOLLOW_UP.name)
+
+    override fun observeTptRegistrationDoneBenIds(): Flow<List<Long>> =
+        responseDao.getPreSubmitDoneBenIds(FormType.TPT_FOLLOW_UP.name)
 
     override fun observeTptFollowUpTargetReachedBenIds(): Flow<List<Long>> =
         combine(
@@ -1163,18 +1217,19 @@ class ContactTracingRepositoryImpl @Inject constructor(
         return allQuestions.firstOrNull { it.question.questionUuid == uuid }
     }
 
-    // Maps a server answer onto a local QuestionResponseEntity. The option is resolved by optionValue
-    // (stable across versions, unlike optionId); the answer is skipped (null) if the selected option
-    // no longer exists in the current version.
+    // Maps a server answer onto a local QuestionResponseEntity. The option is resolved by optionUuid
+    // (stable across versions even if optionValue is renamed, unlike optionId); the answer is skipped
+    // (null) if the selected option no longer exists in the current version.
     private fun toLocalAnswer(
         qDetails: SectionQuestionWithDetails,
         answer: ServerAnswerDto,
         sectionResponseId: Long
     ): QuestionResponseEntity? {
+        val optionUuid = answer.optionUuid?.takeIf { it.isNotBlank() }
         val optionValue = answer.optionValue?.takeIf { it.isNotBlank() }
-        val optionId = optionValue?.let { v ->
-            qDetails.options.firstOrNull { it.option.optionValue == v }?.option?.optionId ?: return null
-        }
+        val optionId = if (optionUuid != null || optionValue != null) {
+            findTargetOptionId(qDetails, optionUuid, optionValue) ?: return null
+        } else null
         return QuestionResponseEntity(
             sectionResponseId = sectionResponseId,
             questionId = qDetails.question.questionId,
@@ -1183,11 +1238,29 @@ class ContactTracingRepositoryImpl @Inject constructor(
         )
     }
 
+    // The target question's local optionId for an answer's option: by optionUuid, falling back to
+    // optionValue only when either side has no optionUuid yet (rows stored before it was synced).
+    private fun findTargetOptionId(
+        qDetails: SectionQuestionWithDetails,
+        optionUuid: String?,
+        optionValue: String?
+    ): Int? {
+        if (optionUuid != null && qDetails.options.any { it.option.optionUuid != null }) {
+            return qDetails.options.firstOrNull { it.option.optionUuid == optionUuid }?.option?.optionId
+        }
+        return optionValue?.let { v -> qDetails.options.firstOrNull { it.option.optionValue == v }?.option?.optionId }
+    }
+
     private companion object {
         private const val DEFAULT_OFFICER_ID = 501L
 
-        // Forms whose server answers are mapped by questionUuid/optionValue (stable across form
+        // Forms whose server answers are mapped by questionUuid/optionUuid (stable across form
         // versions); every other form keeps the server questionId/optionId mapping.
-        private val UUID_MAPPED_FORMS = setOf(FormType.COMMUNITY_CONTACT_TRACING, FormType.OCCUPATION_CONTACT_TRACING)
+        private val UUID_MAPPED_FORMS = setOf(
+            FormType.COMMUNITY_CONTACT_TRACING,
+            FormType.OCCUPATION_CONTACT_TRACING,
+            FormType.CONTACT_FOLLOW_UP,
+            FormType.TPT_FOLLOW_UP
+        )
     }
 }

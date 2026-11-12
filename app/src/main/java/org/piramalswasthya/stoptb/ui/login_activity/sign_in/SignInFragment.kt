@@ -95,7 +95,7 @@ class SignInFragment : Fragment() {
             .setPositiveButton(resources.getString(R.string.yes)) { dialog, _ ->
                 viewModel.unprocessedRecordsCount.value?.let {
                     if (it > 0) {
-                        WorkerUtils.triggerAmritPushWorker(requireContext())
+                        WorkerUtils.triggerAmritPushWorker(requireContext(), "AUTO_LOGIN")
                     } else {
                         lifecycleScope.launch {
                             viewModel.logout()

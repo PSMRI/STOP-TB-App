@@ -33,7 +33,7 @@ import javax.inject.Inject
 @HiltViewModel
 class NewHouseholdViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    preferenceDao: PreferenceDao,
+    private val preferenceDao: PreferenceDao,
     @ApplicationContext context: Context,
     private val benRepo: BenRepo,
     private val householdRepo: HouseholdRepo
@@ -64,6 +64,9 @@ class NewHouseholdViewModel @Inject constructor(
 
     private lateinit var user: User
     private lateinit var household: HouseholdCache
+
+    // Village of a saved household when the form opened (null for a new household / draft)
+    private var savedHouseholdVillageId: Int? = null
     private val dataset = HouseholdFormDataset(context, preferenceDao.getCurrentLanguage())
     val formList = dataset.listFlow
 
@@ -109,6 +112,8 @@ class NewHouseholdViewModel @Inject constructor(
                         registrationType = isAshaFamily,
                         locationRecord = locationRecord
                     )
+                savedHouseholdVillageId =
+                    household.locationRecord.village.id.takeIf { household.householdId != 0L }
 
                 val villageNames = user.villages.map { it.name }.toTypedArray()
 
@@ -117,7 +122,10 @@ class NewHouseholdViewModel @Inject constructor(
                     householdRepo.getAllBenOfHousehold(household.householdId).size
                 } else 0
 
-                dataset.setupPage(household, villageNames, user.villages, registeredMemberCount)
+                // A new household takes the village's Pincode / Residential Area; a saved one keeps (and locks) its
+                // own and only uses the village's Pincode when it has none yet (saved before Pincode was on this form)
+                val villageDefaults = preferenceDao.getVillageDefaults(household.locationRecord.village.id)
+                dataset.setupPage(household, villageNames, user.villages, registeredMemberCount, villageDefaults)
                 _isCampSite.value = dataset.isRegisteredAtCampSite()
 
                 // Restore previously saved location state if editing an existing record
@@ -276,7 +284,26 @@ class NewHouseholdViewModel @Inject constructor(
                         household.benId = linkBenId
                     }
                     householdRepo.persistRecord(household)
-                    benRepo.updateBenToSync(household.householdId, SyncState.UNSYNCED)
+                    dataset.getCapturedVillageDefaults()?.let { capturedDefaults ->
+                        preferenceDao.saveVillageDefaultsIfMissing(household.locationRecord.village.id, capturedDefaults)
+                    }
+                    // Saved household: its members (HoF included) always carry the household's village, Pincode
+                    // and Residential Area, so one household never has different values. When the village changed
+                    // this also moves them, otherwise they keep pushing the old village and the next pull puts
+                    // the household back there. Marks them UNSYNCED in the same transaction.
+                    val selectedVillage = household.locationRecord.village
+                    if (savedHouseholdVillageId != null) {
+                        benRepo.applyHouseholdLocationToMembers(
+                            householdId = household.householdId,
+                            village = selectedVillage,
+                            pinCode = household.family?.pinCode,
+                            residentialAreaId = household.details?.residentialAreaId ?: 0,
+                            residentialArea = household.details?.residentialArea
+                        )
+                        savedHouseholdVillageId = selectedVillage.id
+                    } else {
+                        benRepo.updateBenToSync(household.householdId, SyncState.UNSYNCED)
+                    }
                     if (linkBenId != 0L) {
                         benRepo.linkBenToHousehold(linkBenId, household.householdId, 19, "Self")
                     }

@@ -21,6 +21,17 @@
         android:layout_marginTop="8dp" />
 
     <TextView
+        android:id="@+id/tv_helper_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="32dp"
+        android:layout_marginTop="2dp"
+        android:lineSpacingExtra="2dp"
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:visibility="gone" />
+
+    <TextView
         android:id="@+id/tv_error"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

@@ -15,7 +15,9 @@ object CampHubReachability {
 
     fun healthUrl(rawUrl: String): String = "${rawUrl.trim().trimEnd('/')}/common-api/health"
 
-    fun isReachable(rawUrl: String): Boolean {
+    fun isReachable(rawUrl: String): Boolean = check(rawUrl)
+
+    fun check(rawUrl: String, onResponse: (Int) -> Unit = {}, onFailure: (Throwable) -> Unit = {}): Boolean {
         val healthUrl = healthUrl(rawUrl)
         var connection: HttpURLConnection? = null
         return runCatching {
@@ -25,9 +27,11 @@ object CampHubReachability {
             connection?.requestMethod = "GET"
             connection?.useCaches = false
             val responseCode = connection?.responseCode ?: return@runCatching false
+            runCatching { onResponse(responseCode) }
             Timber.d("Camp hub health check: url=$healthUrl, code=$responseCode")
             responseCode in 200..299
         }.onFailure { error ->
+            runCatching { onFailure(error) }
             Timber.w("Camp hub health check failed: url=$healthUrl, error=${error.javaClass.simpleName}: ${error.message}")
         }.also {
             connection?.disconnect()

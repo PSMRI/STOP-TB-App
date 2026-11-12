@@ -28,5 +28,7 @@ data class QuestionOptionEntity(
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     // Contact Tracing field (unused by existing forms)
-    val isExclusive: Boolean = false
+    val isExclusive: Boolean = false,
+    // Server's stable option identity across form versions (optionValue may be renamed).
+    val optionUuid: String? = null
 )

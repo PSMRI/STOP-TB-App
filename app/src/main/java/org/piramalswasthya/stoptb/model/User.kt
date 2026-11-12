@@ -273,6 +273,16 @@ data class User(
 )
 
 
+/** One village's master Pincode / Residential Area in getUserDetail. Fields are Any? to accept number or string. */
+@JsonClass(generateAdapter = true)
+data class VillageDetailResponse(
+    val villageId: Any? = null,
+    val villageName: String? = null,
+    val pinCode: Any? = null,
+    val residentialAreaId: Any? = null,
+    val residentialArea: String? = null
+)
+
 @JsonClass(generateAdapter = true)
 data class UserNetworkResponse(
     val success: Boolean,
@@ -301,8 +311,34 @@ data class UserDetailsInResponse(
     val tuName: String? = null,
     val healthFacilityId: String? = null,
     val healthFacilityName: String? = null,
-    val updateDate: String? = null
+    val updateDate: String? = null,
+    // Pincode / Residential Area per village (master data). Optional: absent until the backend sends it.
+    val villageDetails: List<VillageDetailResponse>? = null
 ) {
+    /**
+     * Valid Pincode / Residential Area per village id from [villageDetails]. Invalid values are dropped,
+     * so the app asks for them on the village selection page instead.
+     */
+    fun villageMasterDefaults(): Map<Int, VillageDefaults> =
+        villageDetails.orEmpty().mapNotNull { villageDetail ->
+            val villageId = villageDetail.villageId.toPlainString()?.toIntOrNull() ?: return@mapNotNull null
+            val pinCode = villageDetail.pinCode.toPlainString()
+                ?.takeIf { pin -> VillageDefaults.isValidPinCode(pin) }
+            val residentialAreaId = villageDetail.residentialAreaId.toPlainString()?.toIntOrNull()
+                ?.takeIf { areaId -> areaId in VillageDefaults.RESIDENTIAL_AREA_IDS } ?: 0
+            VillageDefaults(pinCode = pinCode, residentialAreaId = residentialAreaId)
+                .takeIf { villageDefaults -> villageDefaults.hasPinCode || villageDefaults.hasResidentialArea }
+                ?.let { villageDefaults -> villageId to villageDefaults }
+        }.toMap()
+
+    // Accepts a JSON number or string (Moshi reads numbers in Any as Double), so a type mismatch from
+    // the server can't fail the whole login.
+    private fun Any?.toPlainString(): String? = when (this) {
+        is Number -> toDouble().takeIf { number -> number % 1.0 == 0.0 }?.toLong()?.toString()
+        is String -> trim().takeIf { text -> text.isNotEmpty() }
+        else -> null
+    }
+
     fun toUser(password: String, subCentre: String? = null): User {
         val healthFacilityList = getLocationEntityList(healthFacilityId, healthFacilityName)
         return User(

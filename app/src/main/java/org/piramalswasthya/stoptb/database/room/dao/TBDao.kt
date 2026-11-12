@@ -28,7 +28,7 @@ interface TBDao {
     suspend fun getTbScreening(benId: Long, visitDate: Long, visitDateGMT: Long): TBScreeningCache?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun saveTbScreening(tbScreeningCache: TBScreeningCache)
+    suspend fun saveTbScreening(tbScreeningCache: TBScreeningCache): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveTbScreening(tbScreeningCaches: List<TBScreeningCache>)
@@ -80,7 +80,9 @@ interface TBDao {
                 "xrayOrderId, xrayOrderStatus, trueNatOrderId, trueNatOrderStatus, " +
                 "rifOrderId, rifOrderStatus, errorMsgXray, errorMsgTrueNat, errorMsgRif, " +
                 "xrayManualResultPendingSync, trueNatManualResultPendingSync, " +
-                "rifManualResultPendingSync FROM TB_DIAGNOSTICS"
+                "rifManualResultPendingSync, " +
+                "(SELECT MAX(s.visitDate) FROM TB_SCREENING s WHERE s.benId = TB_DIAGNOSTICS.benId) " +
+                "AS latestScreeningAt FROM TB_DIAGNOSTICS"
     )
     fun getAllTbDiagnosticsCardFields(): Flow<List<TbDiagnosticsCardFields>>
 
@@ -196,7 +198,12 @@ interface TBDao {
     // autoGenerate primary key and only a non-unique index on benId, so @Upsert is
     // equivalent - id 0 inserts, an existing id updates - as a single statement.
     @Upsert
-    suspend fun saveTbDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache)
+    suspend fun upsertTbDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache): Long
+
+    suspend fun saveTbDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache): Long {
+        val insertedId = upsertTbDiagnostics(tbDiagnosticsCache)
+        return if (tbDiagnosticsCache.id > 0) tbDiagnosticsCache.id.toLong() else insertedId
+    }
 
     @Query("SELECT * FROM TB_SUSPECTED WHERE benId =:benId ORDER BY id DESC limit 1")
     suspend fun getTbSuspected(benId: Long): TBSuspectedCache?
@@ -227,10 +234,15 @@ interface TBDao {
     // autoGenerate primary key and only a non-unique index on benId, so @Upsert is
     // equivalent - id 0 inserts, an existing id updates - as a single statement.
     @Upsert
-    suspend fun saveTbSuspected(tbSuspectedCache: TBSuspectedCache)
+    suspend fun upsertTbSuspected(tbSuspectedCache: TBSuspectedCache): Long
+
+    suspend fun saveTbSuspected(tbSuspectedCache: TBSuspectedCache): Long {
+        val insertedId = upsertTbSuspected(tbSuspectedCache)
+        return if (tbSuspectedCache.id > 0) tbSuspectedCache.id.toLong() else insertedId
+    }
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun saveTbConfirmed(tbConfirmedCache: TBConfirmedTreatmentCache)
+    suspend fun saveTbConfirmed(tbConfirmedCache: TBConfirmedTreatmentCache): Long
 
 
 
