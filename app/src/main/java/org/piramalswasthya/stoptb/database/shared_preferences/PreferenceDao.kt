@@ -21,6 +21,7 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
     private val pref = PreferenceManager.getInstance(context)
 
     private companion object {
+        const val REAUTHENTICATION_REQUIRED = "reauthentication_required"
         const val CHANGES_FEED_TOKEN = "changes_feed_token"
         const val COUNSELLING_SCHEMA_STORE_FORMAT_KEY = "counselling_schema_store_format"
         const val CHANGES_FEED_SCOPE = "changes_feed_scope"
@@ -28,7 +29,6 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         const val CHANGES_FEED_ACTIVE = "changes_feed_active"
         const val VILLAGE_DEFAULTS_KEY = "village_defaults_by_village_id"
         const val VILLAGE_MASTER_DEFAULTS_KEY = "village_master_defaults_by_village_id"
-        const val REAUTHENTICATION_REQUIRED = "reauthentication_required"
     }
 
     fun deleteAmritToken() {
