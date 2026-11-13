@@ -79,6 +79,14 @@ class BenListAdapter(
     private val showRedesignedCard: Boolean = false,
 ) : ListAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenDiffUtilCallBack) {
 
+    companion object {
+        /** AllBenFragment `source` for the Vulnerable Population / TPT-Eligible Groups list (STOP-771). */
+        const val VULNERABLE_POPULATION_SOURCE = 11
+
+        /** Filter value for Tribal-NPVTG / Tribal-PVTG; matches the 'TRIBAL' literal in BenDao's source 11 clause. */
+        const val VULNERABILITY_TRIBAL_CODE = "TRIBAL"
+    }
+
     object BenDiffUtilCallBack : DiffUtil.ItemCallback<BenBasicDomain>() {
         override fun areItemsTheSame(
             oldItem: BenBasicDomain, newItem: BenBasicDomain
@@ -1175,6 +1183,26 @@ class BenListAdapter(
                     }
                 }
             }
+            // Vulnerable Population list (source 11, STOP-771): reuse the card's action button as
+            // "Contact Follow Up", enabled only once the TB Screening Form is submitted ("Screened").
+            if (source == VULNERABLE_POPULATION_SOURCE && !item.isDeath && !item.isDeactivate) {
+                binding.btnVitalScreen.visibility = View.VISIBLE
+                binding.btnVitalScreenSecondary.visibility = View.GONE
+                binding.btnVitalScreen.text = binding.root.context.getString(R.string.contact_tracing_follow_up)
+                binding.btnVitalScreen.isEnabled = hasTbScreening
+                binding.btnVitalScreen.setBackgroundTintList(
+                    ContextCompat.getColorStateList(
+                        binding.root.context,
+                        if (hasTbScreening) android.R.color.holo_green_dark else android.R.color.darker_gray
+                    )
+                )
+                binding.btnVitalScreen.setTextColor(
+                    ContextCompat.getColor(binding.root.context, android.R.color.white)
+                )
+                binding.btnVitalScreen.setOnClickListener {
+                    clickListener?.onClickContactFollowUp(item)
+                }
+            }
             if (binding.btnGeneralOpd.visibility == View.VISIBLE) {
                 binding.btnGeneralOpd.text = binding.root.context.getString(R.string.general_opd)
                 binding.btnGeneralOpd.setBackgroundTintList(
@@ -1624,8 +1652,11 @@ class BenListAdapter(
         private val clickedAnthropometry: (item: BenBasicDomain, benId: Long, hhId: Long, viewOnly: Boolean) -> Unit = { _, _, _, _ -> },
         private val clickedExamine: (item: BenBasicDomain, benId: Long) -> Unit = { _, _ -> },
         private val clickedNonHHHousehold: (item: BenBasicDomain) -> Unit = {},
-        private val clickedAddMember: (item: BenBasicDomain) -> Unit = {}
+        private val clickedAddMember: (item: BenBasicDomain) -> Unit = {},
+        private val clickedContactFollowUp: (item: BenBasicDomain) -> Unit = {}
     ) {
+        fun onClickContactFollowUp(item: BenBasicDomain) = clickedContactFollowUp(item)
+
         fun onClickedBen(item: BenBasicDomain) = clickedBen(
             item,
             item.hhId,

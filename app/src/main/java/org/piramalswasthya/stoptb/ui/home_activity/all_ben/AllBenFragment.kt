@@ -33,6 +33,8 @@ import org.piramalswasthya.stoptb.configuration.HouseholdSpouseRelations
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.adapters.BenListAdapter
+import org.piramalswasthya.stoptb.ui.contact_tracing.ContactTracingActivity
+import org.piramalswasthya.stoptb.utils.CommonConstants
 import org.piramalswasthya.stoptb.adapters.BenPagingAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -235,6 +237,10 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
         binding.ibDownload.setOnClickListener {
             viewModel.downloadCsv(requireContext())
+        }
+
+        if (args.source == BenListAdapter.VULNERABLE_POPULATION_SOURCE) {
+            setupVulnerabilityFilter()
         }
 
         var lastClickTime = 0L
@@ -462,6 +468,12 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 },
                 clickedAddMember = { item ->
                     if (!isReadOnlyReferralList) addMemberToBeneficiaryHousehold(item)
+                },
+                clickedContactFollowUp = { item ->
+                    if (args.source != BenListAdapter.VULNERABLE_POPULATION_SOURCE) return@BenClickListener
+                    ContactTracingActivity.startForType(
+                        requireContext(), item.benId, ContactTracingActivity.CONTACT_TYPE_FOLLOW_UP
+                    )
                 }
             ),
             showBeneficiaries = true,
@@ -480,7 +492,9 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             showRedesignedCard = true,
             source = args.source,
             showContactTracingForms = args.showContactTracingForms,
-            showAddMemberButton = !isReadOnlyReferralList,
+            // Add Member is a Registrar action; hidden on the Counsellor-only Vulnerable Population list (STOP-771).
+            showAddMemberButton = !isReadOnlyReferralList &&
+                    args.source != BenListAdapter.VULNERABLE_POPULATION_SOURCE,
             showVillageName = true
 
         )
@@ -1094,6 +1108,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 getString(R.string.icon_title_tpt_module)
             } else if (args.source == 10) {
                 getString(R.string.referral_clinical_assessment)
+            } else if (args.source == BenListAdapter.VULNERABLE_POPULATION_SOURCE) {
+                getString(R.string.icon_title_vulnerable_population)
             } else {
                 getString(R.string.icon_title_ben)
             }
@@ -1116,6 +1132,46 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 is HomeActivity -> it.updateActionBar(icon, title)
                 is VolunteerActivity -> it.updateActionBar(icon, title)
             }
+        }
+    }
+
+    /**
+     * Vulnerable Population list (source 11, STOP-771): reuses the existing filterText row as the
+     * "Vulnerability conditions" filter. Options: All (default), Tribal, then every TB Screening
+     * risk factor except Other / Not Applicable, labelled from the same translated array the
+     * TB Screening Form uses (R.array.key_population_risk_factor_options, index-aligned with
+     * CommonConstants.RISK_FACTOR_CODES).
+     */
+    private fun setupVulnerabilityFilter() {
+        val riskFactorLabels = resources.getStringArray(R.array.key_population_risk_factor_options)
+        val options: List<Pair<String, String>> = buildList {
+            add("" to getString(R.string.all))
+            add(BenListAdapter.VULNERABILITY_TRIBAL_CODE to getString(R.string.vulnerability_tribal))
+            CommonConstants.RISK_FACTOR_CODES.forEachIndexed { index, code ->
+                if (code == "OTHER" || code == "NOT_APPLICABLE") return@forEachIndexed
+                riskFactorLabels.getOrNull(index)?.let { add(code to it) }
+            }
+        }
+
+        fun renderSelected(code: String) {
+            val label = options.firstOrNull { it.first == code }?.second ?: getString(R.string.all)
+            binding.tvSelectedFilter.text = getString(R.string.vulnerability_conditions_selected, label)
+        }
+
+        binding.filterText.visibility = View.VISIBLE
+        renderSelected(viewModel.vulnerabilityCode.value)
+        binding.filterText.setOnClickListener {
+            val checked = options.indexOfFirst { it.first == viewModel.vulnerabilityCode.value }.coerceAtLeast(0)
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.vulnerability_conditions)
+                .setSingleChoiceItems(options.map { it.second }.toTypedArray(), checked) { dialog, which ->
+                    val code = options[which].first
+                    viewModel.filterVulnerability(code)
+                    renderSelected(code)
+                    dialog.dismiss()
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
         }
     }
 

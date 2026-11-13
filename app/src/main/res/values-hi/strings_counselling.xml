@@ -67,4 +67,11 @@
     <string name="icon_title_tpt_module">टीपीटी</string>
     <string name="home_card_tpt_module_subtitle">टीबी निवारक उपचार फॉलो-अप</string>
 
+    <!-- Vulnerable Population / TPT-Eligible Groups list (STOP-771) -->
+    <string name="icon_title_vulnerable_population">संवेदनशील आबादी</string>
+    <string name="home_card_vulnerable_population_subtitle">टीपीटी-पात्र समूह</string>
+    <string name="vulnerability_conditions">संवेदनशीलता की स्थितियाँ</string>
+    <string name="vulnerability_conditions_selected">संवेदनशीलता की स्थितियाँ: %1$s</string>
+    <string name="vulnerability_tribal">जनजातीय (NPVTG / PVTG)</string>
+
 </resources>

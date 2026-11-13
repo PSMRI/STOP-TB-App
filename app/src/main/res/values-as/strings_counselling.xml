@@ -55,4 +55,11 @@
     <string name="counselling_select_all">সকলো বাছনি কৰক</string>
     <string name="counselling_sections_completed">%2$d টাৰ ভিতৰত %1$d টা শাখা সম্পূৰ্ণ</string>
     <string name="counselling_data_load_error">আমি তথ্য লাভ কৰিবলৈ অসমৰ্থ।\nঅনুগ্ৰহ কৰি পাছত পুনৰ চেষ্টা কৰক।</string>
+
+    <!-- Vulnerable Population / TPT-Eligible Groups list (STOP-771) -->
+    <string name="icon_title_vulnerable_population">সংবেদনশীল জনসংখ্যা</string>
+    <string name="home_card_vulnerable_population_subtitle">টিপিটি-যোগ্য গোট</string>
+    <string name="vulnerability_conditions">সংবেদনশীলতাৰ অৱস্থা</string>
+    <string name="vulnerability_conditions_selected">সংবেদনশীলতাৰ অৱস্থা: %1$s</string>
+    <string name="vulnerability_tribal">জনজাতীয় (NPVTG / PVTG)</string>
 </resources>
