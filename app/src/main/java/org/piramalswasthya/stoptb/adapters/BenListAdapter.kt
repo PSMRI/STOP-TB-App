@@ -828,7 +828,10 @@ class BenListAdapter(
                 )
                 binding.tvTruenatStatus.text = if (truenatResult.isNullOrBlank()) "Unscreened" else "Screened"
                 binding.tvTruenatStatus.visibility = View.GONE
-                binding.tvTruenatResult.text = formatScreeningResult(truenatResult)
+                // STOP-800: the app's wording ("MTB Detected"), not the server's ("TB Positive").
+                binding.tvTruenatResult.text = formatScreeningResult(
+                    DiagnosticResultLabels.mtb(binding.root.context, truenatResult) ?: truenatResult
+                )
                 binding.tvTruenatResult.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
             } else {
                 binding.detailsDivider.visibility = View.GONE
@@ -1119,6 +1122,10 @@ class BenListAdapter(
                                             "Order Status: Closed — Declined\nReason: $declineReasonStr"
                                         notConductedReasonStr.isNotBlank() ->
                                             "Order Status: Closed — Not Conducted\nReason: $notConductedReasonStr"
+                                        // STOP-800: closed after a result (MTB Invalid/Error, or RIF
+                                        // closed / invalid on the same order): the MTB strip and the
+                                        // RIF block below say why; it did not expire.
+                                        !tbDiag?.naatResult.isNullOrBlank() -> "Order Status: Closed"
                                         else ->
                                             "Order Status: Closed — Expired (Result not entered)"
                                     }

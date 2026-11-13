@@ -204,7 +204,10 @@ class TBSuspectedQuickViewModel @Inject constructor(
         dataset.setUpPage(
             ben,
             tbScreening,
-            if (::tbDiagnostics.isInitialized) tbDiagnostics else null,
+            // A copy: saveForm() maps the form's values onto tbDiagnostics, and the dataset's
+            // view of what is saved (canEnterRif, locks) must not change with them — otherwise a
+            // RIF result being entered looks already saved and is never sent (STOP-800).
+            if (::tbDiagnostics.isInitialized) tbDiagnostics.copy() else null,
             vital = vital,
             referralMode = viewOnly,
             referralType = referralType,
@@ -654,32 +657,27 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 trueNatManualResultPendingSync = freshDiag.trueNatManualResultPendingSync,
                                 rifManualResultPendingSync = freshDiag.rifManualResultPendingSync
                             )
-                            // The order status and results of a test this save submitted are the
-                            // server's (or, offline, TBRepo's) answer, not the form's guess.
-                            val submitted = plan.map { it.orderType }.toSet()
-                            if ("XRAY_CHEST" in submitted) {
-                                tbDiagnostics = tbDiagnostics.copy(
-                                    xrayOrderStatus = freshDiag.xrayOrderStatus,
-                                    chestXRayResult = freshDiag.chestXRayResult,
-                                    isChestXRayDone = freshDiag.isChestXRayDone,
-                                    errorMsgXray = freshDiag.errorMsgXray
-                                )
-                            }
-                            if ("SPUTUM_TRUENAT" in submitted || "MDR_RIF" in submitted) {
-                                tbDiagnostics = tbDiagnostics.copy(
-                                    trueNatOrderStatus = freshDiag.trueNatOrderStatus,
-                                    naatResult = freshDiag.naatResult,
-                                    isNaatConducted = freshDiag.isNaatConducted,
-                                    isTBConfirmed = freshDiag.isTBConfirmed,
-                                    isConfirmed = freshDiag.isConfirmed,
-                                    rifOrderId = freshDiag.rifOrderId,
-                                    rifOrderStatus = freshDiag.rifOrderStatus,
-                                    trueNatRifResult = freshDiag.trueNatRifResult,
-                                    isDrTbConfirmed = freshDiag.isDrTbConfirmed,
-                                    errorMsgTrueNat = freshDiag.errorMsgTrueNat,
-                                    errorMsgRif = freshDiag.errorMsgRif
-                                )
-                            }
+                            // Order status and results always come from Room: the server's answer
+                            // (or, offline, TBRepo's) for a test this save submitted, and the stored
+                            // values for one it didn't. The form's mapped values never stand in for
+                            // a result, so a result that wasn't sent can't be saved as if it had been.
+                            tbDiagnostics = tbDiagnostics.copy(
+                                xrayOrderStatus = freshDiag.xrayOrderStatus,
+                                chestXRayResult = freshDiag.chestXRayResult,
+                                isChestXRayDone = freshDiag.isChestXRayDone,
+                                errorMsgXray = freshDiag.errorMsgXray,
+                                trueNatOrderStatus = freshDiag.trueNatOrderStatus,
+                                naatResult = freshDiag.naatResult,
+                                isNaatConducted = freshDiag.isNaatConducted,
+                                isTBConfirmed = freshDiag.isTBConfirmed,
+                                isConfirmed = freshDiag.isConfirmed,
+                                rifOrderId = freshDiag.rifOrderId,
+                                rifOrderStatus = freshDiag.rifOrderStatus,
+                                trueNatRifResult = freshDiag.trueNatRifResult,
+                                isDrTbConfirmed = freshDiag.isDrTbConfirmed,
+                                errorMsgTrueNat = freshDiag.errorMsgTrueNat,
+                                errorMsgRif = freshDiag.errorMsgRif
+                            )
                         }
                         tbDiagnostics.syncState = SyncState.UNSYNCED
                         tbRepo.saveTBDiagnostics(tbDiagnostics)
