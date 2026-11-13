@@ -112,7 +112,7 @@ class TBScreeningFormFragment : Fragment() {
                 binding.btnSubmit.isEnabled = !(recordExists || viewModel.viewOnly)
                 binding.btnSubmit.visibility = if (recordExists || viewModel.viewOnly) View.GONE else View.VISIBLE
                 binding.form.rvInputForm.adapter = adapter
-                lifecycleScope.launch {
+                viewLifecycleOwner.lifecycleScope.launch {
                     viewModel.formList.collect {
                         if (it.isNotEmpty()) {
                             val dateIndex = viewModel.getIndexOfDate()

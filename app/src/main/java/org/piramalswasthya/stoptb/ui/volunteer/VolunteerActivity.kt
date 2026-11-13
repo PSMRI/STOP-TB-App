@@ -76,6 +76,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == pref.getCampHubConnectedKey()) {
                 runOnUiThread {
+                    if (isFinishing || isDestroyed || _binding == null) return@runOnUiThread
                     refreshCampHubOfflineBanner()
                     if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
                         syncRetryStore.resetBackoff()
@@ -110,7 +111,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             if (pref.isCampModeEnabled() && pref.isCampHubConnected()) {
                 org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.observe(applicationContext, pref.getCampHubUrl(), false, "WIFI_UNAVAILABLE", "WIFI_CALLBACK")
                 pref.setCampHubConnected(false)
-                runOnUiThread { refreshCampHubOfflineBanner() }
+                runOnUiThread { refreshCampHubOfflineBannerIfActive() }
             }
         }
 
@@ -647,7 +648,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
                 if (isWifiAvailable() && pingCampHub()) {
                     pref.setCampHubConnected(true)
                     WorkerUtils.triggerDiagnosticResultPollWorker(applicationContext)
-                    if (isActive) runOnUiThread { refreshCampHubOfflineBanner() }
+                    runOnUiThread { refreshCampHubOfflineBannerIfActive() }
                     return@launch
                 }
                 delay(3_000L)
@@ -672,6 +673,11 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         )
         binding.tvCampHubOffline.isClickable = !isConnected
         binding.tvCampHubOffline.isFocusable = !isConnected
+    }
+
+    private fun refreshCampHubOfflineBannerIfActive() {
+        if (isFinishing || isDestroyed || _binding == null) return
+        refreshCampHubOfflineBanner()
     }
 
     private fun refreshCampHubDrawerItem() {
@@ -726,6 +732,16 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     }
 
     override fun onDestroy() {
+        campHubReconnectJob?.cancel()
+        campHubReconnectJob = null
+        campAutoPullJob?.cancel()
+        campAutoPullJob = null
+        pref.removeOnPreferenceChangeListener(campHubPrefListener)
+        if (isNetworkCallbackRegistered) {
+            runCatching { connectivityManager.unregisterNetworkCallback(wifiNetworkCallback) }
+            isNetworkCallbackRegistered = false
+        }
+        refreshMenuItem = null
         super.onDestroy()
         _binding = null
     }
