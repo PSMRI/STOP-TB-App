@@ -120,6 +120,10 @@ class AllBenViewModel @Inject constructor(
     private val kindOrg = MutableStateFlow(0)
     private val expandToBlock = MutableStateFlow(false)
 
+    /** Vulnerable Population list (source 11) filter: "" = All, "TRIBAL", or a risk-factor code. */
+    private val _vulnerabilityCode = MutableStateFlow("")
+    val vulnerabilityCode: StateFlow<String> = _vulnerabilityCode.asStateFlow()
+
     /** True once the current search text can offer/has used the "search other villages" fallback. */
     val canExpandSearchToBlock: Flow<Boolean> = combine(filterOrg, expandToBlock) { text, expanded ->
         text.isNotBlank() && !expanded
@@ -153,16 +157,16 @@ class AllBenViewModel @Inject constructor(
     }
 
     @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
-    val benList: Flow<PagingData<BenBasicDomain>> = combine(filterOrg, kindOrg, expandToBlock) { text, kind, expanded ->
-        Triple(text, kind, expanded)
-    }.debounce { (text, _, _) ->
-        if (text.isEmpty()) 0L else 300L
-    }.flatMapLatest { (text, kind, expanded) ->
+    val benList: Flow<PagingData<BenBasicDomain>> = combine(filterOrg, kindOrg, expandToBlock, _vulnerabilityCode) { text, kind, expanded, vulnerability ->
+        BenListQuery(text, kind, expanded, vulnerability)
+    }.debounce { query ->
+        if (query.text.isEmpty()) 0L else 300L
+    }.flatMapLatest { query ->
         _searchGeneration.update { it + 1 }
         Pager(
             config = PagingConfig(pageSize = 30, prefetchDistance = 10)
         ) {
-            recordsRepo.searchBenPagedSource(text, kind, sourceFromArgs, expanded)
+            recordsRepo.searchBenPagedSource(query.text, query.kind, sourceFromArgs, query.expanded, query.vulnerabilityCode)
         }.flow.map { pagingData ->
             pagingData.map { it.asBasicDomainModel() }
         }
@@ -235,6 +239,10 @@ class AllBenViewModel @Inject constructor(
 
     }
 
+    fun filterVulnerability(code: String) {
+        _vulnerabilityCode.value = code
+    }
+
     fun fetchAbha(benId: Long) {
         _abha.value = null
         _benRegId.value = null
@@ -260,7 +268,7 @@ class AllBenViewModel @Inject constructor(
 
     fun downloadCsv(context: Context) {
         viewModelScope.launch {
-            val users = recordsRepo.searchBenOnce(filterOrg.value, kindOrg.value, sourceFromArgs)
+            val users = recordsRepo.searchBenOnce(filterOrg.value, kindOrg.value, sourceFromArgs, vulnerabilityCode = _vulnerabilityCode.value)
             if (users.isNotEmpty()) {
                 createCsvFile(context, users)
             } else {
@@ -659,3 +667,10 @@ class AllBenViewModel @Inject constructor(
         }
     }
 }
+
+private data class BenListQuery(
+    val text: String,
+    val kind: Int,
+    val expanded: Boolean,
+    val vulnerabilityCode: String
+)

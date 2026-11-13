@@ -657,6 +657,9 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     }
 
     private fun refreshCampHubOfflineBanner() {
+        // Async callbacks (pref listener, WiFi onLost, reconnect job) can land after
+        // onDestroy has cleared the binding; skip the UI update in that case.
+        val binding = _binding ?: return
         val isConnected = pref.isCampHubConnected()
         binding.tvCampHubOffline.visibility = View.VISIBLE
         binding.tvCampHubOffline.text =

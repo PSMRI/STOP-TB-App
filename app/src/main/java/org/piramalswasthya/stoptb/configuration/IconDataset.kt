@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.configuration
 import android.content.res.Resources
 import dagger.hilt.android.scopes.ActivityRetainedScoped
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.adapters.BenListAdapter
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 //import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 //import org.piramalswasthya.stoptb.helpers.isNurseRole
@@ -41,6 +42,18 @@ class IconDataset @Inject constructor(
         recordsRepo.doorLockListCount,
         VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllHouseholdFragment(
             doorLockList = true
+        )
+    )
+
+    /** Vulnerable Population / TPT-Eligible Groups list (STOP-771) — AllBenFragment source 11. */
+    private fun vulnerablePopulationIcon(resources: Resources) = Icon(
+        icon = R.drawable.ic_tpt_module,
+        title = resources.getString(R.string.icon_title_vulnerable_population),
+        subtitle = resources.getString(R.string.home_card_vulnerable_population_subtitle),
+        count = null,
+        navAction = VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment(
+            source = BenListAdapter.VULNERABLE_POPULATION_SOURCE,
+            showContactTracingForms = true
         )
     )
 
@@ -190,6 +203,8 @@ class IconDataset @Inject constructor(
                     )
                 )
             )
+            // Counsellor-only, same as TPT / Contact Follow Up (STOP-771).
+            iconList.add(vulnerablePopulationIcon(resources))
         }
 
         return iconList.apply {
@@ -315,6 +330,8 @@ class IconDataset @Inject constructor(
                     )
                 )
             )
+            // Counsellor-only, same as TPT / Contact Follow Up (STOP-771).
+            iconList.add(vulnerablePopulationIcon(resources))
         }
 
         return iconList.apply {

@@ -65,14 +65,22 @@ class RecordsRepo @Inject constructor(
     val anthropometryFilledBenIds: Flow<List<Long>> get() =
         benDao.getAnthropometryFilledBenIds()
 
-    fun searchBen(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false): Flow<List<BenBasicDomain>> =
-        benDao.searchBen(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query)
+    // vulnerabilityCode only applies to source 11 (Vulnerable Population list): "" = All, "TRIBAL", or a risk-factor code.
+    fun searchBen(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false, vulnerabilityCode: String = ""): Flow<List<BenBasicDomain>> =
+        benDao.searchBen(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query, vulnerabilityCode)
             .map { list -> list.map { it.asBasicDomainModel() } }
 
     /** Sources whose filter touches no TB table: 0 All, 1 ABHA, 2 RCH, 3 age 30+, 4 eligible couple. */
     private val sourcesWithoutTbPredicates = setOf(0, 1, 2, 3, 4)
 
-    fun searchBenPagedSource(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false): PagingSource<Int, BenBasicCache> {
+    // vulnerabilityCode only applies to source 11 (Vulnerable Population list): "" = All, "TRIBAL", or a risk-factor code.
+    fun searchBenPagedSource(
+        query: String,
+        filterType: Int,
+        source: Int,
+        expandToBlock: Boolean = false,
+        vulnerabilityCode: String = ""
+    ): PagingSource<Int, BenBasicCache> {
         val villageIds = if (expandToBlock) allVillageIds else listOf(selectedVillage)
         // Sources 0-4 have no TB predicate, so they use the statement that never names a TB table
         // and therefore is not invalidated by the sync writing to one. See
@@ -80,12 +88,12 @@ class RecordsRepo @Inject constructor(
         return if (source in sourcesWithoutTbPredicates) {
             benDao.searchBenPagedWithoutTbTables(villageIds, source, filterType, query)
         } else {
-            benDao.searchBenPaged(villageIds, source, filterType, query)
+            benDao.searchBenPaged(villageIds, source, filterType, query, vulnerabilityCode)
         }
     }
 
-    suspend fun searchBenOnce(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false): List<BenBasicDomain> =
-        benDao.searchBenOnce(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query)
+    suspend fun searchBenOnce(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false, vulnerabilityCode: String = ""): List<BenBasicDomain> =
+        benDao.searchBenOnce(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query, vulnerabilityCode)
             .map { it.asBasicDomainModel() }
 
     val allBenListCount get() = benDao.getAllBenCount(selectedVillage)
