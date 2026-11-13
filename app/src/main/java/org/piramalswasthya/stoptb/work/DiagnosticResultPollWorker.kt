@@ -72,28 +72,17 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 // not a device is integrated or any order still looks pending (an order saved
                 // without an order id is not in pendingOrders). A pair is cleared only once its
                 // fetch succeeds; the worker keeps rescheduling while any remain.
-                var hasSkippedFeedOrders = false
+                // STOP-800: the feed no longer leaves orders behind to fetch one by one (it only
+                // skips a row for an older order than one this tablet just placed, and that newer
+                // order reaches the feed on its own). Entries an older build recorded are dropped.
+                val hasSkippedFeedOrders = false
                 if (feedActive) {
-                    val skipped = tbRepo.feedSkippedOrdersPastGrace()
-                    skipped.forEach { (benId, type) ->
-                        Timber.d("Polling $type result for benId=$benId skipped by the feed")
-                        if (tbRepo.fetchOrderResult(benId, type) is NetworkResponse.Success) {
-                            tbRepo.ackFeedSkippedOrder(benId, type)
-                        }
-                    }
-                    hasSkippedFeedOrders = preferenceDao.getFeedSkippedOrders().isNotEmpty()
+                    preferenceDao.removeFeedSkippedOrders(preferenceDao.getFeedSkippedOrders().toList())
                 }
 
                 if (!tbRepo.isXrayIntegrated() && !tbRepo.isTruenatIntegrated()) {
                     Timber.d("Skipping automated result polling: no diagnostic devices are integrated")
                 } else {
-                if (!feedActive && tbRepo.isXrayIntegrated()) {
-                    tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST")
-                }
-                if (!feedActive && tbRepo.isTruenatIntegrated()) {
-                    tbRepo.fetchBeneficiariesByStatus("SPUTUM_TRUENAT")
-                    tbRepo.fetchBeneficiariesByStatus("MDR_RIF")
-                }
                 val activeList = tbRepo.getDiagnosticsList()
                 val now = System.currentTimeMillis()
 

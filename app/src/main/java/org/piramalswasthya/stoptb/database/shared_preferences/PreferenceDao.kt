@@ -554,6 +554,19 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         pref.edit().putLong("last_checked_time_${benId}_${orderType}", time).apply()
     }
 
+    /**
+     * STOP-800: the result a user entered by hand for a test (XRAY_CHEST / SPUTUM_TRUENAT /
+     * MDR_RIF), in the server's wording. When the server later holds a different one (a vendor
+     * result replaced it), the card says "Updated by device". Null when nothing was entered.
+     */
+    fun getManualEnteredResult(benId: Long, orderType: String): String? =
+        pref.getString("manual_entered_result_${benId}_${orderType}", null)
+
+    fun setManualEnteredResult(benId: Long, orderType: String, result: String?) {
+        val key = "manual_entered_result_${benId}_${orderType}"
+        pref.edit().apply { if (result == null) remove(key) else putString(key, result) }.apply()
+    }
+
     fun getRifNotConductedReason(benId: Long): String? {
         return pref.getString("rif_not_conducted_reason_$benId", null)
     }

@@ -162,7 +162,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
             renderPage(ben, tbScreening, vital)
             _isLoading.value = false
 
-            refreshLatestOrderResult(ben, tbScreening, vital)
+            observeLatestOrderResult(ben, tbScreening, vital)
         }
     }
 
@@ -214,115 +214,43 @@ class TBSuspectedQuickViewModel @Inject constructor(
     }
 
     /**
-     * Pulls the latest result for this screen's order type, now that the form is already visible.
-     * Same calls and same conditions as before, just no longer between the user and the form.
+     * STOP-800: results reach the tablet only through the changes feed, so this screen does not
+     * call the server when it opens. It watches the beneficiary's diagnostics row instead: when
+     * the feed brings a newer result (a vendor result can also replace a manual one), an untouched
+     * form is rebuilt from it; a form the user has started filling is left as typed and flagged.
      */
-    private suspend fun refreshLatestOrderResult(
+    private suspend fun observeLatestOrderResult(
         ben: BenRegCache?,
         tbScreening: TBScreeningCache?,
         vital: VitalCache?
     ) {
+        if (!::tbDiagnostics.isInitialized) return
         val orderType = if (referralType == 6) "XRAY_CHEST" else "SPUTUM_TRUENAT"
-        val hasLocalResult = if (orderType == "XRAY_CHEST") {
-            !tbDiagnostics.chestXRayResult.isNullOrBlank()
-        } else {
-            !tbDiagnostics.naatResult.isNullOrBlank()
-        }
-        // Real order/result contract: PENDING is the only "in flight" value our own
-        // writes ever produce (IN_PROGRESS/AWAITING_PROVIDER_RESULT are never actually
-        // stored — see TBRepo.reducedOrderStatus). Also require a real order id — a
-        // status can be optimistically PENDING before the referral's own push has
-        // actually landed (see TBScreeningFormViewModel), and fetching a result for an
-        // order that doesn't exist yet would just fail server-side for no benefit.
-        val isOrderActive = if (orderType == "XRAY_CHEST") {
-            val status = tbDiagnostics.xrayOrderStatus
-            !tbDiagnostics.xrayOrderId.isNullOrBlank() &&
-                (status.equals("COMPLETED", ignoreCase = true) || status.equals("PENDING", ignoreCase = true))
-        } else {
-            val status = tbDiagnostics.trueNatOrderStatus
-            !tbDiagnostics.trueNatOrderId.isNullOrBlank() &&
-                (status.equals("COMPLETED", ignoreCase = true) || status.equals("PENDING", ignoreCase = true))
-        }
-        val needsOrderResult = !hasLocalResult && isOrderActive
-        // Evaluated against the same pre-fetch snapshot the old inline version used, so the
-        // RIF leg still fires on exactly the rows it did before.
-        val needsRifResult = orderType == "SPUTUM_TRUENAT" &&
-                MtbResult.fromResultText(tbDiagnostics.naatResult) == MtbResult.TB_POSITIVE &&
-                tbDiagnostics.trueNatRifResult.isNullOrBlank() &&
-                !tbDiagnostics.rifOrderId.isNullOrBlank() &&
-                (tbDiagnostics.rifOrderStatus.equals("COMPLETED", ignoreCase = true) ||
-                        tbDiagnostics.rifOrderStatus.equals("PENDING", ignoreCase = true))
-        if (!needsOrderResult && !needsRifResult) return
-
-        _resultCheck.value = ResultCheck.CHECKING
-        var refreshed: TBDiagnosticsCache? = null
-        var anyFetchFailed = false
-        // Bounded independently of OkHttp's 60 s read timeout, and the outcome is recorded on
-        // every path. Reading the row back used to sit outside any catch, so a failure there
-        // left the status stuck on "checking" for the life of the screen.
-        val checkCompleted = try {
-            withTimeoutOrNull(RESULT_CHECK_TIMEOUT_MS) {
-                withContext(Dispatchers.IO) {
-                    // fetchOrderResult reports a failed call by returning Error rather than
-                    // throwing, so ignoring the return value reported a check that never
-                    // happened as a successful one.
-                    if (needsOrderResult) {
-                        try {
-                            if (tbRepo.fetchOrderResult(benId, orderType) is NetworkResponse.Error) {
-                                anyFetchFailed = true
-                            }
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            Timber.e(e, "Pre-fetching results failed for $orderType")
-                            anyFetchFailed = true
-                        }
-                    }
-                    if (needsRifResult) {
-                        try {
-                            if (tbRepo.fetchOrderResult(benId, "MDR_RIF") is NetworkResponse.Error) {
-                                anyFetchFailed = true
-                            }
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            Timber.e(e, "Pre-fetching results failed for MDR_RIF")
-                            anyFetchFailed = true
-                        }
-                    }
-                    refreshed = tbRepo.getTBDiagnostics(benId)
-                }
-                true
-            } == true
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Timber.e(e, "Checking for a newer result failed for benId=%s", benId)
-            false
-        }
-        _resultCheck.value =
-            if (checkCompleted && !anyFetchFailed) ResultCheck.IDLE else ResultCheck.FAILED
-
-        // Rebuilding the page replaces every field, so a result arriving after the user has
-        // started filling the form is left for the next open rather than wiping their input.
-        val latest = refreshed
-        if (latest != null && latest != tbDiagnostics) {
-            // mapValues() mutates tbDiagnostics in place - the submission timestamp among other
-            // fields - and saveForm() persists that same instance later. Replacing the property
-            // mid-save would store an unmapped snapshot. Submit stays enabled during the check,
-            // so this window is reachable whenever someone submits without editing a field.
-            if (_state.value == State.SAVING) {
-                _resultCheck.value = ResultCheck.NEWER_AVAILABLE
-            } else if (!userHasEditedForm) {
+        tbRepo.observeTBDiagnostics(benId).collect { latest ->
+            if (latest == null || !orderStateDiffers(latest, tbDiagnostics)) return@collect
+            // This screen's own save writes the row too; that is not a newer result.
+            val state = _state.value
+            if (state == State.SAVING || state == State.SAVE_SUCCESS) return@collect
+            if (!userHasEditedForm) {
                 tbDiagnostics = latest
                 renderPage(ben, tbScreening, vital)
-            } else if (!resultFor(latest, orderType).isNullOrBlank()) {
-                // Their input stays exactly as typed, but a result landing mid-edit is no longer
-                // dropped in silence - submitting over it is what the backend rejects.
+                _showSubmit.value = dataset.shouldShowSubmit()
+            } else if (resultFor(latest, orderType) != resultFor(tbDiagnostics, orderType) ||
+                resultFor(latest, "MDR_RIF") != resultFor(tbDiagnostics, "MDR_RIF")
+            ) {
                 _resultCheck.value = ResultCheck.NEWER_AVAILABLE
             }
         }
     }
+
+    /** Whether the order/result fields differ (form-only fields are ignored). */
+    private fun orderStateDiffers(a: TBDiagnosticsCache, b: TBDiagnosticsCache): Boolean =
+        a.xrayOrderId != b.xrayOrderId || a.xrayOrderStatus != b.xrayOrderStatus || a.chestXRayResult != b.chestXRayResult ||
+            a.trueNatOrderId != b.trueNatOrderId || a.trueNatOrderStatus != b.trueNatOrderStatus || a.naatResult != b.naatResult ||
+            a.rifOrderStatus != b.rifOrderStatus || a.trueNatRifResult != b.trueNatRifResult ||
+            a.trueNatManualResultPendingSync != b.trueNatManualResultPendingSync ||
+            a.rifManualResultPendingSync != b.rifManualResultPendingSync ||
+            a.xrayManualResultPendingSync != b.xrayManualResultPendingSync
 
     fun getChestXRayResult(): String? {
         return if (::tbDiagnostics.isInitialized) tbDiagnostics.chestXRayResult else null
@@ -370,6 +298,79 @@ class TBSuspectedQuickViewModel @Inject constructor(
         tbRepo.saveTBDiagnostics(cache)
     }
 
+    /** One manual result or "Not Conducted" this save sends to order/manualResult. */
+    data class ManualSubmission(
+        /** XRAY_CHEST, SPUTUM_TRUENAT (MTB) or MDR_RIF (the RIF test of the MTB order). */
+        val orderType: String,
+        /** The server's wording ("TB Positive", "DR TB" ...); null for Not Conducted. */
+        val wireResult: String?,
+        /** The Not Conducted reason ("Other: text" for a free-text one); null for a result. */
+        val reason: String?
+    )
+
+    /**
+     * What a save of the form, as currently filled in, would send — one test at most per save.
+     * The single source of truth for both the confirmation dialog ([previewSubmissions]) and
+     * [saveForm], so the dialog can never show something other than what is sent.
+     * [mapped] is the row after the form's values were mapped onto it; [stored] the row in Room.
+     */
+    private fun planSubmissions(mapped: TBDiagnosticsCache, stored: TBDiagnosticsCache?): List<ManualSubmission> {
+        fun reason(r: String?, other: String?) =
+            if (r.equals("Other", ignoreCase = true) && !other.isNullOrBlank()) "Other: $other" else r
+        return when (referralType) {
+            6 -> {
+                val entered = ChestXrayResult.fromResultText(mapped.chestXRayResult)
+                when {
+                    mapped.isReferredForDigitalChestXray != true -> emptyList()
+                    mapped.isChestXRayDone != true -> listOf(
+                        ManualSubmission("XRAY_CHEST", null, reason(mapped.reasonNotConductedChestXray, mapped.reasonNotConductedChestXrayOther))
+                    )
+                    entered != null && !stored?.xrayOrderStatus.equals("COMPLETED", ignoreCase = true) &&
+                            stored?.chestXRayResult.isNullOrBlank() ->
+                        listOf(ManualSubmission("XRAY_CHEST", entered.displayValue, null))
+                    else -> emptyList()
+                }
+            }
+            7 -> {
+                val entered = MtbResult.fromResultText(mapped.naatResult)
+                val mtb = when {
+                    mapped.isReferredForSputum != true -> null
+                    mapped.isSputumCollected != true ->
+                        ManualSubmission("SPUTUM_TRUENAT", null, reason(mapped.reasonForDenialSputum, mapped.reasonForDenialSputumOther))
+                    mapped.isNaatConducted != true ->
+                        ManualSubmission("SPUTUM_TRUENAT", null, reason(mapped.reasonNotConductedNaat, mapped.reasonNotConductedNaatOther))
+                    entered != null && stored?.naatResult.isNullOrBlank() ->
+                        ManualSubmission("SPUTUM_TRUENAT", entered.displayValue, null)
+                    else -> null
+                }
+                if (mtb != null) return listOf(mtb)
+                // STOP-800: RIF goes on its own save, once MTB Detected is on the server.
+                if (!dataset.canEnterRif()) return emptyList()
+                val enteredRif = RifResult.fromResultText(mapped.trueNatRifResult)
+                when {
+                    dataset.rifConducted.value == dataset.noValue -> listOf(
+                        ManualSubmission("MDR_RIF", null, reason(mapped.reasonNotConductedRif, mapped.reasonNotConductedRifOther))
+                    )
+                    enteredRif != null -> listOf(ManualSubmission("MDR_RIF", enteredRif.displayValue, null))
+                    else -> emptyList()
+                }
+            }
+            else -> emptyList()
+        }
+    }
+
+    /**
+     * The submissions a save would make right now, for the confirmation dialog. Maps the form onto
+     * a copy, so nothing is changed until the user confirms. Empty when the save sends no manual
+     * result (the dialog is then skipped).
+     */
+    suspend fun previewSubmissions(): List<ManualSubmission> = withContext(Dispatchers.IO) {
+        if (viewOnly || !::tbDiagnostics.isInitialized) return@withContext emptyList()
+        val copy = tbDiagnostics.copy()
+        dataset.mapValues(copy, 1)
+        planSubmissions(copy, tbRepo.getTBDiagnosticsById(benId))
+    }
+
     fun saveForm() {
         // Both set on the caller's (main) thread, before the coroutine starts. SAVING used to be
         // posted from inside the IO block below, which left a window where a second tap still
@@ -380,6 +381,10 @@ class TBSuspectedQuickViewModel @Inject constructor(
             withContext(Dispatchers.IO) {
                 try {
                     dataset.mapValues(tbDiagnostics, 1)
+                    val storedAtStart = tbRepo.getTBDiagnosticsById(benId)
+                    val plan = planSubmissions(tbDiagnostics, storedAtStart)
+                    fun planned(orderType: String, isResult: Boolean) =
+                        plan.firstOrNull { it.orderType == orderType && (it.wireResult != null) == isResult }
 
                     val isXrayDevIntegrated = tbRepo.isXrayIntegrated()
                     val isTruenatDevIntegrated = tbRepo.isTruenatIntegrated()
@@ -456,7 +461,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                     failedOrderType = "XRAY_CHEST"
                                 }
                             }
-                            enteredXrayResult != null && !tbDiagnostics.xrayOrderStatus.equals("COMPLETED", ignoreCase = true) -> {
+                            planned("XRAY_CHEST", isResult = true) != null && enteredXrayResult != null -> {
                                 // Enter Result manually — a standing action whenever the order is
                                 // Pending/Awaiting Manual Entry, not just a device-integration
                                 // fallback. Excludes an already-COMPLETED order so re-saving this
@@ -465,9 +470,8 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 val res = tbRepo.submitManualResult(benId, "XRAY_CHEST", resultSummary = enteredXrayResult.displayValue)
                                 if (res is NetworkResponse.Success) {
                                     if (res.data == TBRepo.PENDING_SYNC) anyPendingManualResultSync = true
-                                    tbDiagnostics.xrayOrderStatus = "COMPLETED"
-                                    tbDiagnostics.isChestXRayDone = true
-                                    tbRepo.getTBDiagnosticsById(benId)?.xrayOrderId?.let { tbDiagnostics.xrayOrderId = it }
+                                    // Status and result are the server's answer, already in Room
+                                    // (TBRepo.submitManualResult); taken over below.
 
                                     // Only once the backend has accepted it: an entry that is merely
                                     // stored locally may still be refused, and the orders it raises are
@@ -575,7 +579,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                     failedOrderType = "SPUTUM_TRUENAT"
                                 }
                             }
-                            enteredMtbResult != null && !tbDiagnostics.trueNatOrderStatus.equals("COMPLETED", ignoreCase = true) -> {
+                            planned("SPUTUM_TRUENAT", isResult = true) != null && enteredMtbResult != null -> {
                                 // Enter Result manually — a standing action whenever the order is
                                 // Pending/Awaiting Manual Entry, not just a device-integration
                                 // fallback. Excludes an already-COMPLETED order — otherwise a save
@@ -586,18 +590,8 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 val res = tbRepo.submitManualResult(benId, "SPUTUM_TRUENAT", resultSummary = enteredMtbResult.displayValue)
                                 if (res is NetworkResponse.Success) {
                                     if (res.data == TBRepo.PENDING_SYNC) anyPendingManualResultSync = true
-                                    tbDiagnostics.trueNatOrderStatus = "COMPLETED"
-                                    tbDiagnostics.isNaatConducted = true
-                                    tbDiagnostics.naatResult = when (enteredMtbResult) {
-                                        MtbResult.TB_POSITIVE -> "MTB detected"
-                                        MtbResult.TB_NEGATIVE -> "MTB not detected"
-                                        // Invalid/Error re-orders immediately below — don't persist
-                                        // this result text, or it can outlive the reorder locally.
-                                        else -> null
-                                    }
-                                    tbDiagnostics.isTBConfirmed = enteredMtbResult == MtbResult.TB_POSITIVE
-                                    tbDiagnostics.isConfirmed = enteredMtbResult == MtbResult.TB_POSITIVE
-                                    tbRepo.getTBDiagnosticsById(benId)?.trueNatOrderId?.let { tbDiagnostics.trueNatOrderId = it }
+                                    // STOP-800: the server decides the status (MTB Detected keeps the
+                                    // order open for RIF); it is already in Room and taken over below.
 
                                     // Only once the backend has accepted it: an entry that is merely
                                     // stored locally may still be refused, and the orders it raises are
@@ -623,77 +617,20 @@ class TBSuspectedQuickViewModel @Inject constructor(
                             }
                         }
 
-                        // ── RIF — only reachable once MTB is Completed + Positive; the RIF order
-                        // itself is always auto-created by the MTB-Positive cascade above (no
-                        // "not referred" state of its own), so this is a 2-way
-                        // Enter-Result/Not-Conducted restructure, same standing-actions principle.
-                        // rifOrderExisted must be true, or this is the save that's still queuing
-                        // the RIF order — submitting a result now would race it.
-                        val isMtbAlreadyCompleted = tbDiagnostics.trueNatOrderStatus.equals("COMPLETED", ignoreCase = true)
-                        val rifOrderExisted = !tbRepo.getTBDiagnosticsById(benId)?.rifOrderStatus.isNullOrBlank()
-                        if (apiSuccess && isMtbAlreadyCompleted && rifOrderExisted && dataset.isMtbDetected()) {
-                            val rifConductedVal = dataset.rifConducted.value
-                            val enteredRifResult = org.piramalswasthya.stoptb.model.RifResult
-                                .fromResultText(tbDiagnostics.trueNatRifResult)
-                            when {
-                                rifConductedVal == dataset.noValue -> {
-                                    val rifNotConductedReason = {
-                                        val r = tbDiagnostics.reasonNotConductedRif
-                                        val o = tbDiagnostics.reasonNotConductedRifOther
-                                        if (r.equals("Other", ignoreCase = true) && !o.isNullOrBlank()) "Other: $o" else r
-                                    }()
-                                    val rifRes = tbRepo.submitManualResult(
-                                        benId, "MDR_RIF", resultSummary = null, reasonForRefusal = rifNotConductedReason
-                                    )
-                                    if (rifRes is NetworkResponse.Success) {
-                                        if (rifRes.data == TBRepo.PENDING_SYNC) anyPendingManualResultSync = true
-                                        tbDiagnostics.rifOrderStatus = "CLOSED"
-                                        tbDiagnostics.trueNatRifResult = null
-                                    } else {
-                                        apiSuccess = false
-                                        apiError = (rifRes as? NetworkResponse.Error)?.message ?: "RIF Not Conducted Submission Failed"
-                                        failedOrderType = "MDR_RIF"
-                                    }
-                                }
-                                enteredRifResult != null && !tbDiagnostics.rifOrderStatus.equals("COMPLETED", ignoreCase = true) -> {
-                                    // Excludes an already-COMPLETED RIF order — same reasoning as
-                                    // the X-ray/MTB guards above.
-                                    val rifRes = tbRepo.submitManualResult(benId, "MDR_RIF", resultSummary = enteredRifResult.displayValue)
-                                    if (rifRes is NetworkResponse.Success) {
-                                        if (rifRes.data == TBRepo.PENDING_SYNC) anyPendingManualResultSync = true
-                                        tbDiagnostics.rifOrderStatus = "COMPLETED"
-                                        tbDiagnostics.trueNatRifResult = when (enteredRifResult) {
-                                            RifResult.DR_TB -> "Rif Resistance Detected"
-                                            RifResult.NON_DR_TB -> "Rif Resistance Not Detected"
-                                            // Invalid/Error re-orders immediately below — don't
-                                            // persist this result text, or it can outlive the
-                                            // reorder locally. Indeterminate is terminal, keep it.
-                                            RifResult.INVALID_ERROR -> null
-                                            else -> enteredRifResult.displayValue
-                                        }
-                                        tbDiagnostics.isDrTbConfirmed = enteredRifResult == RifResult.DR_TB
-                                        if (enteredRifResult == RifResult.DR_TB ||
-                                            enteredRifResult == RifResult.NON_DR_TB
-                                        ) {
-                                            tbDiagnostics.isConfirmed = true
-                                            tbDiagnostics.isTBConfirmed = true
-                                        }
-                                        tbRepo.getTBDiagnosticsById(benId)?.rifOrderId?.let { tbDiagnostics.rifOrderId = it }
-
-                                        // Indeterminate is terminal; Invalid/Error re-orders, mirroring MTB.
-                                        // Gated on backend acceptance for the same reason as above.
-                                        if (rifRes.data != TBRepo.PENDING_SYNC) {
-                                            ordersToPushAfterSave += tbRepo.cascadeOrdersForConfirmedResult(
-                                                benId, "MDR_RIF", enteredRifResult.displayValue
-                                            )
-                                        }
-                                    } else {
-                                        apiSuccess = false
-                                        apiError = (rifRes as? NetworkResponse.Error)?.message ?: "Submit RIF Manual Result Failed"
-                                        failedOrderType = "MDR_RIF"
-                                    }
-                                }
-                                else -> Unit // RIF section not answered on this save
+                        // ── RIF — STOP-800: a test on the same MTB order, entered on its own save
+                        // once MTB Detected is on the server (planSubmissions / canEnterRif).
+                        val rifPlan = plan.firstOrNull { it.orderType == "MDR_RIF" }
+                        if (apiSuccess && rifPlan != null) {
+                            val rifRes = tbRepo.submitManualResult(
+                                benId, "MDR_RIF", resultSummary = rifPlan.wireResult,
+                                reasonForRefusal = if (rifPlan.wireResult == null) rifPlan.reason else null
+                            )
+                            if (rifRes is NetworkResponse.Success) {
+                                if (rifRes.data == TBRepo.PENDING_SYNC) anyPendingManualResultSync = true
+                            } else {
+                                apiSuccess = false
+                                apiError = (rifRes as? NetworkResponse.Error)?.message ?: "Submit RIF Manual Result Failed"
+                                failedOrderType = "MDR_RIF"
                             }
                         }
                     }
@@ -717,6 +654,32 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 trueNatManualResultPendingSync = freshDiag.trueNatManualResultPendingSync,
                                 rifManualResultPendingSync = freshDiag.rifManualResultPendingSync
                             )
+                            // The order status and results of a test this save submitted are the
+                            // server's (or, offline, TBRepo's) answer, not the form's guess.
+                            val submitted = plan.map { it.orderType }.toSet()
+                            if ("XRAY_CHEST" in submitted) {
+                                tbDiagnostics = tbDiagnostics.copy(
+                                    xrayOrderStatus = freshDiag.xrayOrderStatus,
+                                    chestXRayResult = freshDiag.chestXRayResult,
+                                    isChestXRayDone = freshDiag.isChestXRayDone,
+                                    errorMsgXray = freshDiag.errorMsgXray
+                                )
+                            }
+                            if ("SPUTUM_TRUENAT" in submitted || "MDR_RIF" in submitted) {
+                                tbDiagnostics = tbDiagnostics.copy(
+                                    trueNatOrderStatus = freshDiag.trueNatOrderStatus,
+                                    naatResult = freshDiag.naatResult,
+                                    isNaatConducted = freshDiag.isNaatConducted,
+                                    isTBConfirmed = freshDiag.isTBConfirmed,
+                                    isConfirmed = freshDiag.isConfirmed,
+                                    rifOrderId = freshDiag.rifOrderId,
+                                    rifOrderStatus = freshDiag.rifOrderStatus,
+                                    trueNatRifResult = freshDiag.trueNatRifResult,
+                                    isDrTbConfirmed = freshDiag.isDrTbConfirmed,
+                                    errorMsgTrueNat = freshDiag.errorMsgTrueNat,
+                                    errorMsgRif = freshDiag.errorMsgRif
+                                )
+                            }
                         }
                         tbDiagnostics.syncState = SyncState.UNSYNCED
                         tbRepo.saveTBDiagnostics(tbDiagnostics)

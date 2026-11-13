@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
+import org.piramalswasthya.stoptb.helpers.DiagnosticResultLabels
 import org.piramalswasthya.stoptb.helpers.applyManagedFlowBackPolicyOnResume
 import org.piramalswasthya.stoptb.helpers.blockBackNavigationInManagedFlow
 import org.piramalswasthya.stoptb.helpers.setAutoFlowBackNavigationBlocked
@@ -245,14 +246,60 @@ class TBSuspectedQuickFragment : Fragment() {
         }
     }
 
+    /** Guards against a second dialog (or a second save) from a quick double tap. */
+    private var confirmingSubmit = false
+
     private fun submitForm() {
         val result = binding.form.rvInputForm.adapter?.let {
             (it as FormInputAdapter).validateInput(resources, binding.form.rvInputForm)
         } ?: -1
         Timber.d("Validation : $result")
-        if (result == -1) {
-            viewModel.saveForm()
+        if (result != -1 || confirmingSubmit) return
+        confirmingSubmit = true
+        viewLifecycleOwner.lifecycleScope.launch {
+            val submissions = viewModel.previewSubmissions()
+            if (submissions.isEmpty()) {
+                // Nothing irreversible is sent (e.g. only a referral was declined): save directly.
+                confirmingSubmit = false
+                viewModel.saveForm()
+            } else {
+                showConfirmSubmitDialog(submissions)
+            }
         }
+    }
+
+    /**
+     * STOP-800: a manual result cannot be edited once saved, so the user confirms the beneficiary
+     * and exactly what is being sent. One save carries one test, so the dialog names one test.
+     */
+    private fun showConfirmSubmitDialog(submissions: List<TBSuspectedQuickViewModel.ManualSubmission>) {
+        val context = requireContext()
+        val first = submissions.first()
+        val testName = DiagnosticResultLabels.testName(context, first.orderType)
+        val title = if (first.wireResult == null) getString(R.string.confirm_not_conducted_title, testName)
+        else getString(R.string.confirm_result_title, testName)
+        val name = viewModel.benName.value.orEmpty()
+        val lines = submissions.joinToString("\n") { submission ->
+            val value = if (submission.wireResult == null) {
+                getString(R.string.confirm_not_conducted_value, submission.reason.orEmpty())
+            } else {
+                DiagnosticResultLabels.forOrderType(context, submission.orderType, submission.wireResult).orEmpty()
+            }
+            getString(R.string.confirm_result_line, DiagnosticResultLabels.testName(context, submission.orderType), value)
+        }
+        val message = getString(
+            R.string.confirm_result_ben_line, name, viewModel.benId.toString(), viewModel.benAgeGender.value.orEmpty()
+        ) + "\n\n" + lines + "\n\n" + getString(R.string.confirm_result_question, name)
+        MaterialAlertDialogBuilder(context)
+            .setTitle(title)
+            .setMessage(message)
+            .setCancelable(false)
+            .setNegativeButton(R.string.confirm_result_no) { _, _ -> confirmingSubmit = false }
+            .setPositiveButton(R.string.confirm_result_yes) { _, _ ->
+                confirmingSubmit = false
+                viewModel.saveForm()
+            }
+            .show()
     }
 
     override fun onStart() {

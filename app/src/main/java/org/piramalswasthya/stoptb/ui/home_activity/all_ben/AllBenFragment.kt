@@ -361,6 +361,10 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                         OrderAction.REORDER -> {
                             viewModel.createNewOrder(item.benId, orderType ?: return@BenClickListener, requireContext())
                         }
+                        // STOP-800: "Enter RIF Result" opens the same TrueNat form. MTB is
+                        // already saved there (locked), so only the RIF section is open
+                        // (TBSuspectedQuickDataset.canEnterRif) and the save sends mdrRifResult.
+                        // "RIF Not Conducted" goes through NOT_CONDUCTED above the same way.
                         OrderAction.COMPLETE_RIF -> {
                             findNavController().navigate(
                                 AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
@@ -916,7 +920,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         super.onResume()
         updateToolbarTitle()
         viewModel.invalidateCheckedNoPushBenIds()
-        viewModel.fetchBeneficiaryStatuses()
+        // STOP-800: order statuses and results arrive through the changes feed; this screen no
+        // longer runs the getBeneficiariesByStatus sweep on resume.
         
         val sh = findNavController().currentBackStackEntry?.savedStateHandle
         if (sh?.remove<Boolean>("examine_flow_done") == true) {

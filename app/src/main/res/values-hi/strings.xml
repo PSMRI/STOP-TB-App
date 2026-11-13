@@ -1104,7 +1104,7 @@
     <string name="order_status_not_conducted">नहीं किया गया</string>
     <string name="order_status_view_mtb_result">एमटीबी परिणाम देखें</string>
     <string name="order_status_view_rif_result">आरआईएफ परिणाम देखें</string>
-    <string name="order_status_rif_block_label">आरआईएफ परीक्षण · एमटीबी पॉजिटिव द्वारा ट्रिगर</string>
+    <string name="order_status_rif_block_label">आरआईएफ परीक्षण</string>
     <string name="order_status_create_new_order">नया ऑर्डर बनाएं</string>
     <string name="order_status_clinical_assessment_referred">क्लिनिकल आकलन एवं निदान हेतु संदर्भित</string>
     <string name="order_status_retry_referral">रेफरल का पुनः प्रयास करें</string>
@@ -1331,6 +1331,37 @@
     <string name="sputum_sample_submitted_at_screening_camp">टीबी स्क्रीनिंग शिविर में बलगम का नमूना जमा किया गया\</string>
 
 
+    <!-- STOP-800 -->
+    <string name="error_rif_part_of_mtb_order">RIF, MTB ऑर्डर का ही हिस्सा है; RIF का अलग ऑर्डर नहीं बनता</string>
+    <string name="result_display_mtb_detected">MTB पाया गया (MTB Detected)</string>
+    <string name="result_display_mtb_not_detected">MTB नहीं पाया गया (MTB Not Detected)</string>
+    <string name="result_display_rif_detected">रिफ प्रतिरोध पाया गया (Rif Resistance Detected)</string>
+    <string name="result_display_rif_not_detected">रिफ प्रतिरोध नहीं पाया गया (Rif Resistance Not Detected)</string>
+    <string name="result_display_indeterminate">अनिर्णायक (Indeterminate)</string>
+    <string name="result_display_invalid_error">अमान्य/त्रुटि (Invalid/Error)</string>
+    <string name="confirm_test_xray">छाती का एक्स-रे</string>
+    <string name="confirm_test_mtb">TrueNat MTB</string>
+    <string name="confirm_test_rif">TrueNat RIF</string>
+    <string name="confirm_result_title">%1$s परिणाम की पुष्टि करें</string>
+    <string name="confirm_not_conducted_title">%1$s नहीं किया गया — पुष्टि करें</string>
+    <string name="confirm_result_line">%1$s: %2$s</string>
+    <string name="confirm_not_conducted_value">नहीं किया गया — %1$s</string>
+    <string name="confirm_result_ben_line">%1$s · लाभार्थी आईडी %2$s · %3$s</string>
+    <string name="confirm_result_question">क्या आप %1$s के लिए यह परिणाम सबमिट करना चाहते हैं? सेव करने के बाद इसे बदला नहीं जा सकता।</string>
+    <string name="confirm_result_yes">हाँ, सबमिट करें</string>
+    <string name="confirm_result_no">नहीं</string>
+    <string name="order_status_mtb_result">MTB: %1$s</string>
+    <string name="order_status_rif_result">RIF: %1$s</string>
+    <string name="order_status_waiting_rif">डिवाइस से RIF परिणाम की प्रतीक्षा</string>
+    <string name="order_status_enter_rif_result">RIF परिणाम दर्ज करें</string>
+    <string name="order_status_rif_not_conducted_button">RIF नहीं किया गया</string>
+    <string name="order_status_rif_not_conducted">RIF नहीं किया गया — %1$s</string>
+    <string name="order_status_rif_closed">RIF बंद (परिणाम दर्ज नहीं हुआ)</string>
+    <string name="order_status_feed_auto_update">कैंप हब से अपने आप अपडेट होता है</string>
+    <string name="order_status_invalid_retest">अमान्य — मशीन पर दोबारा जाँच चल रही है</string>
+    <string name="order_status_rif_failed">मशीन पर RIF जाँच विफल हुई</string>
+    <string name="order_status_updated_by_device_suffix">%1$s · डिवाइस द्वारा अपडेट किया गया</string>
+    <string name="order_status_xray_updated_by_device">डिवाइस द्वारा परिणाम अपडेट किया गया: %1$s</string>
 </resources>
 
 

@@ -135,8 +135,7 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                     )
 
                     if (result1.all { it }) {
-                        // Order statuses and results come from the feed when it was applied.
-                        if (!feedApplied) syncDiagnosticOrderStatuses()
+                        // STOP-800: order statuses and results come only from the changes feed.
                         return@withContext Result.success()
                     }
                     // Some TB datasets failed (network or server): try again with
@@ -336,23 +335,6 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                 Timber.e(e, "Error pre-fetching contact follow-up / TPT responses in PullTBFromAmritWorker")
             }
             true
-        }
-    }
-    private suspend fun syncDiagnosticOrderStatuses() {
-        withContext(Dispatchers.IO) {
-            try {
-                // 1. Fetch statuses for all orders first (populates all local cache entries)
-                tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST", fetchResult = false)
-                tbRepo.fetchBeneficiariesByStatus("SPUTUM_TRUENAT", fetchResult = false)
-                tbRepo.fetchBeneficiariesByStatus("MDR_RIF", fetchResult = false)
-
-                // 2. Fetch results for completed orders (safely references populated caches to avoid duplicate pushes)
-                tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST", fetchResult = true)
-                tbRepo.fetchBeneficiariesByStatus("SPUTUM_TRUENAT", fetchResult = true)
-                tbRepo.fetchBeneficiariesByStatus("MDR_RIF", fetchResult = true)
-            } catch (e: Exception) {
-                Timber.e(e, "syncDiagnosticOrderStatuses failed")
-            }
         }
     }
 

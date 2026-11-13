@@ -193,6 +193,10 @@ interface TBDao {
     @Query("SELECT * FROM TB_DIAGNOSTICS WHERE benId = :benId ORDER BY id DESC LIMIT 1")
     suspend fun getTbDiagnosticsByBenId(benId: Long): TBDiagnosticsCache?
 
+    /** The same row as [getTbDiagnosticsByBenId], re-emitted whenever TB_DIAGNOSTICS changes. */
+    @Query("SELECT * FROM TB_DIAGNOSTICS WHERE benId = :benId ORDER BY id DESC LIMIT 1")
+    fun observeTbDiagnosticsByBenId(benId: Long): Flow<TBDiagnosticsCache?>
+
     // @Upsert, not @Insert(REPLACE): REPLACE is DELETE + INSERT in SQLite, so every
     // save rewrote the whole row twice and churned its rowid. Both entities have an
     // autoGenerate primary key and only a non-unique index on benId, so @Upsert is
