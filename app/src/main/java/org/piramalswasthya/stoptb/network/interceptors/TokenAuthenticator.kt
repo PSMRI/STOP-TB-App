@@ -27,10 +27,14 @@ class TokenAuthenticator @Inject constructor(
 
     override fun authenticate(route: Route?, response: Response): Request? {
 
-        val attempt = responseCount(response)
-        if (attempt >= 3) return null
         if (response.request.header("No-Auth") == "true") return null
         if (tokenExpiryManager.loginRequired.value) return null
+        val attempt = responseCount(response)
+        if (attempt >= 3) {
+            // The refreshed and fresh-login JWTs were both rejected.
+            tokenExpiryManager.onRefreshFailed()
+            return null
+        }
 
         val oldJwt = response.request.header("Jwttoken")
         val newJwt = synchronized(refreshLock) {

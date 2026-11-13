@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.repositories
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -56,8 +57,11 @@ class UserRepo @Inject constructor(
     suspend fun authenticateUser(userName: String, password: String): NetworkResponse<User?> {
         return withContext(Dispatchers.IO) {
             try {
+                // Keep unsynced rows tied to the same server identity during re-login.
+                val expectedUserId = if (preferenceDao.isReauthenticationRequired())
+                    preferenceDao.getLoggedInUser()?.userId else null
                 val user = withRetry {
-                    val authData = getTokenAmrit(userName, password)
+                    val authData = getTokenAmrit(userName, password, expectedUserId)
                     setUserRole(
                         authData.userId,
                         password,
@@ -132,6 +136,8 @@ class UserRepo @Inject constructor(
                 return@withContext NetworkResponse.Error(
                     message = userMessageContext().getString(R.string.error_login_unable_to_reach_server)
                 )
+            } catch (ce: CancellationException) {
+                throw ce
             } catch (ie: Exception) {
                 return@withContext NetworkResponse.Error(message = localizedAuthExceptionMessage(ie))
             }
@@ -223,6 +229,8 @@ class UserRepo @Inject constructor(
                         response.errorBody()?.close()
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: IOException) {
                 throw e
             } catch (e: Exception) {
@@ -234,6 +242,8 @@ class UserRepo @Inject constructor(
             try {
                 getTokenAmrit(userName, password, expectedUserId = user.userId)
                 true
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: IOException) {
                 throw e
             } catch (e: HttpException) {
