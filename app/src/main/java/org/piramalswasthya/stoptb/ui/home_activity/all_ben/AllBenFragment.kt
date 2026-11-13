@@ -471,9 +471,14 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 },
                 clickedContactFollowUp = { item ->
                     if (args.source != BenListAdapter.VULNERABLE_POPULATION_SOURCE) return@BenClickListener
-                    ContactTracingActivity.startForType(
-                        requireContext(), item.benId, ContactTracingActivity.CONTACT_TYPE_FOLLOW_UP
-                    )
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        // In Camp Mode the push can replace a temp benId after this card captured it;
+                        // open the form with the current ID so camp results and responses resolve.
+                        val currentBenId = benRepo.resolveCurrentBenId(item.benId)
+                        ContactTracingActivity.startForType(
+                            requireContext(), currentBenId, ContactTracingActivity.CONTACT_TYPE_FOLLOW_UP
+                        )
+                    }
                 }
             ),
             showBeneficiaries = true,
