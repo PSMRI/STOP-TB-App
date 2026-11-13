@@ -79,6 +79,7 @@ class NewBenRegFragment : Fragment() {
     // ─── Speech to text ──────────────────────────────────────────────────
     private var micClickedElementId: Int = -1
     private val sttContract = registerForActivityResult(SpeechToTextContract()) { value ->
+        if (_binding == null || !isAdded) return@registerForActivityResult
         val formatted = value.uppercase()
         viewModel.updateValueByIdAndReturnListIndex(micClickedElementId, formatted)
             .takeIf { it >= 0 }
@@ -250,7 +251,7 @@ class NewBenRegFragment : Fragment() {
         binding.form.rvInputForm.adapter = adapter
         binding.form.rvInputForm.itemAnimator = null
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.formList.collect {
                 if (it.isNotEmpty()) adapter.submitList(it)
             }
@@ -901,7 +902,7 @@ class NewBenRegFragment : Fragment() {
 
     // ─── Preview bottom sheet ────────────────────────────────────────────
     private fun showPreview() {
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             val previewItems = try {
                 viewModel.getFormPreviewData()
             } catch (e: Exception) {
@@ -967,7 +968,7 @@ class NewBenRegFragment : Fragment() {
 
     // ─── Camera ──────────────────────────────────────────────────────────
     private fun takeImage() {
-        lifecycleScope.launchWhenStarted {
+        viewLifecycleOwner.lifecycleScope.launchWhenStarted {
             latestTmpUri = getTmpFileUri()
             takePicture.launch(latestTmpUri)
         }
@@ -988,6 +989,7 @@ class NewBenRegFragment : Fragment() {
 
         detector.process(image)
             .addOnSuccessListener { faces ->
+                if (_binding == null || !isAdded) return@addOnSuccessListener
                 if (faces.isNotEmpty()) {
                     val context = requireContext()
                     viewLifecycleOwner.lifecycleScope.launch {
@@ -1006,6 +1008,7 @@ class NewBenRegFragment : Fragment() {
                 }
             }
             .addOnFailureListener {
+                if (_binding == null || !isAdded) return@addOnFailureListener
                 Timber.e(it, "Beneficiary face detection failed")
                 Toast.makeText(requireContext(), getString(R.string.unable_to_validate_photo), Toast.LENGTH_SHORT).show()
                 continuePreviewAfterPhoto = false
@@ -1058,19 +1061,22 @@ class NewBenRegFragment : Fragment() {
 
     override fun onDestroyView() {
         gpsWatchdogJob?.cancel()
+        fetchTimeoutJob?.cancel()
+        activeCancellationTokenSource?.cancel()
+        activeCancellationTokenSource = null
         stopListeningForLocation()
-        super.onDestroyView()
         activity?.let { act ->
             when (act) {
                 is HomeActivity -> act.restoreToolbarNavigation()
                 is VolunteerActivity -> act.restoreToolbarNavigation()
             }
         }
+        _binding = null
+        super.onDestroyView()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        _binding = null
     }
 
     private fun triggerLinkHouseholdFlow(benId: Long) {
@@ -1095,7 +1101,7 @@ class NewBenRegFragment : Fragment() {
     }
 
     private fun showExistingHouseholdSelectionDialog(benId: Long) {
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             val hhList = viewModel.hhList.firstOrNull()
             if (hhList.isNullOrEmpty()) {
                 Toast.makeText(requireContext(), "No existing households found in this village", Toast.LENGTH_SHORT).show()
@@ -1206,7 +1212,7 @@ class NewBenRegFragment : Fragment() {
     }
 
     private fun showRelationshipSelectionDialog(benId: Long, hhId: Long) {
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             val ben = viewModel.getBenFromId(benId) ?: return@launch
             val isFemale = ben.genderId == 2 || ben.gender?.name?.equals("FEMALE", ignoreCase = true) == true
 
