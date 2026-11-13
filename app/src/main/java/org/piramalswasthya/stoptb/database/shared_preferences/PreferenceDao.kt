@@ -21,6 +21,7 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
     private val pref = PreferenceManager.getInstance(context)
 
     private companion object {
+        const val REAUTHENTICATION_REQUIRED = "reauthentication_required"
         const val CHANGES_FEED_TOKEN = "changes_feed_token"
         const val COUNSELLING_SCHEMA_STORE_FORMAT_KEY = "counselling_schema_store_format"
         const val CHANGES_FEED_SCOPE = "changes_feed_scope"
@@ -134,6 +135,24 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
             logs.reset(signedIn = false)
             pref.edit().clear().apply()
         }
+    }
+
+    fun isReauthenticationRequired(): Boolean =
+        pref.getBoolean(REAUTHENTICATION_REQUIRED, false)
+
+    fun setReauthenticationRequired(required: Boolean) {
+        pref.edit().putBoolean(REAUTHENTICATION_REQUIRED, required).commit()
+    }
+
+    /** End the expired session without deleting the current user's unsynced records or cursors. */
+    fun clearAuthenticationForReauthentication() {
+        pref.edit()
+            .remove(context.getString(R.string.PREF_primary_API_KEY))
+            .remove(context.getString(R.string.PREF_primary_JWT_API_KEY))
+            .remove(context.getString(R.string.PREF_primary_REFRESH_TOKEN))
+            .remove(context.getString(R.string.PREF_rem_me_pwd))
+            .putBoolean(REAUTHENTICATION_REQUIRED, true)
+            .commit()
     }
 
     fun deleteLoginCred() {

@@ -58,5 +58,6 @@
     <string name="account_deactivated_title">Account Deactivated</string>
     <string name="session_expired_title">Session Expired</string>
     <string name="session_expired_message">Your session has expired. Please log in again.</string>
+    <string name="session_expired_sync_message">Session expired. Tap here to log in again. Unsynced records remain on this tablet.</string>
 
 </resources>

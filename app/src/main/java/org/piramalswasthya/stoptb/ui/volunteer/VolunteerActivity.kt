@@ -25,6 +25,8 @@ import androidx.core.text.HtmlCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.MenuProvider
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.NavigationUI
@@ -46,6 +48,7 @@ import org.piramalswasthya.stoptb.helpers.Languages
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.helpers.TapjackingProtectionHelper
+import org.piramalswasthya.stoptb.helpers.TokenExpiryManager
 import org.piramalswasthya.stoptb.model.AppRole
 import timber.log.Timber
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
@@ -133,6 +136,11 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
 
     @Inject
     lateinit var roleManager: RoleManager
+
+    @Inject
+    lateinit var tokenExpiryManager: TokenExpiryManager
+
+    private var sessionExpiredDialog: androidx.appcompat.app.AlertDialog? = null
 
     private var _binding: ActivityVolunteerBinding? = null
     private val binding: ActivityVolunteerBinding
@@ -228,6 +236,13 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     override fun onCreate(savedInstanceState: Bundle?) {
         TapjackingProtectionHelper.applyWindowSecurity(this)
         super.onCreate(savedInstanceState)
+        if (pref.isReauthenticationRequired()) {
+            startActivity(Intent(this, LoginActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            })
+            finish()
+            return
+        }
         WorkerUtils.scheduleSyncHeartbeat(applicationContext)
         // Opening the app (including right after login) retries waiting records now.
         syncRetryStore.resetBackoff()
@@ -258,6 +273,8 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             }
         }
 
+        observeTokenExpiry()
+
         // Redirect to ServiceLocationActivity if location not set (multi-village users), or if the
         // selected village's Pincode / Residential Area haven't been captured yet (incl. auto-set single-village users)
         val selectedVillageId = pref.getLocationRecord()?.village?.id
@@ -274,6 +291,30 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             WorkerUtils.triggerAmritPullWorker(this)
         }
         WorkerUtils.triggerCampQuickPullIfConnected(this, pref)
+    }
+
+    private fun observeTokenExpiry() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                tokenExpiryManager.loginRequired.collect { required ->
+                    if (!required || sessionExpiredDialog?.isShowing == true) return@collect
+                    sessionExpiredDialog = MaterialAlertDialogBuilder(this@VolunteerActivity)
+                        .setTitle(R.string.session_expired_title)
+                        .setMessage(R.string.session_expired_message)
+                        .setCancelable(false)
+                        .setPositiveButton(R.string.ok) { dialog, _ ->
+                            dialog.dismiss()
+                            tokenExpiryManager.logoutExpiredSession()
+                            startActivity(Intent(this@VolunteerActivity, LoginActivity::class.java).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                            })
+                            finish()
+                        }
+                        .create()
+                    sessionExpiredDialog?.show()
+                }
+            }
+        }
     }
 
     /**

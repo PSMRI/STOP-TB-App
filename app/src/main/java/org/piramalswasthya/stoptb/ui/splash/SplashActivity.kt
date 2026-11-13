@@ -55,7 +55,8 @@ class SplashActivity : AppCompatActivity() {
 //            loggedInUser != null && RoleConstants.isAllowedStopTbRole(loggedInUser.role)
 //        ) {
         val destination = if (
-            loggedInUser != null && entryPoint.roleManager.hasAnyValidRole()
+            loggedInUser != null && !pref.isReauthenticationRequired() &&
+                entryPoint.roleManager.hasAnyValidRole()
         ) {
             VolunteerActivity::class.java
         } else {

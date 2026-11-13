@@ -425,7 +425,8 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
     private fun observeTokenExpiry() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                tokenExpiryManager.forceLogoutEvent.collect {
+                tokenExpiryManager.loginRequired.collect { required ->
+                    if (!required) return@collect
                     if (sessionExpiredDialog?.isShowing == true) return@collect
                     sessionExpiredDialog = MaterialAlertDialogBuilder(this@HomeActivity)
                         .setTitle(getString(R.string.session_expired_title))
@@ -433,11 +434,10 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
                         .setCancelable(false)
                         .setPositiveButton(getString(R.string.ok)) { dialog, _ ->
                             dialog.dismiss()
-                            pref.deleteForLogout()
-                            // Process-wide backfill cursors must not carry into the next user's village.
-                            org.piramalswasthya.stoptb.repositories.TBRepo.resetOrderIdBackfillState()
-                            WorkerUtils.cancelAllWork(this@HomeActivity)
-                            startActivity(Intent(this@HomeActivity, LoginActivity::class.java))
+                            tokenExpiryManager.logoutExpiredSession()
+                            startActivity(Intent(this@HomeActivity, LoginActivity::class.java).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                            })
                             finish()
                         }
                         .create()

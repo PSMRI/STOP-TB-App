@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.repositories
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -14,6 +15,7 @@ import org.piramalswasthya.stoptb.database.room.dao.SyncDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
+import org.piramalswasthya.stoptb.helpers.TokenExpiryManager
 import org.piramalswasthya.stoptb.model.SyncStatusCache
 import org.piramalswasthya.stoptb.model.LocationEntity
 import org.piramalswasthya.stoptb.model.LocationRecord
@@ -38,6 +40,7 @@ class UserRepo @Inject constructor(
     private val preferenceDao: PreferenceDao,
     private val syncDao: SyncDao,
     private val amritApiService: AmritApiService,
+    private val tokenExpiryManager: TokenExpiryManager,
     @ApplicationContext private val appContext: Context,
 ) {
 
@@ -54,8 +57,11 @@ class UserRepo @Inject constructor(
     suspend fun authenticateUser(userName: String, password: String): NetworkResponse<User?> {
         return withContext(Dispatchers.IO) {
             try {
+                // Keep unsynced rows tied to the same server identity during re-login.
+                val expectedUserId = if (preferenceDao.isReauthenticationRequired())
+                    preferenceDao.getLoggedInUser()?.userId else null
                 val user = withRetry {
-                    val authData = getTokenAmrit(userName, password)
+                    val authData = getTokenAmrit(userName, password, expectedUserId)
                     setUserRole(
                         authData.userId,
                         password,
@@ -130,6 +136,8 @@ class UserRepo @Inject constructor(
                 return@withContext NetworkResponse.Error(
                     message = userMessageContext().getString(R.string.error_login_unable_to_reach_server)
                 )
+            } catch (ce: CancellationException) {
+                throw ce
             } catch (ie: Exception) {
                 return@withContext NetworkResponse.Error(message = localizedAuthExceptionMessage(ie))
             }
@@ -195,46 +203,57 @@ class UserRepo @Inject constructor(
 
     suspend fun refreshTokenTmc(userName: String, password: String): Boolean {
         return withContext(Dispatchers.IO) {
+            if (tokenExpiryManager.loginRequired.value) return@withContext false
             try {
                 val refreshToken = preferenceDao.getRefreshToken()
-                    ?: return@withContext false
-                val response =     amritApiService.getRefreshToken(
-                    json = TmcRefreshTokenRequest(refreshToken)
-                )
-
-                val responseBody = JSONObject(
-                    response.body()?.string()
-                        ?: throw IllegalStateException("Response success but data missing @ $response")
-                )
-                val responseStatusCode = responseBody.getInt("statusCode")
-                if (responseStatusCode == 200) {
-                    val data = responseBody.getJSONObject("data")
-                    TokenInsertTmcInterceptor.setJwt(data.getString("jwtToken"))
-                    preferenceDao.registerJWTAmritToken(data.getString("jwtToken"))
-                    preferenceDao.registerRefreshToken(data.getString("refreshToken"))
-
-                    val token = data.getString("key")
-                    TokenInsertTmcInterceptor.setToken(token)
-                    preferenceDao.registerAmritToken(token)
-                    return@withContext true
-                } else {
-                    val errorMessage = responseBody.getString("errorMessage")
-                    Timber.e("Error Message $errorMessage")
-                    return@withContext false
+                if (refreshToken != null) {
+                    val response = amritApiService.getRefreshToken(TmcRefreshTokenRequest(refreshToken))
+                    if (response.isSuccessful) {
+                        val responseBody = JSONObject(response.body()?.string().orEmpty())
+                        // Common-API returns root tokens; older servers wrap them in data.
+                        val data = responseBody.optJSONObject("data") ?: responseBody
+                        val jwt = data.optString("jwtToken")
+                        val refresh = data.optString("refreshToken")
+                        if (jwt.isNotBlank() && refresh.isNotBlank()) {
+                            TokenInsertTmcInterceptor.setJwt(jwt)
+                            preferenceDao.registerJWTAmritToken(jwt)
+                            preferenceDao.registerRefreshToken(refresh)
+                            data.optString("key").takeIf { it.isNotBlank() }?.let { token ->
+                                TokenInsertTmcInterceptor.setToken(token)
+                                preferenceDao.registerAmritToken(token)
+                            }
+                            tokenExpiryManager.onRefreshSuccess()
+                            return@withContext true
+                        }
+                    } else {
+                        response.errorBody()?.close()
+                    }
                 }
-
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: IOException) {
-                // Network failure (including timeouts): let the caller's worker retry
-                // with backoff. Retrying here recursed without limit.
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Token refresh failed")
+            }
+            val user = preferenceDao.getLoggedInUser()
+            if (user == null || user.userName != userName || user.password != password)
+                return@withContext false
+            try {
+                getTokenAmrit(userName, password, expectedUserId = user.userId)
+                true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: IOException) {
                 throw e
             } catch (e: HttpException) {
-                Timber.e("Auth Failed!")
-                return@withContext false
+                if (e.code() == 401 || e.code() == 403)
+                    tokenExpiryManager.onRefreshFailed()
+                false
             } catch (e: Exception) {
-                // Reporting success here made callers retry their request in a loop
-                // even though no new token was obtained.
-                Timber.e(e, "Token refresh failed")
-                return@withContext false
+                Timber.e(e, "Fresh login after token refresh failed")
+                tokenExpiryManager.onRefreshFailed()
+                false
             }
         }
     }
@@ -273,7 +292,9 @@ class UserRepo @Inject constructor(
         return screenNames.toList()
     }
 
-    private suspend fun getTokenAmrit(userName: String, password: String): AuthUserData {
+    private suspend fun getTokenAmrit(
+        userName: String, password: String, expectedUserId: Int? = null
+    ): AuthUserData {
         return withContext(Dispatchers.IO) {
             val encryptedPassword = encrypt(password)
             val response =
@@ -300,6 +321,8 @@ class UserRepo @Inject constructor(
             val data = responseBody.getJSONObject("data")
             val token = data.getString("key")
             val userId = data.getInt("userID")
+            if (expectedUserId != null && userId != expectedUserId)
+                throw IllegalStateException("Authenticated user differs from local user")
             val subCentre = data.optJSONObject("facilityData")
                 ?.optJSONArray("facilities")
                 ?.takeIf { it.length() > 0 }
@@ -313,6 +336,7 @@ class UserRepo @Inject constructor(
             TokenInsertTmcInterceptor.setJwt(data.getString("jwtToken"))
             preferenceDao.registerJWTAmritToken(data.getString("jwtToken"))
             preferenceDao.registerRefreshToken(refreshToken)
+            tokenExpiryManager.onRefreshSuccess()
             TokenInsertTmcInterceptor.setToken(token)
             preferenceDao.registerAmritToken(token)
             preferenceDao.lastAmritTokenFetchTimestamp = System.currentTimeMillis()
