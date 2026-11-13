@@ -434,10 +434,10 @@ class HomeActivity : AppCompatActivity(), MessageUpdate, AutoFlowBackNavigationH
                         .setCancelable(false)
                         .setPositiveButton(getString(R.string.ok)) { dialog, _ ->
                             dialog.dismiss()
-                            // Keep the logged-in user, local rows and sync cursors. The login
-                            // screen can re-authenticate this same user without deleting work.
-                            WorkerUtils.cancelAllWork(this@HomeActivity)
-                            startActivity(Intent(this@HomeActivity, LoginActivity::class.java))
+                            tokenExpiryManager.logoutExpiredSession()
+                            startActivity(Intent(this@HomeActivity, LoginActivity::class.java).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                            })
                             finish()
                         }
                         .create()

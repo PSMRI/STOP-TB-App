@@ -236,6 +236,13 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     override fun onCreate(savedInstanceState: Bundle?) {
         TapjackingProtectionHelper.applyWindowSecurity(this)
         super.onCreate(savedInstanceState)
+        if (pref.isReauthenticationRequired()) {
+            startActivity(Intent(this, LoginActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            })
+            finish()
+            return
+        }
         WorkerUtils.scheduleSyncHeartbeat(applicationContext)
         // Opening the app (including right after login) retries waiting records now.
         syncRetryStore.resetBackoff()
@@ -297,9 +304,10 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
                         .setCancelable(false)
                         .setPositiveButton(R.string.ok) { dialog, _ ->
                             dialog.dismiss()
-                            // Re-authenticate the same user without clearing local unsynced rows.
-                            WorkerUtils.cancelAllWork(this@VolunteerActivity)
-                            startActivity(Intent(this@VolunteerActivity, LoginActivity::class.java))
+                            tokenExpiryManager.logoutExpiredSession()
+                            startActivity(Intent(this@VolunteerActivity, LoginActivity::class.java).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                            })
                             finish()
                         }
                         .create()

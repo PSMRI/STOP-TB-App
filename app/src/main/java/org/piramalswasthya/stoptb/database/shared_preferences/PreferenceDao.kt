@@ -28,6 +28,7 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         const val CHANGES_FEED_ACTIVE = "changes_feed_active"
         const val VILLAGE_DEFAULTS_KEY = "village_defaults_by_village_id"
         const val VILLAGE_MASTER_DEFAULTS_KEY = "village_master_defaults_by_village_id"
+        const val REAUTHENTICATION_REQUIRED = "reauthentication_required"
     }
 
     fun deleteAmritToken() {
@@ -132,6 +133,24 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
             logs.reset(signedIn = false)
             pref.edit().clear().apply()
         }
+    }
+
+    fun isReauthenticationRequired(): Boolean =
+        pref.getBoolean(REAUTHENTICATION_REQUIRED, false)
+
+    fun setReauthenticationRequired(required: Boolean) {
+        pref.edit().putBoolean(REAUTHENTICATION_REQUIRED, required).commit()
+    }
+
+    /** End the expired session without deleting the current user's unsynced records or cursors. */
+    fun clearAuthenticationForReauthentication() {
+        pref.edit()
+            .remove(context.getString(R.string.PREF_primary_API_KEY))
+            .remove(context.getString(R.string.PREF_primary_JWT_API_KEY))
+            .remove(context.getString(R.string.PREF_primary_REFRESH_TOKEN))
+            .remove(context.getString(R.string.PREF_rem_me_pwd))
+            .putBoolean(REAUTHENTICATION_REQUIRED, true)
+            .commit()
     }
 
     fun deleteLoginCred() {

@@ -25,7 +25,6 @@ import org.piramalswasthya.stoptb.databinding.BottomSheetSyncBinding
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.helpers.TokenExpiryManager
 import org.piramalswasthya.stoptb.ui.login_activity.LoginActivity
-import org.piramalswasthya.stoptb.work.WorkerUtils
 import org.piramalswasthya.stoptb.model.SyncRowFilter
 import org.piramalswasthya.stoptb.model.asDomainModel
 import timber.log.Timber
@@ -66,8 +65,10 @@ class SyncBottomSheetFragment : BottomSheetDialogFragment() {
         binding.rvSync.adapter = adapter
         binding.rvSync.addItemDecoration(divider)
         binding.tvSessionExpired.setOnClickListener {
-            WorkerUtils.cancelAllWork(requireContext())
-            startActivity(Intent(requireContext(), LoginActivity::class.java))
+            tokenExpiryManager.logoutExpiredSession()
+            startActivity(Intent(requireContext(), LoginActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            })
             requireActivity().finish()
         }
         viewLifecycleOwner.lifecycleScope.launch {

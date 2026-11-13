@@ -4,6 +4,8 @@ import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.network.interceptors.TokenInsertTmcInterceptor
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicInteger
@@ -12,7 +14,8 @@ import javax.inject.Singleton
 
 @Singleton
 class TokenExpiryManager @Inject constructor(
-    @ApplicationContext private val appContext: Context
+    @ApplicationContext private val appContext: Context,
+    private val pref: PreferenceDao
 ) {
 
     companion object {
@@ -23,7 +26,7 @@ class TokenExpiryManager @Inject constructor(
 
     // State is retained while the screen is stopped; a one-shot event can be missed by
     // background sync and leave the user looking at pending rows with no explanation.
-    private val _loginRequired = MutableStateFlow(false)
+    private val _loginRequired = MutableStateFlow(pref.isReauthenticationRequired())
     val loginRequired: StateFlow<Boolean> = _loginRequired
 
     fun onRefreshFailed() {
@@ -32,6 +35,9 @@ class TokenExpiryManager @Inject constructor(
         if (count >= MAX_CONSECUTIVE_FAILURES) {
             Timber.w("Authentication failed. Sync paused until login.")
             consecutiveFailures.set(0)
+            pref.clearAuthenticationForReauthentication()
+            TokenInsertTmcInterceptor.setJwt("")
+            TokenInsertTmcInterceptor.setToken("")
             _loginRequired.value = true
             WorkerUtils.cancelAllWork(appContext)
         }
@@ -39,6 +45,15 @@ class TokenExpiryManager @Inject constructor(
 
     fun onRefreshSuccess() {
         consecutiveFailures.set(0)
+        pref.setReauthenticationRequired(false)
         _loginRequired.value = false
+    }
+
+    fun logoutExpiredSession() {
+        pref.clearAuthenticationForReauthentication()
+        TokenInsertTmcInterceptor.setJwt("")
+        TokenInsertTmcInterceptor.setToken("")
+        _loginRequired.value = true
+        WorkerUtils.cancelAllWork(appContext)
     }
 }
