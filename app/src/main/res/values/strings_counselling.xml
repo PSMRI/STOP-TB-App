@@ -67,4 +67,11 @@
     <string name="icon_title_tpt_module">TPT</string>
     <string name="home_card_tpt_module_subtitle">TB Preventive Treatment follow-up</string>
 
+    <!-- Vulnerable Population / TPT-Eligible Groups list (STOP-771) -->
+    <string name="icon_title_vulnerable_population">Vulnerable Population</string>
+    <string name="home_card_vulnerable_population_subtitle">TPT-eligible groups</string>
+    <string name="vulnerability_conditions">Vulnerability conditions</string>
+    <string name="vulnerability_conditions_selected">Vulnerability conditions: %1$s</string>
+    <string name="vulnerability_tribal">Tribal (NPVTG / PVTG)</string>
+
 </resources>

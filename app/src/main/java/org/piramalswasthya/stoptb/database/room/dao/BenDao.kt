@@ -404,6 +404,33 @@ interface BenDao {
             OR (:source = 10 AND isDeath = 0 AND benId IN (
 """ + ClinicalAssessmentSql.MATCHING_BEN_IDS + """
             ))
+            -- Vulnerable Population / TPT-Eligible Groups (STOP-771).
+            -- :vulnerabilityCode '' = All, 'TRIBAL' = Tribal only, else a CommonConstants.RISK_FACTOR_CODES code.
+            -- Risk factors are stored by StringListConverter as "CODE_A|||CODE_B".
+            OR (:source = 11 AND isDeath = 0 AND benId IN (
+                SELECT vb.beneficiaryId FROM BENEFICIARY vb
+                WHERE :vulnerabilityCode IN ('', 'TRIBAL')
+                  AND (
+                    vb.residentialAreaId IN (1, 2)
+                    OR REPLACE(UPPER(TRIM(IFNULL(vb.residentialArea, ''))), '-', ' ') IN ('TRIBAL NPVTG', 'TRIBAL PVTG')
+                  )
+                UNION
+                SELECT vs.benId FROM TB_SCREENING vs
+                WHERE :vulnerabilityCode != 'TRIBAL'
+                  AND vs.id = (
+                    SELECT vs2.id FROM TB_SCREENING vs2
+                    WHERE vs2.benId = vs.benId
+                    ORDER BY vs2.visitDate DESC, vs2.id DESC
+                    LIMIT 1
+                  )
+                  AND (
+                    (:vulnerabilityCode = '' AND REPLACE(REPLACE(REPLACE(
+                        '|||' || IFNULL(vs.keyPopulationRiskFactors, '') || '|||',
+                        '|||OTHER|||', '|||'), '|||NOT_APPLICABLE|||', '|||'), '|||', '') != '')
+                    OR (:vulnerabilityCode != '' AND
+                        ('|||' || IFNULL(vs.keyPopulationRiskFactors, '') || '|||') LIKE '%|||' || :vulnerabilityCode || '|||%')
+                  )
+            ))
         )
         AND (:filterType = 0
             OR (:filterType = 1 AND abhaId IS NOT NULL)
@@ -449,7 +476,7 @@ interface BenDao {
         END DESC,
         benId DESC
     """)
-    fun searchBen(villageIds: List<Int>, source: Int, filterType: Int, query: String): Flow<List<BenBasicCache>>
+    fun searchBen(villageIds: List<Int>, source: Int, filterType: Int, query: String, vulnerabilityCode: String): Flow<List<BenBasicCache>>
 
     @Query("""
         SELECT * FROM BEN_BASIC_CACHE
@@ -572,6 +599,33 @@ interface BenDao {
             OR (:source = 10 AND isDeath = 0 AND benId IN (
 """ + ClinicalAssessmentSql.MATCHING_BEN_IDS + """
             ))
+            -- Vulnerable Population / TPT-Eligible Groups (STOP-771).
+            -- :vulnerabilityCode '' = All, 'TRIBAL' = Tribal only, else a CommonConstants.RISK_FACTOR_CODES code.
+            -- Risk factors are stored by StringListConverter as "CODE_A|||CODE_B".
+            OR (:source = 11 AND isDeath = 0 AND benId IN (
+                SELECT vb.beneficiaryId FROM BENEFICIARY vb
+                WHERE :vulnerabilityCode IN ('', 'TRIBAL')
+                  AND (
+                    vb.residentialAreaId IN (1, 2)
+                    OR REPLACE(UPPER(TRIM(IFNULL(vb.residentialArea, ''))), '-', ' ') IN ('TRIBAL NPVTG', 'TRIBAL PVTG')
+                  )
+                UNION
+                SELECT vs.benId FROM TB_SCREENING vs
+                WHERE :vulnerabilityCode != 'TRIBAL'
+                  AND vs.id = (
+                    SELECT vs2.id FROM TB_SCREENING vs2
+                    WHERE vs2.benId = vs.benId
+                    ORDER BY vs2.visitDate DESC, vs2.id DESC
+                    LIMIT 1
+                  )
+                  AND (
+                    (:vulnerabilityCode = '' AND REPLACE(REPLACE(REPLACE(
+                        '|||' || IFNULL(vs.keyPopulationRiskFactors, '') || '|||',
+                        '|||OTHER|||', '|||'), '|||NOT_APPLICABLE|||', '|||'), '|||', '') != '')
+                    OR (:vulnerabilityCode != '' AND
+                        ('|||' || IFNULL(vs.keyPopulationRiskFactors, '') || '|||') LIKE '%|||' || :vulnerabilityCode || '|||%')
+                  )
+            ))
         )
         AND (:filterType = 0
             OR (:filterType = 1 AND abhaId IS NOT NULL)
@@ -681,7 +735,7 @@ interface BenDao {
         END DESC,
         benId DESC
     """)
-    fun searchBenPaged(villageIds: List<Int>, source: Int, filterType: Int, query: String): PagingSource<Int, BenBasicCache>
+    fun searchBenPaged(villageIds: List<Int>, source: Int, filterType: Int, query: String, vulnerabilityCode: String): PagingSource<Int, BenBasicCache>
 
     /**
      * The beneficiary list query for the sources that have no TB predicate: 0 All, 1 ABHA,
@@ -865,6 +919,33 @@ interface BenDao {
             OR (:source = 10 AND isDeath = 0 AND benId IN (
 """ + ClinicalAssessmentSql.MATCHING_BEN_IDS + """
             ))
+            -- Vulnerable Population / TPT-Eligible Groups (STOP-771).
+            -- :vulnerabilityCode '' = All, 'TRIBAL' = Tribal only, else a CommonConstants.RISK_FACTOR_CODES code.
+            -- Risk factors are stored by StringListConverter as "CODE_A|||CODE_B".
+            OR (:source = 11 AND isDeath = 0 AND benId IN (
+                SELECT vb.beneficiaryId FROM BENEFICIARY vb
+                WHERE :vulnerabilityCode IN ('', 'TRIBAL')
+                  AND (
+                    vb.residentialAreaId IN (1, 2)
+                    OR REPLACE(UPPER(TRIM(IFNULL(vb.residentialArea, ''))), '-', ' ') IN ('TRIBAL NPVTG', 'TRIBAL PVTG')
+                  )
+                UNION
+                SELECT vs.benId FROM TB_SCREENING vs
+                WHERE :vulnerabilityCode != 'TRIBAL'
+                  AND vs.id = (
+                    SELECT vs2.id FROM TB_SCREENING vs2
+                    WHERE vs2.benId = vs.benId
+                    ORDER BY vs2.visitDate DESC, vs2.id DESC
+                    LIMIT 1
+                  )
+                  AND (
+                    (:vulnerabilityCode = '' AND REPLACE(REPLACE(REPLACE(
+                        '|||' || IFNULL(vs.keyPopulationRiskFactors, '') || '|||',
+                        '|||OTHER|||', '|||'), '|||NOT_APPLICABLE|||', '|||'), '|||', '') != '')
+                    OR (:vulnerabilityCode != '' AND
+                        ('|||' || IFNULL(vs.keyPopulationRiskFactors, '') || '|||') LIKE '%|||' || :vulnerabilityCode || '|||%')
+                  )
+            ))
         )
         AND (:filterType = 0
             OR (:filterType = 1 AND abhaId IS NOT NULL)
@@ -922,7 +1003,7 @@ interface BenDao {
         END DESC,
         benId DESC
     """)
-    suspend fun searchBenOnce(villageIds: List<Int>, source: Int, filterType: Int, query: String): List<BenBasicCache>
+    suspend fun searchBenOnce(villageIds: List<Int>, source: Int, filterType: Int, query: String, vulnerabilityCode: String): List<BenBasicCache>
 
     @Query("SELECT * FROM BEN_BASIC_CACHE where villageId = :selectedVillage AND abhaId IS NOT NULL AND isDeactivate = 0")
     fun getAllBenWithAbha(selectedVillage: Int): Flow<List<BenBasicCache>>
