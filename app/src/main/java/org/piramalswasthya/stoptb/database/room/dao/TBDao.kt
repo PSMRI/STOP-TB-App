@@ -104,7 +104,7 @@ interface TBDao {
     /**
      * The beneficiaries in [benIds] that already hold a usable order id for one test type.
      *
-     * The order-id backfill in [TBRepo.fetchBeneficiariesByStatus] used to decide this one
+     * The order-id backfill (removed with STOP-800's getBeneficiariesByStatus sweep) used to decide this one
      * beneficiary at a time - a `getBenByRegId` plus a whole-row `getTbDiagnosticsByBenId` per
      * entry, over the entire in-flight backlog - which is thousands of statements queued on the
      * single Room executor before the first one is even needed. Asking SQLite which ids are

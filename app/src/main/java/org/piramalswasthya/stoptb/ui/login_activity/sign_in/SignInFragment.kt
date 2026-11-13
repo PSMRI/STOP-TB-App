@@ -289,7 +289,7 @@ class SignInFragment : Fragment() {
                         // unreachable during the call, which is the only failure that should fall
                         // back to a local login. A 401 or a server error leaves it set, so bad
                         // credentials still surface instead of silently signing the user in.
-                        if (!viewModel.isCampHubConnected()) {
+                        if (!prefDao.isReauthenticationRequired() && !viewModel.isCampHubConnected()) {
                             loginLocally(
                                 binding.etUsername.text.toString(),
                                 binding.etPassword.text.toString()
@@ -596,7 +596,7 @@ class SignInFragment : Fragment() {
             return
         }
 
-        if (viewModel.isCampHubConnected()) {
+        if (prefDao.isReauthenticationRequired() || viewModel.isCampHubConnected()) {
             campAuthInFlight = true
             viewModel.authUser(username, password)
             return

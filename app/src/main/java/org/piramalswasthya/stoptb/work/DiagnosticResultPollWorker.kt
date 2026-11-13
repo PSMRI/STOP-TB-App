@@ -86,14 +86,11 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 val activeList = tbRepo.getDiagnosticsList()
                 val now = System.currentTimeMillis()
 
-                // Real order/result contract confirmed: PENDING, IN_PROGRESS, COMPLETED, FAILED,
-                // CLOSED, MANUAL_ENTRY. IN_PROGRESS is collapsed into our stored PENDING at the
-                // repository boundary (TBRepo.reducedOrderStatus/createOrder/
-                // fetchBeneficiariesByStatus), so Room never actually holds "IN_PROGRESS" or
-                // "AWAITING_PROVIDER_RESULT" literally — checking PENDING alone is correct.
-                // MANUAL_ENTRY is intentionally excluded here — there is no automated result to
-                // fetch for it; the unconditional fetchBeneficiariesByStatus sweep above already
-                // reconciles it (and FAILED) every time this worker runs.
+                // Order statuses: PENDING, IN_PROGRESS, COMPLETED, FAILED, CLOSED, MANUAL_ENTRY and
+                // (STOP-800) INVALID. IN_PROGRESS is collapsed into PENDING at the repository
+                // boundary (TBRepo.reducedOrderStatus), so checking PENDING covers it. MANUAL_ENTRY
+                // has no automated result to wait for; every status change arrives through the
+                // changes feed.
                 data class PendingOrder(val benId: Long, val xray: Boolean, val trueNat: Boolean, val rif: Boolean)
 
                 fun hasRealOrderId(orderId: String?) =
