@@ -315,12 +315,8 @@ class TBScreeningDataset(
          * false = Non-presumptive (the ten core answers are No and no later question is Yes)
          * null  = cannot decide (no record / unanswered)
          *
-         * The card has to agree with the screening form, which counts chest pain, shortness of
-         * breath, fatigue, Others and the two child-only questions as symptoms too
-         * ([requiredSymptomFields] + [others]). Only the ten core answers decided before, so a
-         * beneficiary whose one symptom was, say, fatigue showed "Asymptomatic" on the card while
-         * the form, the server and the referral orders treated them as symptomatic. The later
-         * questions are null on older rows (not asked), so they only ever add a Yes.
+         * Must agree with the screening form, which also counts the later questions as symptoms
+         * ([requiredSymptomFields] + [others]). Those are null on older rows, so they only add a Yes.
          */
         fun isPresumptive(saved: TBScreeningCache?): Boolean? {
             if (saved == null) return null

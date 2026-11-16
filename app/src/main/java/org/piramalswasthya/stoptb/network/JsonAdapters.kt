@@ -458,15 +458,15 @@ data class DiagnosticOrderPushRequest(
     val providerServiceMapID: Int,
     val orderType: String,
     val orderEvent: String = "STOP_TB_REFERRAL",
-    // STOP-800: presence of the reason for the order's test (X-ray or MTB) makes order/push
-    // close the order (beneficiary declined) instead of pushing it to the vendor.
+    // A reason for the order's test (X-ray or MTB) makes order/push close the order
+    // (beneficiary declined) instead of pushing it to the vendor.
     val reasonToCloseXray: String? = null,
     val reasonToCloseMTB: String? = null,
     val patient: PatientRequest
 )
 
 /**
- * order/manualResult (STOP-800 contract). One test per call:
+ * order/manualResult, one test per call:
  *  - X-ray: [resultSummary] or [reasonToCloseXray]
  *  - MTB:   [resultSummary] or [reasonToCloseMTB]
  *  - RIF:   [mdrRifResult] or [reasonToCloseRif], on the same MTB order ([orderType] "MTB"),

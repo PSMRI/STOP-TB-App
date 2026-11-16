@@ -15,9 +15,8 @@ enum class OrderStatus {
     FAILED,
     CLOSED,
     MANUAL_ENTRY,
-    /** STOP-800: MTB / MTB_PLUS only. The machine reported an invalid run ("Error-2") for MTB or
-     *  RIF and retests the same order by itself; the retest result moves it to PENDING/COMPLETED.
-     *  Manual entry and closing (MTB or RIF) are still allowed. */
+    /** MTB / MTB_PLUS only: an invalid machine run ("Error-2"); the machine retests the same order.
+     *  Manual entry and closing are still allowed. */
     INVALID
 }
 

@@ -7,9 +7,8 @@ import org.piramalswasthya.stoptb.model.MtbResult
 import org.piramalswasthya.stoptb.model.RifResult
 
 /**
- * STOP-800: results are stored and sent in the server's wording ("TB Positive", "DR TB" ...)
- * and shown in the app's ("MTB Detected", "Rif Resistance Detected" ...). Every screen that
- * shows an MTB or RIF result goes through these, so the two never drift apart.
+ * Results are stored and sent in the server's wording ("TB Positive") and shown in the app's
+ * ("MTB Detected"). Every screen maps through these so the two never drift apart.
  */
 object DiagnosticResultLabels {
 
@@ -45,9 +44,8 @@ object DiagnosticResultLabels {
     }
 
     /**
-     * True when the user entered a result for this test and the stored (server) result is a
-     * different one — a vendor result replaced the manual entry. Compared by meaning, so the
-     * old local synonyms ("MTB detected") never count as a change.
+     * True when the stored (server) result differs in meaning from the one the user entered, i.e. a
+     * vendor result replaced it. Old local synonyms ("MTB detected") don't count as a change.
      */
     fun replacedByDevice(orderType: String, enteredByUser: String?, stored: String?): Boolean {
         if (enteredByUser.isNullOrBlank() || stored.isNullOrBlank()) return false

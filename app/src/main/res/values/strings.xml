@@ -1681,7 +1681,7 @@
     <string name="rif_result_non_dr_tb">Non DR TB</string>
     <string name="rif_result_indeterminate">Indeterminate</string>
     <string name="rif_result_invalid_error">Invalid/Error</string>
-    <!-- STOP-800: how results are shown in the app (the server's wording is "TB Positive", "DR TB" ...) -->
+    <!-- How results are shown in the app (the server's wording is "TB Positive", "DR TB" ...) -->
     <string name="result_display_mtb_detected">MTB Detected</string>
     <string name="result_display_mtb_not_detected">MTB Not Detected</string>
     <string name="result_display_rif_detected">Rif Resistance Detected</string>

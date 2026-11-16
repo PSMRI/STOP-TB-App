@@ -875,7 +875,7 @@
     <string name="form_submitted_successfully">ফৰ্ম সফলতাৰে দাখিল কৰা হৈছে</string>
 
 
-    <!-- STOP-800 -->
+    <!-- TrueNat MTB / RIF results -->
     <string name="error_rif_part_of_mtb_order">RIF, MTB অৰ্ডাৰৰ এটা অংশ; RIF ৰ বাবে বেলেগ অৰ্ডাৰ সৃষ্টি নহয়</string>
     <string name="result_display_mtb_detected">MTB পোৱা গৈছে (MTB Detected)</string>
     <string name="result_display_mtb_not_detected">MTB পোৱা নগ\'ল (MTB Not Detected)</string>

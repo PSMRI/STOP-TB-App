@@ -26,7 +26,7 @@ import org.piramalswasthya.stoptb.network.AmritApiService
 import retrofit2.Response
 
 /**
- * TBRepo.createOrder writes the row a new order starts from (CodeRabbit review, PR #368).
+ * TBRepo.createOrder writes the row a new order starts from.
  * The network and Room are mocked; the row passed to TBDao.saveTbDiagnostics is checked.
  *
  * Suspend DAO / API methods are answered by method name: a suspend call carries a Continuation
@@ -80,7 +80,7 @@ class CreateOrderResetTest {
         )
     }
 
-    /** Fix 1: the previous order's "RIF not conducted" must not carry over to the new MTB order. */
+    /** The previous order's "RIF not conducted" must not carry over to the new MTB order. */
     @Test
     fun newMtbOrderClearsThePreviousRifCloseReason() = runBlocking {
         val closed = TBDiagnosticsCache(benId = benId).copy(
@@ -102,7 +102,7 @@ class CreateOrderResetTest {
         assertNull(row.rifOrderStatus)
         assertNull(row.reasonNotConductedRif)
         assertNull(row.reasonNotConductedRifOther)
-        // Product rule (16 Nov 2026): a new order is a new test, not TB confirmed until its result.
+        // A new order is a new test, not TB confirmed until its result.
         assertEquals(false, row.isTBConfirmed)
         assertEquals(false, row.isConfirmed)
     }
@@ -120,7 +120,7 @@ class CreateOrderResetTest {
         assertEquals(true, savedRows.first().isTBConfirmed)
     }
 
-    /** Fix 6: a declined sputum referral is stored CLOSED and not done, not as a pending test. */
+    /** A declined sputum referral is stored CLOSED and not done, not as a pending test. */
     @Test
     fun declinedSputumReferralIsStoredClosedAndNotConducted() = runBlocking {
         val repo = repoForOrderPush(TBDiagnosticsCache(benId = benId), serverStatus = "CLOSED")

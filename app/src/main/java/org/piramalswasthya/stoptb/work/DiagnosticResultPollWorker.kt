@@ -72,9 +72,7 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 // not a device is integrated or any order still looks pending (an order saved
                 // without an order id is not in pendingOrders). A pair is cleared only once its
                 // fetch succeeds; the worker keeps rescheduling while any remain.
-                // STOP-800: the feed no longer leaves orders behind to fetch one by one (it only
-                // skips a row for an older order than one this tablet just placed, and that newer
-                // order reaches the feed on its own). Entries an older build recorded are dropped.
+                // The feed leaves no orders to fetch one by one; entries an older build recorded are dropped.
                 val hasSkippedFeedOrders = false
                 if (feedActive) {
                     preferenceDao.removeFeedSkippedOrders(preferenceDao.getFeedSkippedOrders().toList())
@@ -86,11 +84,9 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 val activeList = tbRepo.getDiagnosticsList()
                 val now = System.currentTimeMillis()
 
-                // Order statuses: PENDING, IN_PROGRESS, COMPLETED, FAILED, CLOSED, MANUAL_ENTRY and
-                // (STOP-800) INVALID. IN_PROGRESS is collapsed into PENDING at the repository
-                // boundary (TBRepo.reducedOrderStatus), so checking PENDING covers it. MANUAL_ENTRY
-                // has no automated result to wait for; every status change arrives through the
-                // changes feed.
+                // Statuses: PENDING, IN_PROGRESS, COMPLETED, FAILED, CLOSED, MANUAL_ENTRY, INVALID. IN_PROGRESS is
+                // collapsed into PENDING (TBRepo.reducedOrderStatus); MANUAL_ENTRY has no automated result to wait
+                // for. Every status change arrives through the changes feed.
                 data class PendingOrder(val benId: Long, val xray: Boolean, val trueNat: Boolean, val rif: Boolean)
 
                 fun hasRealOrderId(orderId: String?) =

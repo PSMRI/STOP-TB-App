@@ -93,8 +93,7 @@ class IsPresumptiveProjectionTest {
         failureToGainWeightInChildren = later[4], decreasedActivityOrPlayfulnessInChildren = later[5]
     )
 
-    // Found on amritdemo (HERO PUNE): fatigue was the only symptom, the form and the server treated
-    // the beneficiary as symptomatic, and the card said "Asymptomatic".
+    // Fatigue as the only symptom: the form and the server treat it as symptomatic, so the card must too.
     @Test
     fun `a yes on any later question is presumptive on both shapes`() {
         val coreNo = List<Boolean?>(10) { false }

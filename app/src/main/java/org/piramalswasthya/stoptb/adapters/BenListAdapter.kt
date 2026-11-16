@@ -298,8 +298,7 @@ class BenListAdapter(
 
                         val lastChecked = pref?.getLastCheckedTime(benId, testType.wireValue) ?: 0L
                         if (pref?.isChangesFeedActive() == true) {
-                            // STOP-800: results come only through the changes feed; there is no
-                            // per-order check whose time could be shown.
+                            // Results arrive only through the changes feed, so there is no per-order check time to show.
                             statusDivider.visibility = View.VISIBLE
                             lastCheckedCaption.visibility = View.VISIBLE
                             lastCheckedCaption.text = ctx.getString(R.string.order_status_feed_auto_update)
@@ -317,8 +316,7 @@ class BenListAdapter(
                         pollingStoppedCaption.visibility = View.GONE
                     }
                 }
-                // STOP-800: the machine's run was invalid ("Error-2"); it retests the same order and
-                // the result arrives through the feed. A result can still be entered by hand.
+                // Invalid run ("Error-2"): the machine retests the same order; a manual result is still allowed.
                 status.equals(OrderStatus.INVALID.name, ignoreCase = true) -> {
                     pillContainer.visibility = View.VISIBLE
                     setPillIcon(spinning = false, staticRes = R.drawable.ic_exclamation_circle, tintRes = android.R.color.holo_orange_dark)
@@ -384,8 +382,8 @@ class BenListAdapter(
                 waitingText = ctx.getString(R.string.order_status_waiting_rif)
             )
 
-            // STOP-800: RIF is a test on the MTB order — no order of its own, so no Retry
-            // Referral / Create New Order here; a new MTB order (main button) brings a new RIF.
+            // RIF has no order of its own, so no Retry Referral / Create New Order here;
+            // a new MTB order (main button) brings a new RIF.
             when {
                 tbDiag?.rifManualResultPendingSync == true -> bindRifPill(orderStatus, pendingSync = true)
                 rifDisplay != null -> {
@@ -494,7 +492,7 @@ class BenListAdapter(
                         binding.viewOrderStatusDivider, binding.tvLastCheckedCaption, binding.llPollingStoppedCaption,
                         binding.tvPollingStoppedCaptionTitle, binding.tvPollingStoppedCaptionText
                     )
-                    // STOP-800: a vendor X-ray result replaced the one entered by hand.
+                    // A vendor X-ray result replaced the one entered by hand.
                     if (status.equals(OrderStatus.COMPLETED.name, ignoreCase = true) &&
                         tbDiag?.xrayManualResultPendingSync != true &&
                         DiagnosticResultLabels.replacedByDevice(
@@ -515,8 +513,7 @@ class BenListAdapter(
                     val status = tbDiag?.trueNatOrderStatus
                     val isPendingTrueNatSync = tbDiag?.trueNatManualResultPendingSync == true
                     val mtbDisplay = DiagnosticResultLabels.mtb(ctx, tbDiag?.naatResult)
-                    // STOP-800: the MTB result shows as soon as it is known, even while the
-                    // order stays open waiting for RIF.
+                    // The MTB result shows as soon as it is known, even while the order waits for RIF.
                     if (mtbDisplay != null && !isPendingTrueNatSync) {
                         binding.llMtbSummaryStrip.visibility = View.VISIBLE
                         binding.tvMtbSummaryText.text = withDeviceUpdateNote(
@@ -799,11 +796,8 @@ class BenListAdapter(
                         xrayResult.equals("Normal", ignoreCase = true)
 
                 binding.llXrayTile.visibility = if (isPregnantFemale) View.GONE else View.VISIBLE
-                // Product rule (16 Nov 2026): a symptomatic beneficiary gets both an X-ray and a
-                // TrueNat order whatever the X-ray result, and a pregnant woman gets TrueNat only.
-                // So a Normal X-ray hides the TrueNat tile only for someone with no TrueNat at all
-                // (asymptomatic, not referred, no MTB order or result). It used to hide it for
-                // every Normal X-ray, including a symptomatic beneficiary's MTB order and result.
+                // Symptomatic beneficiaries get TrueNat whatever the X-ray result, so a Normal X-ray hides the
+                // TrueNat tile only for an asymptomatic, unreferred beneficiary with no MTB order or result.
                 val hasTrueNat = isPresumptive == true || isPregnantFemale ||
                         tbDiagForStatus?.isReferredForSputum == true ||
                         !tbDiagForStatus?.trueNatOrderId.isMissingOrderId() ||
@@ -839,7 +833,7 @@ class BenListAdapter(
                 )
                 binding.tvTruenatStatus.text = if (truenatResult.isNullOrBlank()) "Unscreened" else "Screened"
                 binding.tvTruenatStatus.visibility = View.GONE
-                // STOP-800: the app's wording ("MTB Detected"), not the server's ("TB Positive").
+                // The app's wording ("MTB Detected"), not the server's ("TB Positive").
                 binding.tvTruenatResult.text = formatScreeningResult(
                     DiagnosticResultLabels.mtb(binding.root.context, truenatResult) ?: truenatResult
                 )
@@ -943,17 +937,15 @@ class BenListAdapter(
                                 referredForSputum == false -> {
                                     ButtonConfig("TEST REFUSED", android.R.color.darker_gray, OrderAction.NONE, DiagnosticOrderType.SPUTUM_TRUENAT)
                                 }
-                                // A FAILED order whose MTB is already Detected failed in its RIF
-                                // test: the RIF block offers Enter RIF Result instead (STOP-800).
+                                // A FAILED order whose MTB is already Detected failed in its RIF test:
+                                // the RIF block offers Enter RIF Result instead.
                                 status.equals(OrderStatus.FAILED.name, ignoreCase = true) &&
                                         MtbResult.fromResultText(tbDiag?.naatResult) != MtbResult.TB_POSITIVE -> {
                                     bindErrorMsg(tbDiag?.errorMsgTrueNat)
                                     ButtonConfig(context.getString(R.string.order_status_retry_referral), android.R.color.holo_red_dark, OrderAction.RETRY_PUSH, DiagnosticOrderType.SPUTUM_TRUENAT)
                                 }
-                                // STOP-800: once the MTB result is in (or saved locally), the MTB
-                                // part collapses to the summary strip and any RIF action lives in
-                                // the RIF block — even while the order stays PENDING / MANUAL_ENTRY
-                                // waiting for RIF on this same order.
+                                // Once MTB has a result (even only saved locally), the MTB part collapses to the strip
+                                // and any RIF action is in the RIF block, even while the order still waits for RIF.
                                 status.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
                                         (!tbDiag?.naatResult.isNullOrBlank() &&
                                                 !status.equals(OrderStatus.CLOSED.name, ignoreCase = true)) -> {
@@ -1133,9 +1125,8 @@ class BenListAdapter(
                                             "Order Status: Closed — Declined\nReason: $declineReasonStr"
                                         notConductedReasonStr.isNotBlank() ->
                                             "Order Status: Closed — Not Conducted\nReason: $notConductedReasonStr"
-                                        // STOP-800: closed after a result (MTB Invalid/Error, or RIF
-                                        // closed / invalid on the same order): the MTB strip and the
-                                        // RIF block below say why; it did not expire.
+                                        // Closed after a result (MTB Invalid/Error, or RIF closed / invalid): the MTB strip and
+                                        // the RIF block say why; it did not expire.
                                         !tbDiag?.naatResult.isNullOrBlank() -> "Order Status: Closed"
                                         else ->
                                             "Order Status: Closed — Expired (Result not entered)"

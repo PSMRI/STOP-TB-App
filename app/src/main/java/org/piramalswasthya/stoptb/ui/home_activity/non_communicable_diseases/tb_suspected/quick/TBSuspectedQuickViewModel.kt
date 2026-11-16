@@ -204,9 +204,8 @@ class TBSuspectedQuickViewModel @Inject constructor(
         dataset.setUpPage(
             ben,
             tbScreening,
-            // A copy: saveForm() maps the form's values onto tbDiagnostics, and the dataset's
-            // view of what is saved (canEnterRif, locks) must not change with them — otherwise a
-            // RIF result being entered looks already saved and is never sent (STOP-800).
+            // A copy: saveForm() maps the form onto tbDiagnostics, and the dataset's view of what is saved
+            // (canEnterRif, locks) must not change with it, or a RIF being entered looks saved and is never sent.
             if (::tbDiagnostics.isInitialized) tbDiagnostics.copy() else null,
             vital = vital,
             referralMode = viewOnly,
@@ -217,10 +216,8 @@ class TBSuspectedQuickViewModel @Inject constructor(
     }
 
     /**
-     * STOP-800: results reach the tablet only through the changes feed, so this screen does not
-     * call the server when it opens. It watches the beneficiary's diagnostics row instead: when
-     * the feed brings a newer result (a vendor result can also replace a manual one), an untouched
-     * form is rebuilt from it; a form the user has started filling is left as typed and flagged.
+     * Results reach the tablet only through the changes feed, so this screen watches the diagnostics
+     * row: a newer result rebuilds an untouched form; a form being filled is left as typed and flagged.
      */
     private suspend fun observeLatestOrderResult(
         ben: BenRegCache?,
@@ -315,10 +312,9 @@ class TBSuspectedQuickViewModel @Inject constructor(
     )
 
     /**
-     * What a save of the form, as currently filled in, would send — one test at most per save.
-     * The single source of truth for both the confirmation dialog ([previewSubmissions]) and
-     * [saveForm], so the dialog can never show something other than what is sent.
-     * [mapped] is the row after the form's values were mapped onto it; [stored] the row in Room.
+     * What a save of the form would send now (one test at most). Shared by [previewSubmissions] and
+     * [saveForm] so the dialog never differs from what is sent. [mapped]: the form mapped onto the
+     * row; [stored]: the row in Room.
      */
     private fun planSubmissions(mapped: TBDiagnosticsCache, stored: TBDiagnosticsCache?): List<ManualSubmission> {
         fun reason(r: String?, other: String?) =
@@ -350,7 +346,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                     else -> null
                 }
                 if (mtb != null) return listOf(mtb)
-                // STOP-800: RIF goes on its own save, once MTB Detected is on the server.
+                // RIF goes on its own save, once MTB Detected is on the server.
                 if (!dataset.canEnterRif()) return emptyList()
                 val enteredRif = RifResult.fromResultText(mapped.trueNatRifResult)
                 when {
@@ -366,9 +362,8 @@ class TBSuspectedQuickViewModel @Inject constructor(
     }
 
     /**
-     * The submissions a save would make right now, for the confirmation dialog. Maps the form onto
-     * a copy, so nothing is changed until the user confirms. Empty when the save sends no manual
-     * result (the dialog is then skipped).
+     * The submissions a save would make now, for the confirmation dialog (maps onto a copy, so nothing
+     * changes until confirmed). Empty when no manual result is sent, and the dialog is skipped.
      */
     suspend fun previewSubmissions(): List<ManualSubmission> = withContext(Dispatchers.IO) {
         if (viewOnly || !::tbDiagnostics.isInitialized) return@withContext emptyList()
@@ -596,8 +591,8 @@ class TBSuspectedQuickViewModel @Inject constructor(
                                 val res = tbRepo.submitManualResult(benId, "SPUTUM_TRUENAT", resultSummary = enteredMtbResult.displayValue)
                                 if (res is NetworkResponse.Success) {
                                     if (res.data == TBRepo.PENDING_SYNC) anyPendingManualResultSync = true
-                                    // STOP-800: the server decides the status (MTB Detected keeps the
-                                    // order open for RIF); it is already in Room and taken over below.
+                                    // The server decides the status (MTB Detected keeps the order open for RIF); it is
+                                    // already in Room and taken over below.
 
                                     // Only once the backend has accepted it: an entry that is merely
                                     // stored locally may still be refused, and the orders it raises are
@@ -623,8 +618,8 @@ class TBSuspectedQuickViewModel @Inject constructor(
                             }
                         }
 
-                        // ── RIF — STOP-800: a test on the same MTB order, entered on its own save
-                        // once MTB Detected is on the server (planSubmissions / canEnterRif).
+                        // ── RIF: a test on the same MTB order, entered on its own save once MTB Detected
+                        // is on the server (planSubmissions / canEnterRif).
                         val rifPlan = plan.firstOrNull { it.orderType == "MDR_RIF" }
                         if (apiSuccess && rifPlan != null) {
                             val rifRes = tbRepo.submitManualResult(

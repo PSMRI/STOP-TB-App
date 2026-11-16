@@ -1331,7 +1331,7 @@
     <string name="sputum_sample_submitted_at_screening_camp">टीबी स्क्रीनिंग शिविर में बलगम का नमूना जमा किया गया\</string>
 
 
-    <!-- STOP-800 -->
+    <!-- TrueNat MTB / RIF results -->
     <string name="error_rif_part_of_mtb_order">RIF, MTB ऑर्डर का ही हिस्सा है; RIF का अलग ऑर्डर नहीं बनता</string>
     <string name="result_display_mtb_detected">MTB पाया गया (MTB Detected)</string>
     <string name="result_display_mtb_not_detected">MTB नहीं पाया गया (MTB Not Detected)</string>

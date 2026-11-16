@@ -392,8 +392,8 @@ class TBSuspectedQuickDataset(
         }
 
         // ── RIF Conducted & Results ───────────────────────────────────────
-        // STOP-800: a PENDING RIF status only means "waiting for RIF on the MTB order"; the
-        // answer is pre-filled only once a RIF result exists.
+        // A PENDING RIF status only means "waiting for RIF on the MTB order"; the answer is
+        // pre-filled only once a RIF result exists.
         val isRifConductedVal = !saved?.trueNatRifResult.isNullOrBlank()
         // RIF order lifecycle redesign: "Not Conducted" is now a Closed order/manualResult
         // closure (see TBRepo.submitManualResult) using RIF's own reasonNotConductedRif/Other
@@ -800,7 +800,7 @@ class TBSuspectedQuickDataset(
                 trueNatConducted.value = if (index == 0) yesValue else noValue
                 syncFieldStates()
                 if (index == 0) {
-                    // STOP-800: RIF never opens on the save that enters MTB; see showRifSection().
+                    // RIF never opens on the save that enters MTB; see showRifSection().
                     val addItems = mutableListOf<FormElement>(trueNatResult)
                     triggerDependants(
                         source = trueNatConducted,
@@ -821,8 +821,7 @@ class TBSuspectedQuickDataset(
             trueNatResult.id -> {
                 trueNatResult.value = trueNatResult.entries?.getOrNull(index)
                 syncFieldStates()
-                // STOP-800: picking MTB Detected here does not open RIF; it opens once that
-                // result is saved (showRifSection()).
+                // Picking MTB Detected does not open RIF; it opens once that result is saved (showRifSection()).
                 val shouldShowRif = showRifSection()
                 val addItems = if (shouldShowRif) listOf(trueNatRifResult) else emptyList()
                 val removeItems = if (!shouldShowRif) {
@@ -1397,8 +1396,8 @@ class TBSuspectedQuickDataset(
 
         val showRif = showRifSection()
         val rifStatus = diagnosticsCache?.rifOrderStatus
-        // A failed RIF test can still get a hand-entered result (STOP-800), so it is only shown as
-        // "Referral Failed" when RIF can't be entered here.
+        // A failed RIF test can still get a hand-entered result, so it shows "Referral Failed"
+        // only when RIF can't be entered here.
         val isRifFailed = rifStatus.equals("FAILED", ignoreCase = true) && !canEnterRif()
         val canForceRifConducted = manualEntryAction != null && showRif && !lockRif && !isRifFailed
         if (canForceRifConducted) {
@@ -1545,9 +1544,8 @@ class TBSuspectedQuickDataset(
         MtbResult.fromResultText(diagnosticsCache?.naatResult) == MtbResult.TB_POSITIVE
 
     /**
-     * STOP-800: RIF is a test on the MTB order and is entered on its own save, after MTB Detected
-     * has been saved and has reached the server (the server rejects a RIF result otherwise), while
-     * the order is still waiting for it (PENDING with a vendor, MANUAL_ENTRY without).
+     * RIF is entered on its own save, after MTB Detected is saved and on the server (which rejects
+     * RIF otherwise), while the order still waits for it (PENDING with a vendor, MANUAL_ENTRY without).
      */
     fun canEnterRif(): Boolean {
         val saved = diagnosticsCache ?: return false

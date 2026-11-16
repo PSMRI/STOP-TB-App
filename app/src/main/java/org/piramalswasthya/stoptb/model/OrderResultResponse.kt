@@ -13,11 +13,9 @@ data class OrderResultResponse(
 /**
  * One diagnostic order as order/result, order/manualResult and the changes feed return it.
  *
- * STOP-800: an MTB / MTB_PLUS order now carries the MTB result and, once MTB is positive, the
- * MDR RIF result, each as its own entry in [results] (main test first, then MDR_RIF). There is
- * no separate MDR_RIF order any more. The flat [providerStatus] / [resultSummary] /
- * [tbPresence] / [drugResistancePresence] fields are what servers before that change send;
- * they are read only when [results] is absent (see [perTest]).
+ * An MTB / MTB_PLUS order carries the MTB and (once MTB is positive) the MDR RIF result as
+ * separate [results] entries. The flat fields are what older servers send; they are read only
+ * when [results] is absent (see [perTest]).
  */
 @JsonClass(generateAdapter = true)
 data class OrderResultData(
@@ -36,8 +34,7 @@ data class OrderResultData(
 ) {
     /**
      * The per-test view of this order, from [results] or, on an older server, the flat fields.
-     * [fallbackType] is the order type the caller asked about, used when the response itself
-     * carries no [orderType].
+     * [fallbackType] is used when the response carries no [orderType].
      */
     fun perTest(fallbackType: String? = null): PerTestResults {
         val entries = results
@@ -82,10 +79,9 @@ data class DiagnosticResultEntry(
 )
 
 /**
- * [hasResultsList] is true when the server sent the STOP-800 `results` list. Then a missing
- * entry means "this test has no result", and the stored result is cleared — that is how a
- * vendor result that replaced a manual one (e.g. MTB Positive -> Negative) also removes the RIF
- * result that no longer applies. With the old flat shape a missing value means "not sent".
+ * [hasResultsList]: the server sent the `results` list, so a missing entry means "no result" and
+ * clears the stored one (e.g. a vendor MTB Negative also removes the RIF result). With the old
+ * flat shape a missing value means "not sent".
  */
 data class PerTestResults(
     val hasResultsList: Boolean,

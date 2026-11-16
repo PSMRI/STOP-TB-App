@@ -135,7 +135,7 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                     )
 
                     if (result1.all { it }) {
-                        // STOP-800: order statuses and results come only from the changes feed.
+                        // Order statuses and results come only from the changes feed.
                         return@withContext Result.success()
                     }
                     // Some TB datasets failed (network or server): try again with

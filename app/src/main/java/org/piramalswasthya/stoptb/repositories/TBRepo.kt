@@ -897,7 +897,7 @@ class TBRepo @Inject constructor(
         preferenceDao.removeFeedSkippedOrder(feedSkippedKey(benId, type))
     }
 
-    /** One `diagnosticOrder` feed record, in the STOP-800 shape (`results` list) or the older flat one. */
+    /** One `diagnosticOrder` feed record, in the `results` list shape or the older flat one. */
     private fun parseFeedOrder(item: JSONObject): OrderResultData {
         val resultsArray = item.optJSONArray("results")
         val results = resultsArray?.let { array ->
@@ -2633,15 +2633,12 @@ class TBRepo @Inject constructor(
     }
 
     /**
-     * order/manualResult for one test (STOP-800 contract, see [DiagnosticManualResultRequest]).
-     * [orderType] is the local test: XRAY_CHEST, SPUTUM_TRUENAT (MTB) or MDR_RIF (the RIF test of
-     * the same MTB order — sent as orderType MTB with mdrRifResult / reasonToCloseRif).
-     * [resultSummary] is the server's wording ("TB Positive", "DR TB" ...); null with a
-     * [reasonForRefusal] closes that test ("Not Conducted").
+     * order/manualResult for one test (see [DiagnosticManualResultRequest]). [orderType] is the local
+     * test; MDR_RIF is sent as orderType MTB with mdrRifResult / reasonToCloseRif. [resultSummary] is
+     * in the server's wording; null with a [reasonForRefusal] closes the test ("Not Conducted").
      *
-     * The server decides the order status (a manual MTB Positive on a vendor order stays PENDING,
-     * without a vendor it becomes MANUAL_ENTRY), so the accepted response is written to Room
-     * through [mergeOrderResult] rather than assuming COMPLETED.
+     * The server decides the order status, so the accepted response is written through
+     * [mergeOrderResult] rather than assuming COMPLETED.
      */
     suspend fun submitManualResult(
         benId: Long,
@@ -2693,9 +2690,8 @@ class TBRepo @Inject constructor(
                             errMsg.contains("DiagnosticOrder not found for beneficiaryId=")
                         ) {
                             if (WorkerUtils.isDiagnosticOrderPushActive(context, benId)) {
-                                // This device's own order push is still in flight, so the same
-                                // submit succeeds once it lands. Queued and replayed by
-                                // DiagnosticResultPollWorker.
+                                // This device's order push is still in flight; queued and replayed by
+                                // DiagnosticResultPollWorker once it lands.
                                 return@withContext queueForLaterReplay(benId, orderType, wireResult, reasonForRefusal)
                             }
                             val orderResult = createOrder(benId, orderType)
@@ -2745,9 +2741,8 @@ class TBRepo @Inject constructor(
     }
 
     /**
-     * Writes an accepted manual result. With the STOP-800 response (`results` list) the server's
-     * own view of the order goes through [mergeOrderResult]; an older server's response carries no
-     * result, so the entered values are written as before.
+     * Writes an accepted manual result: a `results` list response goes through [mergeOrderResult];
+     * an older server returns no result, so the entered values are written.
      */
     private suspend fun saveAcceptedManualResult(
         benId: Long,
@@ -2822,8 +2817,8 @@ class TBRepo @Inject constructor(
                     else -> emptyList()
                 }
             }
-            // STOP-800: RIF is a test on the MTB order, never an order of its own. An invalid
-            // MTB closes the order on the server; the nurse raises a new one (Create New Order).
+            // RIF is a test on the MTB order, never an order of its own. An invalid MTB closes
+            // the order on the server; the nurse raises a new one (Create New Order).
             else -> emptyList()
         }
     }
@@ -2866,8 +2861,7 @@ class TBRepo @Inject constructor(
 
     /**
      * The row with a manual entry written into it, for a result the server has not answered with
-     * its own view of the order (queued offline, or an older server). The status mirrors what the
-     * STOP-800 server does with it:
+     * its own view of the order (queued offline, or an older server). The status mirrors the server:
      *  - X-ray result -> COMPLETED; MTB Negative -> COMPLETED; Invalid/Error -> CLOSED
      *  - MTB Positive -> order stays as it was (PENDING / MANUAL_ENTRY, waiting for RIF)
      *  - RIF result -> the whole TrueNat order COMPLETED (RIF Invalid/Error -> CLOSED)
@@ -3149,7 +3143,7 @@ class TBRepo @Inject constructor(
                     status.equals("EXPIRED", ignoreCase = true) ||
                     status.equals("REFUSED", ignoreCase = true) -> OrderStatus.CLOSED.name
             status.equals(OrderStatus.MANUAL_ENTRY.name, ignoreCase = true) -> OrderStatus.MANUAL_ENTRY.name
-            // STOP-800: an invalid MTB / RIF machine run; the machine retests the same order.
+            // An invalid MTB / RIF machine run; the machine retests the same order.
             status.equals(OrderStatus.INVALID.name, ignoreCase = true) -> OrderStatus.INVALID.name
             else -> OrderStatus.PENDING.name // PENDING, IN_PROGRESS, or anything unrecognized
         }
@@ -3161,7 +3155,7 @@ class TBRepo @Inject constructor(
         reasonForRefusal: String? = null
     ): NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
-            // STOP-800: RIF is a test on the MTB order; the server has no MDR_RIF order to create.
+            // RIF is a test on the MTB order; the server has no MDR_RIF order to create.
             if (testType.equals("MDR_RIF", ignoreCase = true)) {
                 Timber.e("createOrder called for MDR_RIF benId=$benId; RIF is part of the MTB order, nothing pushed")
                 return@withContext NetworkResponse.Error(context.getString(R.string.error_rif_part_of_mtb_order))
@@ -3435,11 +3429,9 @@ class TBRepo @Inject constructor(
         }
 
         val naatResLocal = diag.naatResult
-        // The current MTB order has no MTB result: still waiting (a new order from Create New
-        // Order), or marked INVALID / CLOSED / FAILED. Product rule (16 Nov 2026): a new order is
-        // a new test, so an earlier order's MTB / RIF result no longer applies and the
-        // beneficiary is not TB confirmed until this order's result arrives (a positive liquid
-        // culture still confirms). Without an MTB order at all, the stored values stay.
+        // The current MTB order has no MTB result (waiting, INVALID, CLOSED or FAILED). A new order is a
+        // new test: earlier MTB / RIF results no longer apply and the beneficiary is not TB confirmed
+        // until its result arrives (a positive liquid culture still confirms). No MTB order: keep stored.
         val mtbOrderHasNoResult = naatResLocal.isNullOrBlank() && diag.trueNatOrderId.asValidOrderId() != null
         val mappedSputumTestResult = when {
             !naatResLocal.isNullOrBlank() -> {
@@ -3476,9 +3468,8 @@ class TBRepo @Inject constructor(
             else -> diag.chestXRayResult ?: existing?.chestXRayResult
         }
 
-        // The server's result wins (STOP-800): once the MTB result is known and not positive,
-        // no RIF result applies any more, even one TB_SUSPECTED held before.
-        // No MTB result on the order (mtbOrderHasNoResult) means no RIF result either.
+        // The server's result wins: once MTB is known and not positive, or absent
+        // (mtbOrderHasNoResult), no RIF result applies, even one TB_SUSPECTED held before.
         val mtbKnownNotPositive = mtbOrderHasNoResult ||
             MtbResult.fromResultText(diag.naatResult).let { it != null && it != MtbResult.TB_POSITIVE }
         val currentOrderCarriesRif = diag.trueNatOrderId.asValidOrderId() != null &&
@@ -3495,9 +3486,8 @@ class TBRepo @Inject constructor(
                     else -> diag.trueNatRifResult
                 }
             }
-            // STOP-800 combined order: the current MTB order carries its own RIF test, so its RIF
-            // result (none yet while it waits) is the only one that applies. An earlier order's
-            // RIF result must not stand in for it. Legacy separate MDR_RIF orders keep the fallback.
+            // Combined order: the current MTB order carries its own RIF test, so an earlier order's RIF
+            // result must not stand in for it. Legacy separate MDR_RIF orders keep the fallback.
             currentOrderCarriesRif -> diag.trueNatRifResult
             else -> diag.trueNatRifResult ?: existing?.mdrRifResult
         }
@@ -3522,24 +3512,20 @@ class TBRepo @Inject constructor(
             sputumSubmittedAt = mappedSputumSubmittedAt,
             isNaatConducted = diag.isNaatConducted ?: existing?.isNaatConducted,
             naatResult = if (mtbOrderHasNoResult) null else diag.naatResult ?: existing?.naatResult,
-            // As for MTB and RIF: a previous X-ray order's "not conducted" reason stays only while
-            // the current X-ray order is CLOSED (found on amritdemo, ALPHA PUNE: X-ray Not
-            // Conducted, then Create New X-Ray Order kept the old reason on TB_SUSPECTED).
+            // A previous X-ray order's "not conducted" reason stays only while the current X-ray
+            // order is CLOSED (as for MTB and RIF).
             reasonForRefusalXray = diag.reasonNotConductedChestXray
                 ?: if (diag.xrayOrderId.asValidOrderId() != null &&
                     !diag.xrayOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
                 ) null else existing?.reasonForRefusalXray,
             reasonForRefusalSputum = diag.reasonForDenialSputum ?: existing?.reasonForRefusalSputum,
-            // Same rule as the RIF reason below: a previous order's "MTB not conducted" reason stays
-            // only while the current MTB order is CLOSED (found on amritdemo, FISH PUNE: MTB Not
-            // Conducted, then Create New Order kept the old reason on TB_SUSPECTED).
+            // A previous order's "MTB not conducted" reason stays only while the current MTB order is CLOSED.
             reasonForRefusalMTB = diag.reasonNotConductedNaat
                 ?: if (diag.trueNatOrderId.asValidOrderId() != null &&
                     !diag.trueNatOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
                 ) null else existing?.reasonForRefusalMTB,
-            // The stored reason is kept only while the RIF test of the current MTB order is closed.
-            // A new MTB order (Create New Order) or a RIF still to come has no "RIF not conducted",
-            // so the previous order's reason must not stay on TB_SUSPECTED (found on amritdemo).
+            // The stored reason stays only while the current MTB order's RIF test is closed; a new MTB
+            // order or a RIF still to come must not inherit the previous order's reason.
             reasonForRefusalMDRRIF = reasonForRefusalMDRRIF
                 ?: formatNotConductedReason(diag.reasonNotConductedRif, diag.reasonNotConductedRifOther)
                 ?: if (!diag.trueNatOrderId.isNullOrBlank() &&
@@ -3548,7 +3534,7 @@ class TBRepo @Inject constructor(
             mdrRifResult = mappedMdrRifResult,
             isDRTBConfirmed = mappedIsDRTBConfirmed,
             // Confirmed by an MTB Positive or a positive liquid culture, as on TB_DIAGNOSTICS
-            // (formRowOverStored / mergeTrueNatOrder); it used to read the sputum result only.
+            // (formRowOverStored / mergeTrueNatOrder).
             isTBConfirmed = mappedSputumTestResult == "TB Positive" ||
                 isLiquidCulturePositive(diag.liquidCultureResult ?: existing?.liquidCultureResult),
             isConfirmed = mappedSputumTestResult == "TB Positive" ||
@@ -3704,8 +3690,8 @@ class TBRepo @Inject constructor(
                             }
                             preferenceDao.setDiagPollStartTime(benId, orderType, System.currentTimeMillis())
                             
-                            // Without the changes feed, fetch the X-ray result straight away; with it,
-                            // the result arrives through the feed (STOP-800: no per-order calls).
+                            // Without the changes feed, fetch the X-ray result now; with it, the result
+                            // arrives through the feed (no per-order calls).
                             if (orderType.equals("XRAY_CHEST", ignoreCase = true) && !preferenceDao.isChangesFeedActive()) {
                                 fetchOrderResult(benId, orderType)
                             }
@@ -3726,10 +3712,8 @@ class TBRepo @Inject constructor(
     }
 
     /**
-     * Applies one order's result to TB_DIAGNOSTICS (through [mergeOrderResult]) and syncs TB
-     * Suspected from it. Used by [fetchOrderResult] after its network call. Returns the server
-     * status. STOP-800: no RIF order is created here any more; the RIF result arrives on the same
-     * MTB order.
+     * Applies one order's result to TB_DIAGNOSTICS (through [mergeOrderResult]), syncs TB Suspected
+     * from it and returns the server status. Used by [fetchOrderResult].
      */
     private suspend fun applyOrderResult(
         ben: BenRegCache,
@@ -3791,12 +3775,9 @@ class TBRepo @Inject constructor(
      * The diagnostics row after applying one order (from the changes feed, order/result or the
      * order/manualResult response) to [existing] (null = no row yet). Pure: no database or network.
      *
-     * STOP-800: one MTB order carries both the MTB and the MDR RIF result ([OrderResultData.perTest]).
-     * The server's result always wins, so when the server sent the `results` list every result
-     * field of the test is rewritten from it — an entry that is missing clears the stored value.
-     * That is what hides the RIF section again when a vendor result replaces a manual MTB Positive
-     * with TB Negative. The one exception is a manual result still waiting to reach the server
-     * (`*ManualResultPendingSync`): its fields are kept until the replay gets the server's answer.
+     * The server's result always wins: when it sent the `results` list, every result field of the
+     * test is rewritten and a missing entry clears the stored value (so a vendor TB Negative hides
+     * RIF again). Exception: a manual result still pending sync keeps its fields until the replay.
      *
      * [triggerTrueNat] asks the caller to push the X-ray -> TrueNat referral once the row is saved.
      * Never when [hubCreatesOrders]: a camp hub creates that order itself from the X-ray result.
@@ -3904,9 +3885,8 @@ class TBRepo @Inject constructor(
         if (base.trueNatManualResultPendingSync == true || base.rifManualResultPendingSync == true) return merged
 
         val legacyFlat = !perTest.hasResultsList
-        // An invalid machine run ("Error-2") is not a result: the machine retests the same order
-        // (status INVALID) and the real result replaces it. It is kept out of naatResult /
-        // trueNatRifResult, so the card offers Enter Result instead of showing "Error-2" as one.
+        // An invalid run ("Error-2") is not a result: the machine retests the same order (INVALID).
+        // Kept out of naatResult / trueNatRifResult so the card offers Enter Result instead.
         val mtbSummary = perTest.mtb?.resultSummary?.takeIf { it.isNotBlank() && !isMachineRunError(it) }
         val mtbResult = MtbResult.fromResultText(mtbSummary)
         // Older server, order not finished yet: the flat summary is not a result; keep what is stored.
@@ -3924,10 +3904,8 @@ class TBRepo @Inject constructor(
             },
             reasonNotConductedNaat = mtbClose?.first ?: if (naatResult != null) null else base.reasonNotConductedNaat,
             reasonNotConductedNaatOther = mtbClose?.second ?: if (naatResult != null) null else base.reasonNotConductedNaatOther,
-            // The results list is the server's whole answer for this order: with no MTB result in
-            // it (Error-2 retest, closed, failed) an earlier MTB Positive no longer confirms TB,
-            // and only a positive liquid culture still does. A legacy flat response says nothing
-            // either way, so the stored value stays.
+            // The results list is the server's whole answer: with no MTB result in it, an earlier MTB
+            // Positive no longer confirms TB (only a positive liquid culture does). A flat response keeps it.
             isTBConfirmed = when {
                 mtbResult != null -> mtbResult == MtbResult.TB_POSITIVE || isLiquidCulturePositive(base.liquidCultureResult)
                 perTest.hasResultsList -> isLiquidCulturePositive(base.liquidCultureResult)
@@ -3989,9 +3967,9 @@ class TBRepo @Inject constructor(
     }
 
     /**
-     * An MDR_RIF order from before STOP-800 (servers kept them as separate orders). Applied onto
-     * the RIF fields only while the current TrueNat order is MTB Positive and holds no RIF result
-     * of its own, so an old order never overrides the RIF result of a newer MTB order.
+     * An MDR_RIF order from an older server (RIF as a separate order). Applied onto the RIF fields
+     * only while the current TrueNat order is MTB Positive with no RIF result of its own, so an old
+     * order never overrides a newer MTB order's RIF.
      */
     private fun mergeLegacyRifOrder(
         base: TBDiagnosticsCache,
@@ -4161,8 +4139,8 @@ class TBRepo @Inject constructor(
     fun isXrayIntegrated(): Boolean {
         return preferenceDao.getXrayIntegrated()
     }
-    /** A camp hub that creates the referred orders itself (from the screening and, STOP-800,
-     *  from an X-ray result that refers for TrueNat), so this tablet must not push them too. */
+    /** A camp hub that creates the referred orders itself (from the screening and from an X-ray
+     *  result that refers for TrueNat), so this tablet must not push them too. */
     fun hubCreatesOrders(): Boolean =
         preferenceDao.isCampModeEnabled() && preferenceDao.hubCreatesReferralOrders()
 

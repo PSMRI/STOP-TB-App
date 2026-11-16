@@ -44,7 +44,7 @@ class FeedDiagnosticOrderMergeTest {
         truenatIntegrated: Boolean = true, hubCreatesOrders: Boolean = false
     ) = repo.mergeOrderResult(existing, benId, type, data, data.status ?: "IN_PROGRESS", truenatIntegrated, hubCreatesOrders)
 
-    /** An order in the STOP-800 shape: one `results` entry per test. */
+    /** An order in the `results` list shape: one entry per test. */
     private fun mtbOrder(
         status: String, mtb: String? = null, rif: String? = null, id: String = "ext-mtb",
         reasonToCloseMTB: String? = null, reasonToCloseMDRRIF: String? = null
@@ -102,7 +102,7 @@ class FeedDiagnosticOrderMergeTest {
         assertFalse(merge(null, "XRAY_CHEST", presumptive, hubCreatesOrders = true).triggerTrueNat)
     }
 
-    // ── STOP-800: MTB and RIF on one order ───────────────────────────────────
+    // ── MTB and RIF on one order ─────────────────────────────────────────────
 
     @Test
     fun mtbPositiveWithoutRifKeepsTheOrderOpenForRif() { // M2 after the manual entry
@@ -210,8 +210,8 @@ class FeedDiagnosticOrderMergeTest {
         assertEquals(OrderStatus.PENDING.name, after.rifOrderStatus)
     }
 
-    // CodeRabbit (PR #368): an MTB Positive the machine then reports as Error-2 no longer confirms
-    // TB on TB_DIAGNOSTICS either (isKnownTbCase reads these flags).
+    // An MTB Positive the machine then reports as Error-2 no longer confirms TB on
+    // TB_DIAGNOSTICS either (isKnownTbCase reads these flags).
     @Test
     fun error2AfterMtbPositiveClearsTheConfirmation() {
         val positive = merge(null, "SPUTUM_TRUENAT", mtbOrder("PENDING", mtb = "TB Positive")).cache
@@ -230,8 +230,8 @@ class FeedDiagnosticOrderMergeTest {
         assertEquals(true, invalid.isTBConfirmed)
     }
 
-    // CodeRabbit (PR #368): the form save takes results, statuses and the RIF close reason from
-    // the stored row, and derives confirmation from the final values.
+    // The form save takes results, statuses and the RIF close reason from the stored row,
+    // and derives confirmation from the final values.
     @Test
     fun formSaveKeepsRepositoryOwnedFieldsFromTheStoredRow() {
         val stored = merge(null, "SPUTUM_TRUENAT",
@@ -277,8 +277,7 @@ class FeedDiagnosticOrderMergeTest {
         assertEquals(false, updated.isDRTBConfirmed)
     }
 
-    // Found on device: a manual MTB Detected the machine then reported as Error-2 left the
-    // beneficiary "TB confirmed" in TB_SUSPECTED although the order had no MTB result any more.
+    // A manual MTB Detected later reported as Error-2 must not leave TB_SUSPECTED "TB confirmed".
     @Test
     fun suspectedDropsMtbResultWhenTheMachineReportsError2() {
         val positive = merge(null, "SPUTUM_TRUENAT", mtbOrder("PENDING", mtb = "TB Positive")).cache
@@ -293,8 +292,8 @@ class FeedDiagnosticOrderMergeTest {
         assertNull(updated.mdrRifResult)
     }
 
-    // Product rule (16 Nov 2026): a new MTB order (Create New Order) is a new test. Until its
-    // result arrives the beneficiary is not TB confirmed and the earlier MTB / RIF results go.
+    // A new MTB order (Create New Order) is a new test: until its result arrives the beneficiary
+    // is not TB confirmed and the earlier MTB / RIF results go.
     @Test
     fun suspectedDropsEarlierResultsWhileANewOrderWaitsForItsResult() {
         val earlier = merge(null, "SPUTUM_TRUENAT",
@@ -312,8 +311,8 @@ class FeedDiagnosticOrderMergeTest {
         assertEquals(false, updated.isTBConfirmed)
     }
 
-    // Found on amritdemo (HI PUNE): RIF Invalid/Error, Create New Order, MTB Detected on the new
-    // order. TB_SUSPECTED kept the earlier order's RIF "Invalid/Error" while the new RIF was pending.
+    // RIF Invalid/Error, Create New Order, MTB Detected on the new order: TB_SUSPECTED must not
+    // keep the earlier order's RIF "Invalid/Error" while the new RIF is pending.
     @Test
     fun suspectedDropsAnEarlierRifResultWhileTheNewOrderWaitsForItsRif() {
         val earlier = merge(null, "SPUTUM_TRUENAT",
@@ -341,8 +340,7 @@ class FeedDiagnosticOrderMergeTest {
         assertEquals(true, updated.isTBConfirmed)
     }
 
-    // Found on device: MTB Negative and a positive liquid culture left TB_SUSPECTED unconfirmed
-    // while TB_DIAGNOSTICS was confirmed.
+    // MTB Negative with a positive liquid culture confirms TB_SUSPECTED, as on TB_DIAGNOSTICS.
     @Test
     fun suspectedIsConfirmedByAPositiveLiquidCulture() {
         val negative = merge(null, "SPUTUM_TRUENAT", mtbOrder("COMPLETED", mtb = "TB Negative")).cache
@@ -355,8 +353,8 @@ class FeedDiagnosticOrderMergeTest {
         assertEquals(true, updated.isConfirmed)
     }
 
-    // Found on amritdemo: after RIF Not Conducted and Create New Order, TB_SUSPECTED kept the
-    // previous order's "RIF not conducted" reason while the new order waited for its RIF.
+    // After RIF Not Conducted and Create New Order, the previous "RIF not conducted" reason
+    // must not stay on TB_SUSPECTED while the new order waits for RIF.
     @Test
     fun suspectedDropsTheRifReasonOfAPreviousOrder() {
         val closed = merge(null, "SPUTUM_TRUENAT",
@@ -370,8 +368,7 @@ class FeedDiagnosticOrderMergeTest {
         assertNull(updated.reasonForRefusalMDRRIF)
     }
 
-    // Found on amritdemo (FISH PUNE): MTB Not Conducted, then Create New Order kept the old
-    // "MTB not conducted" reason on TB_SUSPECTED while the new order waited for its result.
+    // After MTB Not Conducted and Create New Order, the old reason must not stay on TB_SUSPECTED.
     @Test
     fun suspectedDropsTheMtbReasonOfAPreviousOrder() {
         val closed = merge(null, "SPUTUM_TRUENAT",
@@ -384,8 +381,8 @@ class FeedDiagnosticOrderMergeTest {
         assertNull(updated.reasonForRefusalMTB)
     }
 
-    // Found on amritdemo (ALPHA PUNE): X-ray Not Conducted, then Create New X-Ray Order kept the
-    // old reason on TB_SUSPECTED while the new X-ray order was pending.
+    // After X-ray Not Conducted and Create New X-Ray Order, the old reason must not stay on
+    // TB_SUSPECTED while the new X-ray order is pending.
     @Test
     fun suspectedDropsTheXrayReasonOfAPreviousOrder() {
         val closed = merge(null, "XRAY_CHEST", OrderResultData(

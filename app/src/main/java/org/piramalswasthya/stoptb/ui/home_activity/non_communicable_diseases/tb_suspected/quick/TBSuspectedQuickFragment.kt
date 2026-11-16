@@ -91,9 +91,8 @@ class TBSuspectedQuickFragment : Fragment() {
             binding.tvAgeGender.text = it
         }
         viewModel.showSubmit.observe(viewLifecycleOwner) { show ->
-            // View Result of a test that already has a result: nothing to submit. The first
-            // emission comes before the saved row is read, so a view-only screen keeps Submit
-            // hidden until the row says otherwise (it used to show Submit there and never hide it).
+            // View Result of a test that already has a result: nothing to submit. Submit stays hidden
+            // until the saved row is read, since the first emission comes before it.
             val viewedTestDone = viewedTestIsDone()
             if (viewedTestDone != false) {
                 binding.btnSubmit.visibility = View.GONE
@@ -252,10 +251,8 @@ class TBSuspectedQuickFragment : Fragment() {
     private var confirmingSubmit = false
 
     /**
-     * Whether this is View Result of an X-ray / TrueNat test that is already done (nothing to
-     * submit). Null while a view-only screen has not read its saved row yet, which callers treat
-     * as "don't offer Submit": the button must not appear, or act, before that is known.
-     * False for every editable screen, so Enter Result / Not Conducted are unaffected.
+     * Whether this is View Result of a finished X-ray / TrueNat test (nothing to submit). Null until
+     * the saved row is read, treated as "don't offer Submit". False for every editable screen.
      */
     private fun viewedTestIsDone(): Boolean? {
         if (!viewModel.viewOnly) return false
@@ -287,8 +284,8 @@ class TBSuspectedQuickFragment : Fragment() {
     }
 
     /**
-     * STOP-800: a manual result cannot be edited once saved, so the user confirms the beneficiary
-     * and exactly what is being sent. One save carries one test, so the dialog names one test.
+     * A manual result cannot be edited once saved, so the user confirms the beneficiary and the one
+     * test being sent.
      */
     private fun showConfirmSubmitDialog(submissions: List<TBSuspectedQuickViewModel.ManualSubmission>) {
         val context = requireContext()

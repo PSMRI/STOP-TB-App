@@ -574,9 +574,8 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
     }
 
     /**
-     * STOP-800: the result a user entered by hand for a test (XRAY_CHEST / SPUTUM_TRUENAT /
-     * MDR_RIF), in the server's wording. When the server later holds a different one (a vendor
-     * result replaced it), the card says "Updated by device". Null when nothing was entered.
+     * The result the user entered by hand for a test (XRAY_CHEST / SPUTUM_TRUENAT / MDR_RIF), in the
+     * server's wording; a different server result later shows "Updated by device". Null if none.
      */
     fun getManualEnteredResult(benId: Long, orderType: String): String? =
         pref.getString("manual_entered_result_${benId}_${orderType}", null)
