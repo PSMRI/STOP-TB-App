@@ -80,6 +80,46 @@ class IsPresumptiveProjectionTest {
         assertThat(compared).isEqualTo(answerPermutations().size * asymptomaticValues.size)
     }
 
+    /** The six later questions, in [TbScreeningSymptoms] order, each set alone to [value]. */
+    private fun laterAnswer(slot: Int, value: Boolean?) = List<Boolean?>(6) { index -> if (index == slot) value else null }
+
+    private fun TBScreeningCache.withLater(later: List<Boolean?>) = copy(
+        chestPain = later[0], shortnessOfBreath = later[1], fatigue = later[2], otherSymptoms = later[3],
+        failureToGainWeightInChildren = later[4], decreasedActivityOrPlayfulnessInChildren = later[5]
+    )
+
+    private fun TbScreeningSymptoms.withLater(later: List<Boolean?>) = copy(
+        chestPain = later[0], shortnessOfBreath = later[1], fatigue = later[2], otherSymptoms = later[3],
+        failureToGainWeightInChildren = later[4], decreasedActivityOrPlayfulnessInChildren = later[5]
+    )
+
+    // Fatigue as the only symptom: the form and the server treat it as symptomatic, so the card must too.
+    @Test
+    fun `a yes on any later question is presumptive on both shapes`() {
+        val coreNo = List<Boolean?>(10) { false }
+        for (slot in 0 until 6) {
+            val later = laterAnswer(slot, true)
+            assertThat(TBScreeningDataset.TbScreeningUtils.isPresumptive(cacheOf(coreNo, "NO").withLater(later)))
+                .isTrue()
+            assertThat(TBScreeningDataset.TbScreeningUtils.isPresumptive(projectionOf(coreNo, "NO").withLater(later)))
+                .isTrue()
+        }
+    }
+
+    @Test
+    fun `later questions answered no or not asked keep an all-no core asymptomatic`() {
+        val coreNo = List<Boolean?>(10) { false }
+        listOf(false, null).forEach { value ->
+            for (slot in 0 until 6) {
+                val later = laterAnswer(slot, value)
+                assertThat(TBScreeningDataset.TbScreeningUtils.isPresumptive(cacheOf(coreNo, "YES").withLater(later)))
+                    .isFalse()
+                assertThat(TBScreeningDataset.TbScreeningUtils.isPresumptive(projectionOf(coreNo, "YES").withLater(later)))
+                    .isFalse()
+            }
+        }
+    }
+
     @Test
     fun `null row is undecidable for both shapes`() {
         assertThat(TBScreeningDataset.TbScreeningUtils.isPresumptive(null as TBScreeningCache?))

@@ -72,39 +72,22 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 // not a device is integrated or any order still looks pending (an order saved
                 // without an order id is not in pendingOrders). A pair is cleared only once its
                 // fetch succeeds; the worker keeps rescheduling while any remain.
-                var hasSkippedFeedOrders = false
+                // The feed leaves no orders to fetch one by one; entries an older build recorded are dropped.
+                val hasSkippedFeedOrders = false
                 if (feedActive) {
-                    val skipped = tbRepo.feedSkippedOrdersPastGrace()
-                    skipped.forEach { (benId, type) ->
-                        Timber.d("Polling $type result for benId=$benId skipped by the feed")
-                        if (tbRepo.fetchOrderResult(benId, type) is NetworkResponse.Success) {
-                            tbRepo.ackFeedSkippedOrder(benId, type)
-                        }
-                    }
-                    hasSkippedFeedOrders = preferenceDao.getFeedSkippedOrders().isNotEmpty()
+                    preferenceDao.removeFeedSkippedOrders(preferenceDao.getFeedSkippedOrders().toList())
                 }
 
                 if (!tbRepo.isXrayIntegrated() && !tbRepo.isTruenatIntegrated()) {
                     Timber.d("Skipping automated result polling: no diagnostic devices are integrated")
                 } else {
-                if (!feedActive && tbRepo.isXrayIntegrated()) {
-                    tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST")
-                }
-                if (!feedActive && tbRepo.isTruenatIntegrated()) {
-                    tbRepo.fetchBeneficiariesByStatus("SPUTUM_TRUENAT")
-                    tbRepo.fetchBeneficiariesByStatus("MDR_RIF")
-                }
                 val activeList = tbRepo.getDiagnosticsList()
                 val now = System.currentTimeMillis()
 
-                // Real order/result contract confirmed: PENDING, IN_PROGRESS, COMPLETED, FAILED,
-                // CLOSED, MANUAL_ENTRY. IN_PROGRESS is collapsed into our stored PENDING at the
-                // repository boundary (TBRepo.reducedOrderStatus/createOrder/
-                // fetchBeneficiariesByStatus), so Room never actually holds "IN_PROGRESS" or
-                // "AWAITING_PROVIDER_RESULT" literally — checking PENDING alone is correct.
-                // MANUAL_ENTRY is intentionally excluded here — there is no automated result to
-                // fetch for it; the unconditional fetchBeneficiariesByStatus sweep above already
-                // reconciles it (and FAILED) every time this worker runs.
+                // Statuses: PENDING, IN_PROGRESS, COMPLETED, FAILED, CLOSED, MANUAL_ENTRY, INVALID. IN_PROGRESS is
+                // collapsed into PENDING (TBRepo.reducedOrderStatus); MANUAL_ENTRY has no automated result to wait
+                // for. With the feed active every change arrives through it; without it (no feed, or it failed)
+                // INVALID orders are polled too, as they wait for the machine's retest.
                 data class PendingOrder(val benId: Long, val xray: Boolean, val trueNat: Boolean, val rif: Boolean)
 
                 fun hasRealOrderId(orderId: String?) =
@@ -115,7 +98,8 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                             diag.xrayOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) &&
                             hasRealOrderId(diag.xrayOrderId)
                     val trueNatInProgress = tbRepo.isTruenatIntegrated() &&
-                            diag.trueNatOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) &&
+                            (diag.trueNatOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
+                                (!feedActive && diag.trueNatOrderStatus.equals(OrderStatus.INVALID.name, ignoreCase = true))) &&
                             hasRealOrderId(diag.trueNatOrderId)
                     val rifInProgress = tbRepo.isTruenatIntegrated() &&
                             diag.rifOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) &&

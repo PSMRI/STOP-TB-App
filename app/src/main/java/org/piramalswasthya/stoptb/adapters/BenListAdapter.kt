@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.adapters
 
+import org.piramalswasthya.stoptb.helpers.DiagnosticResultLabels
 import android.graphics.Color
 import android.graphics.Typeface
 import android.text.Spannable
@@ -237,7 +238,8 @@ class BenListAdapter(
             lastCheckedCaption: android.widget.TextView,
             pollingStoppedCaption: View,
             messageCaptionTitle: android.widget.TextView,
-            messageCaptionText: android.widget.TextView
+            messageCaptionText: android.widget.TextView,
+            waitingText: String? = null
         ) {
             val ctx = binding.root.context
 
@@ -291,11 +293,16 @@ class BenListAdapter(
                         messageCaptionText.text = ctx.getString(R.string.order_status_hub_disconnected_desc)
                     } else {
                         setPillIcon(spinning = true, staticRes = R.drawable.ic_health_person, tintRes = android.R.color.holo_orange_dark)
-                        pillText.text = ctx.getString(R.string.order_status_fetching_from_device)
+                        pillText.text = waitingText ?: ctx.getString(R.string.order_status_fetching_from_device)
                         pillText.setTextColor(ContextCompat.getColor(ctx, android.R.color.holo_orange_dark))
 
                         val lastChecked = pref?.getLastCheckedTime(benId, testType.wireValue) ?: 0L
-                        if (lastChecked > 0L) {
+                        if (pref?.isChangesFeedActive() == true) {
+                            // Results arrive only through the changes feed, so there is no per-order check time to show.
+                            statusDivider.visibility = View.VISIBLE
+                            lastCheckedCaption.visibility = View.VISIBLE
+                            lastCheckedCaption.text = ctx.getString(R.string.order_status_feed_auto_update)
+                        } else if (lastChecked > 0L) {
                             statusDivider.visibility = View.VISIBLE
                             lastCheckedCaption.visibility = View.VISIBLE
                             lastCheckedCaption.text = ctx.getString(
@@ -308,6 +315,16 @@ class BenListAdapter(
                         }
                         pollingStoppedCaption.visibility = View.GONE
                     }
+                }
+                // Invalid run ("Error-2"): the machine retests the same order; a manual result is still allowed.
+                status.equals(OrderStatus.INVALID.name, ignoreCase = true) -> {
+                    pillContainer.visibility = View.VISIBLE
+                    setPillIcon(spinning = false, staticRes = R.drawable.ic_exclamation_circle, tintRes = android.R.color.holo_orange_dark)
+                    pillText.text = ctx.getString(R.string.order_status_invalid_retest)
+                    pillText.setTextColor(ContextCompat.getColor(ctx, android.R.color.holo_orange_dark))
+                    statusDivider.visibility = View.GONE
+                    lastCheckedCaption.visibility = View.GONE
+                    pollingStoppedCaption.visibility = View.GONE
                 }
                 status.equals(OrderStatus.MANUAL_ENTRY.name, ignoreCase = true) -> {
                     pillContainer.visibility = View.VISIBLE
@@ -353,98 +370,75 @@ class BenListAdapter(
             binding.btnRifPrimary.icon = null
             binding.btnRifSecondary.icon = null
 
+            val orderStatus = tbDiag?.trueNatOrderStatus
+            val rifDisplay = DiagnosticResultLabels.rif(ctx, tbDiag?.trueNatRifResult)
+            val rifReason = formatDenialReason(tbDiag?.reasonNotConductedRif, tbDiag?.reasonNotConductedRifOther)
+
+            fun bindRifPill(pillStatus: String?, pendingSync: Boolean) = bindPillAndCaptions(
+                pillStatus, tbDiag?.trueNatOrderId, item.benId, DiagnosticOrderType.SPUTUM_TRUENAT, pref, pendingSync,
+                binding.llRifOrderStatusPill, binding.ivRifOrderStatusPillIcon, binding.tvRifOrderStatusPillText,
+                binding.viewRifOrderStatusDivider, binding.tvRifLastCheckedCaption, binding.llRifPollingStoppedCaption,
+                binding.tvRifPollingStoppedCaptionTitle, binding.tvRifPollingStoppedCaptionText,
+                waitingText = ctx.getString(R.string.order_status_waiting_rif)
+            )
+
+            // RIF has no order of its own, so no Retry Referral / Create New Order here;
+            // a new MTB order (main button) brings a new RIF.
             when {
-                tbDiag?.rifManualResultPendingSync == true -> {
-                    binding.tvRifOrderStatus.visibility = View.GONE
-                    bindPillAndCaptions(
-                        status, tbDiag?.rifOrderId, item.benId, DiagnosticOrderType.MDR_RIF, pref, true,
-                        binding.llRifOrderStatusPill, binding.ivRifOrderStatusPillIcon, binding.tvRifOrderStatusPillText,
-                        binding.viewRifOrderStatusDivider, binding.tvRifLastCheckedCaption, binding.llRifPollingStoppedCaption,
-                        binding.tvRifPollingStoppedCaptionTitle, binding.tvRifPollingStoppedCaptionText
-                    )
-                }
-                status.equals(OrderStatus.FAILED.name, ignoreCase = true) -> {
-                    if (!tbDiag?.errorMsgRif.isNullOrBlank()) {
-                        binding.tvRifErrorMsg.visibility = View.VISIBLE
-                        binding.tvRifErrorMsg.text = ctx.getString(R.string.error_message) + tbDiag?.errorMsgRif
-                    }
-                    binding.btnRifPrimary.visibility = View.VISIBLE
-                    binding.btnRifPrimary.text = ctx.getString(R.string.order_status_retry_referral)
-                    binding.btnRifPrimary.setBackgroundTintList(ContextCompat.getColorStateList(ctx, android.R.color.holo_red_dark))
-                    val enabled = canActOnReferral && !retryingBenIds.contains(item.benId)
-                    binding.btnRifPrimary.isEnabled = enabled
-                    binding.btnRifPrimary.alpha = if (enabled) 1.0f else 0.5f
-                    binding.btnRifPrimary.setOnClickListener {
-                        clickListener?.onClickOrderAction(item, OrderAction.RETRY_PUSH, DiagnosticOrderType.MDR_RIF)
-                    }
-                }
-                status.equals(OrderStatus.COMPLETED.name, ignoreCase = true) -> {
+                tbDiag?.rifManualResultPendingSync == true -> bindRifPill(orderStatus, pendingSync = true)
+                rifDisplay != null -> {
                     binding.llRifSummaryStrip.visibility = View.VISIBLE
-                    val standardized = RifResult.fromResultText(tbDiag?.trueNatRifResult)
-                    val displayVal = standardized?.displayValue ?: tbDiag?.trueNatRifResult ?: "Available"
-                    binding.tvRifSummaryText.text = "RIF Result: $displayVal"
+                    binding.tvRifSummaryText.text = withDeviceUpdateNote(
+                        ctx.getString(R.string.order_status_rif_result, rifDisplay),
+                        DiagnosticResultLabels.replacedByDevice(
+                            "MDR_RIF", pref?.getManualEnteredResult(item.benId, "MDR_RIF"), tbDiag?.trueNatRifResult
+                        )
+                    )
                     binding.btnViewRifResult.setOnClickListener {
                         clickListener?.onClickOrderAction(item, OrderAction.VIEW_RIF, DiagnosticOrderType.MDR_RIF)
                     }
                 }
-                status.equals(OrderStatus.CLOSED.name, ignoreCase = true) -> {
+                rifReason.isNotBlank() || status.equals(OrderStatus.CLOSED.name, ignoreCase = true) -> {
                     binding.tvRifOrderStatus.visibility = View.VISIBLE
-                    val reasonStr = formatDenialReason(tbDiag?.reasonNotConductedRif, tbDiag?.reasonNotConductedRifOther)
-                    binding.tvRifOrderStatus.text = if (reasonStr.isNotBlank()) {
-                        "Order Status: Closed — Not Conducted\nReason: $reasonStr"
+                    binding.tvRifOrderStatus.text = if (rifReason.isNotBlank()) {
+                        ctx.getString(R.string.order_status_rif_not_conducted, rifReason)
                     } else {
-                        "Order Status: Closed — Expired (Result not entered)"
-                    }
-                    binding.btnRifPrimary.visibility = View.VISIBLE
-                    binding.btnRifPrimary.text = ctx.getString(R.string.order_status_create_new_order)
-                    binding.btnRifPrimary.setBackgroundTintList(ContextCompat.getColorStateList(ctx, android.R.color.holo_blue_dark))
-                    val reorderEnabled = canActOnReferral && !retryingBenIds.contains(item.benId)
-                    binding.btnRifPrimary.isEnabled = reorderEnabled
-                    binding.btnRifPrimary.alpha = if (reorderEnabled) 1.0f else 0.5f
-                    binding.btnRifPrimary.setOnClickListener {
-                        clickListener?.onClickOrderAction(item, OrderAction.REORDER, DiagnosticOrderType.MDR_RIF)
+                        ctx.getString(R.string.order_status_rif_closed)
                     }
                 }
-                // A missing order id on its own does NOT mean the referral failed. Every
-                // status this app stores for these three tests comes from the backend's own
-                // getBeneficiariesByStatus, which only ever reports beneficiaries that already
-                // HAVE an order - awaitingProviderResult, completed, awaitingManualEntry, failed
-                // and closed all imply one exists. A beneficiary referred from the registrar tab
-                // therefore arrives on the nurse tab with a real backend order, a status of
-                // PENDING or MANUAL_ENTRY, and no local order id yet, because that sweep carries
-                // benRegIds only. Offering "Retry Referral" there invites a duplicate order for
-                // a referral that already succeeded.
-                //
-                // A genuine failure is already caught by the FAILED branch above, so the only
-                // case left for retry is the one with no backend evidence at all: no status and
-                // no id, i.e. a referral this device never managed to push.
-                status.isNullOrBlank() && tbDiag?.rifOrderId.isMissingOrderId() -> {
-                    clickListener?.onClickOrderAction(item, OrderAction.CHECK_PUSH_ACTIVE, DiagnosticOrderType.MDR_RIF)
-                    if (!tbDiag?.errorMsgRif.isNullOrBlank()) {
-                        binding.tvRifErrorMsg.visibility = View.VISIBLE
-                        binding.tvRifErrorMsg.text = ctx.getString(R.string.error_message) + tbDiag?.errorMsgRif
-                    }
+                // MTB Detected was saved here but has not reached the server yet; RIF can only
+                // be entered after it has.
+                tbDiag?.trueNatManualResultPendingSync == true -> bindRifPill(orderStatus, pendingSync = true)
+                // The vendor gave MTB Detected and completed the order without a RIF result
+                // (its RIF report is still to come); the server takes no manual RIF on it.
+                orderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ->
+                    bindRifPill(OrderStatus.PENDING.name, pendingSync = false)
+                // The vendor reported the RIF test FAILED. The server takes a hand-entered RIF on a
+                // FAILED order (but no reasonToCloseRif), so only Enter RIF Result is offered.
+                orderStatus.equals(OrderStatus.FAILED.name, ignoreCase = true) -> {
+                    binding.tvRifErrorMsg.visibility = View.VISIBLE
+                    binding.tvRifErrorMsg.text = ctx.getString(R.string.order_status_rif_failed) +
+                            (tbDiag?.errorMsgTrueNat?.takeIf { it.isNotBlank() }?.let { " — $it" } ?: "")
                     binding.btnRifPrimary.visibility = View.VISIBLE
-                    binding.btnRifPrimary.text = ctx.getString(R.string.order_status_retry_referral)
+                    binding.btnRifPrimary.text = ctx.getString(R.string.order_status_enter_rif_result)
+                    binding.btnRifPrimary.icon = ContextCompat.getDrawable(ctx, R.drawable.ic_pencil)
+                    binding.btnRifPrimary.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
                     binding.btnRifPrimary.setBackgroundTintList(ContextCompat.getColorStateList(ctx, android.R.color.holo_red_dark))
-                    val enabled = canActOnReferral && !retryingBenIds.contains(item.benId)
-                    binding.btnRifPrimary.isEnabled = enabled
-                    binding.btnRifPrimary.alpha = if (enabled) 1.0f else 0.5f
+                    binding.btnRifPrimary.isEnabled = canActOnReferral
+                    binding.btnRifPrimary.alpha = if (canActOnReferral) 1.0f else 0.5f
                     binding.btnRifPrimary.setOnClickListener {
-                        clickListener?.onClickOrderAction(item, OrderAction.RETRY_PUSH, DiagnosticOrderType.MDR_RIF)
+                        clickListener?.onClickOrderAction(item, OrderAction.COMPLETE_RIF, DiagnosticOrderType.MDR_RIF)
                     }
                 }
-                else -> {
-                    binding.tvRifOrderStatus.visibility = View.GONE
-                    bindPillAndCaptions(
-                        status, tbDiag?.rifOrderId, item.benId, DiagnosticOrderType.MDR_RIF, pref, tbDiag?.rifManualResultPendingSync == true,
-                        binding.llRifOrderStatusPill, binding.ivRifOrderStatusPillIcon, binding.tvRifOrderStatusPillText,
-                        binding.viewRifOrderStatusDivider, binding.tvRifLastCheckedCaption, binding.llRifPollingStoppedCaption,
-                        binding.tvRifPollingStoppedCaptionTitle, binding.tvRifPollingStoppedCaptionText
-                    )
+                // PENDING (vendor running RIF), MANUAL_ENTRY (no vendor) or INVALID (RIF run was
+                // invalid, the machine retests): RIF can be entered or closed by hand.
+                orderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
+                        orderStatus.equals(OrderStatus.MANUAL_ENTRY.name, ignoreCase = true) ||
+                        orderStatus.equals(OrderStatus.INVALID.name, ignoreCase = true) -> {
+                    bindRifPill(orderStatus, pendingSync = false)
 
                     binding.btnRifPrimary.visibility = View.VISIBLE
-                    binding.btnRifPrimary.text = ctx.getString(R.string.order_status_enter_result)
+                    binding.btnRifPrimary.text = ctx.getString(R.string.order_status_enter_rif_result)
                     binding.btnRifPrimary.icon = ContextCompat.getDrawable(ctx, R.drawable.ic_pencil)
                     binding.btnRifPrimary.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
                     binding.btnRifPrimary.setBackgroundTintList(ContextCompat.getColorStateList(ctx, android.R.color.holo_red_dark))
@@ -455,7 +449,7 @@ class BenListAdapter(
                     }
 
                     binding.btnRifSecondary.visibility = View.VISIBLE
-                    binding.btnRifSecondary.text = ctx.getString(R.string.order_status_not_conducted)
+                    binding.btnRifSecondary.text = ctx.getString(R.string.order_status_rif_not_conducted_button)
                     binding.btnRifSecondary.icon = ContextCompat.getDrawable(ctx, R.drawable.ic_block)
                     binding.btnRifSecondary.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
                     binding.btnRifSecondary.setBackgroundTintList(ContextCompat.getColorStateList(ctx, android.R.color.holo_orange_dark))
@@ -465,8 +459,13 @@ class BenListAdapter(
                         clickListener?.onClickOrderAction(item, OrderAction.NOT_CONDUCTED, DiagnosticOrderType.MDR_RIF)
                     }
                 }
+                else -> Unit
             }
         }
+        /** "MTB: MTB Detected · Updated by device" when a vendor result replaced the manual one. */
+        private fun withDeviceUpdateNote(text: String, replaced: Boolean): String =
+            if (replaced) binding.root.context.getString(R.string.order_status_updated_by_device_suffix, text) else text
+
         private fun bindOrderStatusExtras(
             item: BenBasicDomain,
             source: Int,
@@ -493,14 +492,36 @@ class BenListAdapter(
                         binding.viewOrderStatusDivider, binding.tvLastCheckedCaption, binding.llPollingStoppedCaption,
                         binding.tvPollingStoppedCaptionTitle, binding.tvPollingStoppedCaptionText
                     )
+                    // A vendor X-ray result replaced the one entered by hand.
+                    if (status.equals(OrderStatus.COMPLETED.name, ignoreCase = true) &&
+                        tbDiag?.xrayManualResultPendingSync != true &&
+                        DiagnosticResultLabels.replacedByDevice(
+                            "XRAY_CHEST", pref?.getManualEnteredResult(item.benId, "XRAY_CHEST"), tbDiag?.chestXRayResult
+                        )
+                    ) {
+                        binding.llOrderStatusPill.visibility = View.VISIBLE
+                        (binding.ivOrderStatusPillIcon.drawable as? androidx.swiperefreshlayout.widget.CircularProgressDrawable)?.stop()
+                        binding.ivOrderStatusPillIcon.setImageResource(R.drawable.ic_health_person)
+                        binding.ivOrderStatusPillIcon.imageTintList = ContextCompat.getColorStateList(ctx, android.R.color.holo_blue_dark)
+                        binding.tvOrderStatusPillText.text = ctx.getString(
+                            R.string.order_status_xray_updated_by_device, DiagnosticResultLabels.xray(tbDiag?.chestXRayResult)
+                        )
+                        binding.tvOrderStatusPillText.setTextColor(ContextCompat.getColor(ctx, android.R.color.holo_blue_dark))
+                    }
                 }
                 7 -> {
                     val status = tbDiag?.trueNatOrderStatus
-                    val isMtbCompleted = status.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
                     val isPendingTrueNatSync = tbDiag?.trueNatManualResultPendingSync == true
-                    if (isMtbCompleted && !isPendingTrueNatSync) {
+                    val mtbDisplay = DiagnosticResultLabels.mtb(ctx, tbDiag?.naatResult)
+                    // The MTB result shows as soon as it is known, even while the order waits for RIF.
+                    if (mtbDisplay != null && !isPendingTrueNatSync) {
                         binding.llMtbSummaryStrip.visibility = View.VISIBLE
-                        binding.tvMtbSummaryText.text = "MTB Test Completed"
+                        binding.tvMtbSummaryText.text = withDeviceUpdateNote(
+                            ctx.getString(R.string.order_status_mtb_result, mtbDisplay),
+                            DiagnosticResultLabels.replacedByDevice(
+                                "SPUTUM_TRUENAT", pref?.getManualEnteredResult(item.benId, "SPUTUM_TRUENAT"), tbDiag?.naatResult
+                            )
+                        )
                         binding.btnViewMtbResult.setOnClickListener {
                             clickListener?.onClickOrderAction(item, OrderAction.VIEW, DiagnosticOrderType.SPUTUM_TRUENAT)
                         }
@@ -513,8 +534,9 @@ class BenListAdapter(
                         )
                     }
 
-                    val isMtbPositive = isMtbCompleted &&
-                            MtbResult.fromResultText(tbDiag?.naatResult) == MtbResult.TB_POSITIVE
+                    // The RIF block's only condition: MTB Detected. A later server result that
+                    // replaces it (e.g. a vendor MTB Not Detected) hides the block again on its own.
+                    val isMtbPositive = MtbResult.fromResultText(tbDiag?.naatResult) == MtbResult.TB_POSITIVE
                     if (isMtbPositive) {
                         binding.viewRifDivider.visibility = View.VISIBLE
                         bindRifBlock(item, tbDiag, canActOnReferral, pref, retryingBenIds, clickListener)
@@ -774,7 +796,14 @@ class BenListAdapter(
                         xrayResult.equals("Normal", ignoreCase = true)
 
                 binding.llXrayTile.visibility = if (isPregnantFemale) View.GONE else View.VISIBLE
-                binding.llTruenatTile.visibility = if (isNegativeXray) View.GONE else View.VISIBLE
+                // Symptomatic beneficiaries get TrueNat whatever the X-ray result, so a Normal X-ray hides the
+                // TrueNat tile only for an asymptomatic, unreferred beneficiary with no MTB order or result.
+                val hasTrueNat = isPresumptive == true || isPregnantFemale ||
+                        tbDiagForStatus?.isReferredForSputum == true ||
+                        !tbDiagForStatus?.trueNatOrderId.isMissingOrderId() ||
+                        !tbDiagForStatus?.trueNatOrderStatus.isNullOrBlank() ||
+                        !tbDiagForStatus?.naatResult.isNullOrBlank()
+                binding.llTruenatTile.visibility = if (isNegativeXray && !hasTrueNat) View.GONE else View.VISIBLE
 
                 // Clinical Assessment tile removed from the card — the same referral criteria is
                 // already surfaced via the dedicated Clinical Assessment line listing.
@@ -783,7 +812,8 @@ class BenListAdapter(
                 binding.llScreeningStatus.weightSum = listOf(
                     true, // TB Symptoms tile is always visible
                     !isPregnantFemale,
-                    !isNegativeXray
+                    // Must match the TrueNat tile's visibility above, or a shown tile gets no width.
+                    !isNegativeXray || hasTrueNat
                 ).count { it }.toFloat()
                 binding.ivXray.setImageResource(
                     if (!xrayResult.isNullOrBlank()) R.drawable.circle_check else R.drawable.circle_uncheck
@@ -803,7 +833,10 @@ class BenListAdapter(
                 )
                 binding.tvTruenatStatus.text = if (truenatResult.isNullOrBlank()) "Unscreened" else "Screened"
                 binding.tvTruenatStatus.visibility = View.GONE
-                binding.tvTruenatResult.text = formatScreeningResult(truenatResult)
+                // The app's wording ("MTB Detected"), not the server's ("TB Positive").
+                binding.tvTruenatResult.text = formatScreeningResult(
+                    DiagnosticResultLabels.mtb(binding.root.context, truenatResult) ?: truenatResult
+                )
                 binding.tvTruenatResult.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
             } else {
                 binding.detailsDivider.visibility = View.GONE
@@ -904,14 +937,18 @@ class BenListAdapter(
                                 referredForSputum == false -> {
                                     ButtonConfig("TEST REFUSED", android.R.color.darker_gray, OrderAction.NONE, DiagnosticOrderType.SPUTUM_TRUENAT)
                                 }
-                                status.equals(OrderStatus.FAILED.name, ignoreCase = true) -> {
+                                // A FAILED order whose MTB is already Detected failed in its RIF test:
+                                // the RIF block offers Enter RIF Result instead.
+                                status.equals(OrderStatus.FAILED.name, ignoreCase = true) &&
+                                        MtbResult.fromResultText(tbDiag?.naatResult) != MtbResult.TB_POSITIVE -> {
                                     bindErrorMsg(tbDiag?.errorMsgTrueNat)
                                     ButtonConfig(context.getString(R.string.order_status_retry_referral), android.R.color.holo_red_dark, OrderAction.RETRY_PUSH, DiagnosticOrderType.SPUTUM_TRUENAT)
                                 }
-                                status.equals(OrderStatus.COMPLETED.name, ignoreCase = true) -> {
-                                    // Collapses to the compact one-line summary strip (bound
-                                    // below) — deliberately quiet, no pill, no full-size button,
-                                    // so it doesn't compete with the RIF block once RIF is active.
+                                // Once MTB has a result (even only saved locally), the MTB part collapses to the strip
+                                // and any RIF action is in the RIF block, even while the order still waits for RIF.
+                                status.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
+                                        (!tbDiag?.naatResult.isNullOrBlank() &&
+                                                !status.equals(OrderStatus.CLOSED.name, ignoreCase = true)) -> {
                                     binding.btnVitalScreen.visibility = View.GONE
                                     ButtonConfig("", android.R.color.holo_green_dark, OrderAction.NONE, DiagnosticOrderType.SPUTUM_TRUENAT)
                                 }
@@ -1088,6 +1125,9 @@ class BenListAdapter(
                                             "Order Status: Closed — Declined\nReason: $declineReasonStr"
                                         notConductedReasonStr.isNotBlank() ->
                                             "Order Status: Closed — Not Conducted\nReason: $notConductedReasonStr"
+                                        // Closed after a result (MTB Invalid/Error, or RIF closed / invalid): the MTB strip and
+                                        // the RIF block say why; it did not expire.
+                                        !tbDiag?.naatResult.isNullOrBlank() -> "Order Status: Closed"
                                         else ->
                                             "Order Status: Closed — Expired (Result not entered)"
                                     }

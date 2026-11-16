@@ -87,14 +87,16 @@ interface TBDao {
     fun getAllTbDiagnosticsCardFields(): Flow<List<TbDiagnosticsCardFields>>
 
     /**
-     * The eleven values the beneficiary cards derive "Presumptive / Asymptomatic" from. Kept
+     * The values the beneficiary cards derive "Presumptive / Asymptomatic" from. Kept
      * narrow deliberately: `SELECT *` here loaded 50 columns per beneficiary, four of them
      * TypeConverter-parsed lists, to render one label. See [TbScreeningSymptoms].
      */
     @Query(
         "SELECT benId, coughMoreThan2Weeks, bloodInSputum, feverMoreThan2Weeks, riseOfFever, " +
                 "lossOfAppetite, lossOfWeight, nightSweats, historyOfTb, takingAntiTBDrugs, " +
-                "familySufferingFromTB, asymptomatic FROM TB_SCREENING"
+                "familySufferingFromTB, asymptomatic, chestPain, shortnessOfBreath, fatigue, " +
+                "otherSymptoms, failureToGainWeightInChildren, decreasedActivityOrPlayfulnessInChildren " +
+                "FROM TB_SCREENING"
     )
     fun getAllTbScreeningSymptoms(): Flow<List<TbScreeningSymptoms>>
 
@@ -104,7 +106,7 @@ interface TBDao {
     /**
      * The beneficiaries in [benIds] that already hold a usable order id for one test type.
      *
-     * The order-id backfill in [TBRepo.fetchBeneficiariesByStatus] used to decide this one
+     * The order-id backfill (removed with the getBeneficiariesByStatus sweep) used to decide this one
      * beneficiary at a time - a `getBenByRegId` plus a whole-row `getTbDiagnosticsByBenId` per
      * entry, over the entire in-flight backlog - which is thousands of statements queued on the
      * single Room executor before the first one is even needed. Asking SQLite which ids are
@@ -192,6 +194,10 @@ interface TBDao {
     /** Get latest TB_DIAGNOSTICS record for ben — used to retrieve existing id before save */
     @Query("SELECT * FROM TB_DIAGNOSTICS WHERE benId = :benId ORDER BY id DESC LIMIT 1")
     suspend fun getTbDiagnosticsByBenId(benId: Long): TBDiagnosticsCache?
+
+    /** The same row as [getTbDiagnosticsByBenId], re-emitted whenever TB_DIAGNOSTICS changes. */
+    @Query("SELECT * FROM TB_DIAGNOSTICS WHERE benId = :benId ORDER BY id DESC LIMIT 1")
+    fun observeTbDiagnosticsByBenId(benId: Long): Flow<TBDiagnosticsCache?>
 
     // @Upsert, not @Insert(REPLACE): REPLACE is DELETE + INSERT in SQLite, so every
     // save rewrote the whole row twice and churned its rowid. Both entities have an

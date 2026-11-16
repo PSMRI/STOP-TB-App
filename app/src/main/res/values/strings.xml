@@ -1444,7 +1444,19 @@
     <string name="order_status_not_conducted">Not Conducted</string>
     <string name="order_status_view_mtb_result">View MTB Result</string>
     <string name="order_status_view_rif_result">View RIF Result</string>
-    <string name="order_status_rif_block_label">RIF Test · triggered by MTB Positive</string>
+    <string name="order_status_rif_block_label">RIF Test</string>
+    <string name="order_status_mtb_result">MTB: %1$s</string>
+    <string name="order_status_rif_result">RIF: %1$s</string>
+    <string name="order_status_waiting_rif">Waiting for RIF result from device</string>
+    <string name="order_status_enter_rif_result">Enter RIF Result</string>
+    <string name="order_status_rif_not_conducted_button">RIF Not Conducted</string>
+    <string name="order_status_rif_not_conducted">RIF Not Conducted — %1$s</string>
+    <string name="order_status_rif_closed">RIF Closed (Result not entered)</string>
+    <string name="order_status_feed_auto_update">Updates automatically from Camp Hub</string>
+    <string name="order_status_invalid_retest">Invalid — retest running on machine</string>
+    <string name="order_status_rif_failed">RIF test failed on the machine</string>
+    <string name="order_status_updated_by_device_suffix">%1$s · Updated by device</string>
+    <string name="order_status_xray_updated_by_device">Result updated by device: %1$s</string>
     <string name="order_status_create_new_order">Create New Order</string>
     <string name="order_status_clinical_assessment_referred">Referred for Clinical Assessment &amp; Diagnosis</string>
     <string name="order_status_retry_referral">Retry Referral</string>
@@ -1456,6 +1468,9 @@
     <string name="error_beneficiary_id_invalid">Beneficiary ID not valid</string>
     <string name="error_no_user_logged_in">No user logged in!!</string>
     <string name="error_camp_hub_not_connected">Camp Hub not connected</string>
+    <string name="error_rif_part_of_mtb_order">RIF is part of the MTB order; no separate RIF order is created</string>
+    <string name="error_order_changed_reopen">This test\'s order changed while the form was open. Close the form and open it again.</string>
+    <string name="error_form_changed_resubmit">The form changed after you confirmed. Check the values and submit again.</string>
     <string name="error_http_code">HTTP Error %1$d</string>
     <string name="error_no_location_record_found">No location record found</string>
     <string name="error_camp_mode_disabled">Camp Mode is disabled</string>
@@ -1668,6 +1683,24 @@
     <string name="rif_result_non_dr_tb">Non DR TB</string>
     <string name="rif_result_indeterminate">Indeterminate</string>
     <string name="rif_result_invalid_error">Invalid/Error</string>
+    <!-- How results are shown in the app (the server's wording is "TB Positive", "DR TB" ...) -->
+    <string name="result_display_mtb_detected">MTB Detected</string>
+    <string name="result_display_mtb_not_detected">MTB Not Detected</string>
+    <string name="result_display_rif_detected">Rif Resistance Detected</string>
+    <string name="result_display_rif_not_detected">Rif Resistance Not Detected</string>
+    <string name="result_display_indeterminate">Indeterminate</string>
+    <string name="result_display_invalid_error">Invalid/Error</string>
+    <string name="confirm_test_xray">Chest X-Ray</string>
+    <string name="confirm_test_mtb">TrueNat MTB</string>
+    <string name="confirm_test_rif">TrueNat RIF</string>
+    <string name="confirm_result_title">Confirm %1$s result</string>
+    <string name="confirm_not_conducted_title">Confirm %1$s Not Conducted</string>
+    <string name="confirm_result_line">%1$s: %2$s</string>
+    <string name="confirm_not_conducted_value">Not Conducted — %1$s</string>
+    <string name="confirm_result_ben_line">%1$s · Ben ID %2$s · %3$s</string>
+    <string name="confirm_result_question">Are you sure you want to submit this result for %1$s? It cannot be edited after saving.</string>
+    <string name="confirm_result_yes">Yes, Submit</string>
+    <string name="confirm_result_no">No</string>
 
 
 
