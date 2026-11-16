@@ -87,14 +87,16 @@ interface TBDao {
     fun getAllTbDiagnosticsCardFields(): Flow<List<TbDiagnosticsCardFields>>
 
     /**
-     * The eleven values the beneficiary cards derive "Presumptive / Asymptomatic" from. Kept
+     * The values the beneficiary cards derive "Presumptive / Asymptomatic" from. Kept
      * narrow deliberately: `SELECT *` here loaded 50 columns per beneficiary, four of them
      * TypeConverter-parsed lists, to render one label. See [TbScreeningSymptoms].
      */
     @Query(
         "SELECT benId, coughMoreThan2Weeks, bloodInSputum, feverMoreThan2Weeks, riseOfFever, " +
                 "lossOfAppetite, lossOfWeight, nightSweats, historyOfTb, takingAntiTBDrugs, " +
-                "familySufferingFromTB, asymptomatic FROM TB_SCREENING"
+                "familySufferingFromTB, asymptomatic, chestPain, shortnessOfBreath, fatigue, " +
+                "otherSymptoms, failureToGainWeightInChildren, decreasedActivityOrPlayfulnessInChildren " +
+                "FROM TB_SCREENING"
     )
     fun getAllTbScreeningSymptoms(): Flow<List<TbScreeningSymptoms>>
 

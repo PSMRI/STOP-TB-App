@@ -799,7 +799,17 @@ class BenListAdapter(
                         xrayResult.equals("Normal", ignoreCase = true)
 
                 binding.llXrayTile.visibility = if (isPregnantFemale) View.GONE else View.VISIBLE
-                binding.llTruenatTile.visibility = if (isNegativeXray) View.GONE else View.VISIBLE
+                // Product rule (16 Nov 2026): a symptomatic beneficiary gets both an X-ray and a
+                // TrueNat order whatever the X-ray result, and a pregnant woman gets TrueNat only.
+                // So a Normal X-ray hides the TrueNat tile only for someone with no TrueNat at all
+                // (asymptomatic, not referred, no MTB order or result). It used to hide it for
+                // every Normal X-ray, including a symptomatic beneficiary's MTB order and result.
+                val hasTrueNat = isPresumptive == true || isPregnantFemale ||
+                        tbDiagForStatus?.isReferredForSputum == true ||
+                        !tbDiagForStatus?.trueNatOrderId.isMissingOrderId() ||
+                        !tbDiagForStatus?.trueNatOrderStatus.isNullOrBlank() ||
+                        !tbDiagForStatus?.naatResult.isNullOrBlank()
+                binding.llTruenatTile.visibility = if (isNegativeXray && !hasTrueNat) View.GONE else View.VISIBLE
 
                 // Clinical Assessment tile removed from the card — the same referral criteria is
                 // already surfaced via the dedicated Clinical Assessment line listing.
@@ -808,7 +818,8 @@ class BenListAdapter(
                 binding.llScreeningStatus.weightSum = listOf(
                     true, // TB Symptoms tile is always visible
                     !isPregnantFemale,
-                    !isNegativeXray
+                    // Must match the TrueNat tile's visibility above, or a shown tile gets no width.
+                    !isNegativeXray || hasTrueNat
                 ).count { it }.toFloat()
                 binding.ivXray.setImageResource(
                     if (!xrayResult.isNullOrBlank()) R.drawable.circle_check else R.drawable.circle_uncheck

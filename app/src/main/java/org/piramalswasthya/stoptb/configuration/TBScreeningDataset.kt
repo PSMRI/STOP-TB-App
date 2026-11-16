@@ -311,15 +311,22 @@ class TBScreeningDataset(
     object TbScreeningUtils {
 
         /**
-         * true  = Presumptive (any of the 10 answers is Yes)
-         * false = Non-presumptive (all 10 answers are No)
+         * true  = Presumptive (any symptom answer is Yes)
+         * false = Non-presumptive (the ten core answers are No and no later question is Yes)
          * null  = cannot decide (no record / unanswered)
+         *
+         * The card has to agree with the screening form, which counts chest pain, shortness of
+         * breath, fatigue, Others and the two child-only questions as symptoms too
+         * ([requiredSymptomFields] + [others]). Only the ten core answers decided before, so a
+         * beneficiary whose one symptom was, say, fatigue showed "Asymptomatic" on the card while
+         * the form, the server and the referral orders treated them as symptomatic. The later
+         * questions are null on older rows (not asked), so they only ever add a Yes.
          */
         fun isPresumptive(saved: TBScreeningCache?): Boolean? {
             if (saved == null) return null
 
             return decide(
-                answers = listOf(
+                coreAnswers = listOf(
                     saved.coughMoreThan2Weeks,
                     saved.bloodInSputum,
                     saved.feverMoreThan2Weeks,
@@ -330,6 +337,14 @@ class TBScreeningDataset(
                     saved.historyOfTb,
                     saved.takingAntiTBDrugs,
                     saved.familySufferingFromTB
+                ),
+                laterAnswers = listOf(
+                    saved.chestPain,
+                    saved.shortnessOfBreath,
+                    saved.fatigue,
+                    saved.otherSymptoms,
+                    saved.failureToGainWeightInChildren,
+                    saved.decreasedActivityOrPlayfulnessInChildren
                 ),
                 asymptomatic = saved.asymptomatic
             )
@@ -343,7 +358,7 @@ class TBScreeningDataset(
             if (saved == null) return null
 
             return decide(
-                answers = listOf(
+                coreAnswers = listOf(
                     saved.coughMoreThan2Weeks,
                     saved.bloodInSputum,
                     saved.feverMoreThan2Weeks,
@@ -355,13 +370,21 @@ class TBScreeningDataset(
                     saved.takingAntiTBDrugs,
                     saved.familySufferingFromTB
                 ),
+                laterAnswers = listOf(
+                    saved.chestPain,
+                    saved.shortnessOfBreath,
+                    saved.fatigue,
+                    saved.otherSymptoms,
+                    saved.failureToGainWeightInChildren,
+                    saved.decreasedActivityOrPlayfulnessInChildren
+                ),
                 asymptomatic = saved.asymptomatic
             )
         }
 
-        private fun decide(answers: List<Boolean?>, asymptomatic: String?): Boolean? = when {
-            answers.any { answer -> answer == true } -> true
-            answers.all { answer -> answer == false } -> false
+        private fun decide(coreAnswers: List<Boolean?>, laterAnswers: List<Boolean?>, asymptomatic: String?): Boolean? = when {
+            (coreAnswers + laterAnswers).any { answer -> answer == true } -> true
+            coreAnswers.all { answer -> answer == false } -> false
             // Fallback to the stored value (asymptomatic YES = not presumptive)
             else -> when (asymptomatic) {
                 "NO" -> true
