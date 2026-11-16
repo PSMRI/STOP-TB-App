@@ -110,6 +110,9 @@ class GeneralOpdFormFragment : Fragment() {
         viewModel.prescriptionVisible.observe(viewLifecycleOwner) {
             binding.prescriptionSection.visibility = if (it) View.VISIBLE else View.GONE
         }
+        viewModel.notesVisible.observe(viewLifecycleOwner) {
+            binding.notesLayout.visibility = if (it) View.VISIBLE else View.GONE
+        }
         viewModel.notes.observe(viewLifecycleOwner) {
             if (binding.notes.text.toString() != it) binding.notes.setText(it)
             binding.notes.isEnabled = !(viewModel.recordExists.value == true || viewModel.viewOnly)
