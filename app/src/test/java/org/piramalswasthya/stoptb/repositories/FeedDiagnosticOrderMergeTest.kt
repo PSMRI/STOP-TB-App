@@ -187,15 +187,74 @@ class FeedDiagnosticOrderMergeTest {
         assertEquals(true, row.trueNatManualResultPendingSync)
     }
 
+    // An older server: the MTB order comes in the flat shape and RIF on its own MDR_RIF order.
     @Test
-    fun aLegacyRifOrderFillsRifOnlyWhenTheMtbOrderHasNone() {
-        val mtbPositive = merge(null, "SPUTUM_TRUENAT", mtbOrder("COMPLETED", mtb = "TB Positive")).cache
+    fun aLegacyRifOrderFillsRifOfALegacyMtbOrder() {
+        val mtbPositive = merge(null, "SPUTUM_TRUENAT",
+            OrderResultData(externalOrderId = "ext-mtb", orderType = "MTB", status = "COMPLETED", resultSummary = "MTB detected")).cache
         val legacy = OrderResultData(externalOrderId = "ext-rif", orderType = "MDR_RIF", status = "COMPLETED", resultSummary = "Rif Resistance Detected")
         val withLegacy = merge(mtbPositive, "MDR_RIF", legacy).cache
         assertEquals("DR TB", withLegacy.trueNatRifResult)
 
         val ownRif = merge(null, "SPUTUM_TRUENAT", mtbOrder("COMPLETED", mtb = "TB Positive", rif = "Non DR TB")).cache
         assertEquals("Non DR TB", merge(ownRif, "MDR_RIF", legacy).cache.trueNatRifResult)
+    }
+    @Test
+    fun aLegacyRifOrderNeverFillsANewMtbOrderWaitingForItsRif() {
+        val waiting = merge(null, "SPUTUM_TRUENAT", mtbOrder("PENDING", mtb = "TB Positive", id = "ext-new")).cache
+        assertEquals("ext-new", waiting.rifOrderId)
+        val legacy = OrderResultData(externalOrderId = "ext-old-rif", orderType = "MDR_RIF", status = "COMPLETED", resultSummary = "Rif Resistance Detected")
+        val after = merge(waiting, "MDR_RIF", legacy).cache
+        assertNull(after.trueNatRifResult)
+        assertEquals("ext-new", after.rifOrderId)
+        assertEquals(OrderStatus.PENDING.name, after.rifOrderStatus)
+    }
+
+    // CodeRabbit (PR #368): an MTB Positive the machine then reports as Error-2 no longer confirms
+    // TB on TB_DIAGNOSTICS either (isKnownTbCase reads these flags).
+    @Test
+    fun error2AfterMtbPositiveClearsTheConfirmation() {
+        val positive = merge(null, "SPUTUM_TRUENAT", mtbOrder("PENDING", mtb = "TB Positive")).cache
+        assertEquals(true, positive.isTBConfirmed)
+        val invalid = merge(positive, "SPUTUM_TRUENAT", mtbOrder("INVALID", mtb = "Error-2")).cache
+        assertNull(invalid.naatResult)
+        assertEquals(false, invalid.isTBConfirmed)
+        assertEquals(false, invalid.isConfirmed)
+    }
+
+    @Test
+    fun aPositiveLiquidCultureStillConfirmsWithoutAnMtbResult() {
+        val positive = merge(null, "SPUTUM_TRUENAT", mtbOrder("PENDING", mtb = "TB Positive")).cache
+            .copy(liquidCultureResult = "Positive")
+        val invalid = merge(positive, "SPUTUM_TRUENAT", mtbOrder("INVALID", mtb = "Error-2")).cache
+        assertEquals(true, invalid.isTBConfirmed)
+    }
+
+    // CodeRabbit (PR #368): the form save takes results, statuses and the RIF close reason from
+    // the stored row, and derives confirmation from the final values.
+    @Test
+    fun formSaveKeepsRepositoryOwnedFieldsFromTheStoredRow() {
+        val stored = merge(null, "SPUTUM_TRUENAT",
+            mtbOrder("CLOSED", mtb = "TB Positive", reasonToCloseMDRRIF = "Patient refused")).cache
+        assertEquals("Patient refused", stored.reasonNotConductedRif)
+        // The form, with RIF not open for entry, mapped the RIF reason away and holds a stale result.
+        val form = stored.copy(reasonNotConductedRif = null, naatResult = "TB Negative", trueNatOrderStatus = "PENDING")
+        val saved = repo.formRowOverStored(form, stored)
+        assertEquals("Patient refused", saved.reasonNotConductedRif)
+        assertEquals("TB Positive", saved.naatResult)
+        assertEquals(OrderStatus.CLOSED.name, saved.trueNatOrderStatus)
+        assertEquals(true, saved.isTBConfirmed)
+    }
+
+    @Test
+    fun formSaveConfirmsTbOnAPositiveLiquidCultureItEntered() {
+        val stored = merge(null, "SPUTUM_TRUENAT", mtbOrder("COMPLETED", mtb = "TB Negative")).cache
+        assertEquals(false, stored.isTBConfirmed)
+        val form = stored.copy(isLiquidCultureConducted = true, liquidCultureResult = "Positive", isTBConfirmed = true, isConfirmed = true)
+        val saved = repo.formRowOverStored(form, stored)
+        assertEquals("Positive", saved.liquidCultureResult)
+        assertEquals(true, saved.isTBConfirmed)
+        assertEquals(true, saved.isConfirmed)
     }
 
     @Test

@@ -642,48 +642,8 @@ class TBSuspectedQuickViewModel @Inject constructor(
                     }
 
                     if (apiSuccess) {
-
-                        // xrayOrderId/trueNatOrderId/rifOrderId to Room internally; tbDiagnostics
-                        // here is the stale snapshot loaded at init{}, so merge those ids forward
-                        // instead of only carrying the id, or the final save below wipes them out.
-                        val freshDiag = tbRepo.getTBDiagnosticsById(benId)
-                        if (freshDiag != null) {
-                            tbDiagnostics = tbDiagnostics.copy(
-                                id = freshDiag.id,
-                                xrayOrderId = freshDiag.xrayOrderId ?: tbDiagnostics.xrayOrderId,
-                                trueNatOrderId = freshDiag.trueNatOrderId ?: tbDiagnostics.trueNatOrderId,
-                                rifOrderId = freshDiag.rifOrderId ?: tbDiagnostics.rifOrderId,
-                                // Owned exclusively by TBRepo.submitManualResult's offline-first
-                                // path — never take these from the stale snapshot, or a result
-                                // saved while the hub was disconnected never gets replayed.
-                                xrayManualResultPendingSync = freshDiag.xrayManualResultPendingSync,
-                                trueNatManualResultPendingSync = freshDiag.trueNatManualResultPendingSync,
-                                rifManualResultPendingSync = freshDiag.rifManualResultPendingSync
-                            )
-                            // Order status and results always come from Room: the server's answer
-                            // (or, offline, TBRepo's) for a test this save submitted, and the stored
-                            // values for one it didn't. The form's mapped values never stand in for
-                            // a result, so a result that wasn't sent can't be saved as if it had been.
-                            tbDiagnostics = tbDiagnostics.copy(
-                                xrayOrderStatus = freshDiag.xrayOrderStatus,
-                                chestXRayResult = freshDiag.chestXRayResult,
-                                isChestXRayDone = freshDiag.isChestXRayDone,
-                                errorMsgXray = freshDiag.errorMsgXray,
-                                trueNatOrderStatus = freshDiag.trueNatOrderStatus,
-                                naatResult = freshDiag.naatResult,
-                                isNaatConducted = freshDiag.isNaatConducted,
-                                isTBConfirmed = freshDiag.isTBConfirmed,
-                                isConfirmed = freshDiag.isConfirmed,
-                                rifOrderId = freshDiag.rifOrderId,
-                                rifOrderStatus = freshDiag.rifOrderStatus,
-                                trueNatRifResult = freshDiag.trueNatRifResult,
-                                isDrTbConfirmed = freshDiag.isDrTbConfirmed,
-                                errorMsgTrueNat = freshDiag.errorMsgTrueNat,
-                                errorMsgRif = freshDiag.errorMsgRif
-                            )
-                        }
                         tbDiagnostics.syncState = SyncState.UNSYNCED
-                        tbRepo.saveTBDiagnostics(tbDiagnostics)
+                        tbDiagnostics = tbRepo.saveTBDiagnosticsFromForm(tbDiagnostics)
                         tbRepo.syncTBSuspectedFromDiagnostics(benId, tbDiagnostics)
 
                         // Enqueued only now that the save has landed — see ordersToPushAfterSave above.

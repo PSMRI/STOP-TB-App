@@ -375,8 +375,6 @@ class TBRepo @Inject constructor(
         }
     }
 
-    /** Returns latest TB_DIAGNOSTICS record by benId — used to get existing id before save */
-    /** Emits the beneficiary's diagnostics row on every change (feed apply, manual result). */
     fun observeTBDiagnostics(benId: Long): kotlinx.coroutines.flow.Flow<TBDiagnosticsCache?> =
         tbDao.observeTbDiagnosticsByBenId(benId).distinctUntilChanged()
 
@@ -386,26 +384,61 @@ class TBRepo @Inject constructor(
         }
     }
 
-    // Called directly from ViewModels (form save flows) with a snapshot that can be stale by the
-    // time it's written — most notably, a screen's own in-memory diagnostics object doesn't know
-    // about an in-flight auto-reorder Worker (see createOrder()) that may have already cleared
-    // naatResult/chestXRayResult/trueNatRifResult and moved to a new order underneath it. Re-read
-    // fresh under the row's lock and, for each test type whose order id has moved on since this
-    // caller's snapshot was taken, defer to the fresh order-lifecycle fields instead of the stale
-    // ones — every other field in the caller's snapshot (its actual form edits) still applies.
     suspend fun saveTBDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache) {
-        withContext(Dispatchers.IO) {
+        saveTBDiagnosticsLocked(tbDiagnosticsCache, fromForm = false)
+    }
+    suspend fun saveTBDiagnosticsFromForm(form: TBDiagnosticsCache): TBDiagnosticsCache =
+        saveTBDiagnosticsLocked(form, fromForm = true)
+
+    internal fun formRowOverStored(form: TBDiagnosticsCache, stored: TBDiagnosticsCache): TBDiagnosticsCache {
+        val confirmed = MtbResult.fromResultText(stored.naatResult) == MtbResult.TB_POSITIVE ||
+            isLiquidCulturePositive(form.liquidCultureResult)
+        return form.copy(
+            id = stored.id,
+            xrayOrderId = stored.xrayOrderId ?: form.xrayOrderId,
+            trueNatOrderId = stored.trueNatOrderId ?: form.trueNatOrderId,
+            rifOrderId = stored.rifOrderId,
+            // Owned by submitManualResult's offline path; a stale copy would stop the replay.
+            xrayManualResultPendingSync = stored.xrayManualResultPendingSync,
+            trueNatManualResultPendingSync = stored.trueNatManualResultPendingSync,
+            rifManualResultPendingSync = stored.rifManualResultPendingSync,
+            xrayOrderStatus = stored.xrayOrderStatus,
+            chestXRayResult = stored.chestXRayResult,
+            isChestXRayDone = stored.isChestXRayDone,
+            errorMsgXray = stored.errorMsgXray,
+            trueNatOrderStatus = stored.trueNatOrderStatus,
+            naatResult = stored.naatResult,
+            isNaatConducted = stored.isNaatConducted,
+            rifOrderStatus = stored.rifOrderStatus,
+            trueNatRifResult = stored.trueNatRifResult,
+            isDrTbConfirmed = stored.isDrTbConfirmed,
+            // The form clears these whenever RIF is not open for entry (TBSuspectedQuickDataset).
+            reasonNotConductedRif = stored.reasonNotConductedRif,
+            reasonNotConductedRifOther = stored.reasonNotConductedRifOther,
+            errorMsgTrueNat = stored.errorMsgTrueNat,
+            errorMsgRif = stored.errorMsgRif,
+            isTBConfirmed = confirmed,
+            isConfirmed = confirmed
+        )
+    }
+
+    private suspend fun saveTBDiagnosticsLocked(tbDiagnosticsCache: TBDiagnosticsCache, fromForm: Boolean): TBDiagnosticsCache {
+        return withContext(Dispatchers.IO) {
             benDao.getBen(tbDiagnosticsCache.benId)?.let { ben ->
                 ben.gpsLatitude?.let { tbDiagnosticsCache.latitude = it }
                 ben.gpsLongitude?.let { tbDiagnosticsCache.longitude = it }
             }
             var knownTbHouseholdId: Long? = null
-            withBenIdLock(tbDiagnosticsCache.benId) {
+            val saved = withBenIdLock(tbDiagnosticsCache.benId) {
                 val fresh = tbDao.getTbDiagnosticsByBenId(tbDiagnosticsCache.benId)
                 // id is a val (Room primary key) — .copy() to retarget the existing row instead
                 // of reassigning, then apply the deferred-field overrides below onto that copy.
-                val cache = if (fresh != null) tbDiagnosticsCache.copy(id = fresh.id) else tbDiagnosticsCache
-                if (fresh != null) {
+                val cache = when {
+                    fresh == null -> tbDiagnosticsCache
+                    fromForm -> formRowOverStored(tbDiagnosticsCache, fresh)
+                    else -> tbDiagnosticsCache.copy(id = fresh.id)
+                }
+                if (fresh != null && !fromForm) {
                     if (fresh.trueNatOrderId != cache.trueNatOrderId) {
                         cache.naatResult = fresh.naatResult
                         cache.trueNatOrderId = fresh.trueNatOrderId
@@ -425,11 +458,13 @@ class TBRepo @Inject constructor(
                     knownTbHouseholdId = benDao.getBen(cache.benId)?.householdId
                 }
                 SyncDailyStore.record("TB_DIAGNOSTICS", listOf(savedId), "SAVE", "SUCCESS")
+                cache
             }
             knownTbHouseholdId?.takeIf { it > 0L }?.let { applyKnownTbContactRiskFactors(it) }
-            if (tbDiagnosticsCache.isChestXRayDone == true) benDao.updateScreeningStatus(tbDiagnosticsCache.benId,"SCREENED")   // NEW
+            if (saved.isChestXRayDone == true) benDao.updateScreeningStatus(saved.benId,"SCREENED")   // NEW
 
-            if (tbDiagnosticsCache.isNaatConducted == true) benDao.updateScreeningStatus(tbDiagnosticsCache.benId,"SCREENED")   // NEW
+            if (saved.isNaatConducted == true) benDao.updateScreeningStatus(saved.benId,"SCREENED")   // NEW
+            saved
         }
     }
 
@@ -731,12 +766,6 @@ class TBRepo @Inject constructor(
             logSyncModule("TB_CONFIRMED", "PULL", "SUCCESS", "received" to records.length(), "saved" to it.size)
         }
     }
-
-    // Diagnostic orders from the changes feed: one item per order row, with the same result fields
-    // order/result returns. Only the latest order per beneficiary and test type is applied, through
-    // mergeOrderResult. STOP-800: the TrueNat (MTB) order carries the RIF result too, so it goes
-    // first; an MDR_RIF row only comes from an order made before that change and is applied after,
-    // onto whatever the TrueNat order left. X-ray last, so it sees the TrueNat state.
     suspend fun applyFeedDiagnosticOrders(records: JSONArray) = withContext(Dispatchers.IO) {
         val latest = HashMap<Pair<Long, String>, Pair<Long, OrderResultData>>()
         for (i in 0 until records.length()) {
@@ -900,13 +929,6 @@ class TBRepo @Inject constructor(
         )
     }
 
-    /**
-     * True when a feed row describes an older order than the one this tablet placed moments ago
-     * (Retry Referral / Create New Order / the manual X-ray -> TrueNat referral): the hub's feed
-     * may not hold the new order yet, and the old row must not overwrite it. A row for the same
-     * order id is never skipped — it is the server's newer state of that order, and with the
-     * changes feed as the only source of results nothing would fetch it again.
-     */
     private suspend fun isOlderThanLocalOrder(benId: Long, localType: String, data: OrderResultData, now: Long): Boolean {
         val createdAt = orderCreatedTimestamps["${benId}_$localType"] ?: return false
         if (now - createdAt >= ORDER_STATUS_GRACE_PERIOD_MS) return false
@@ -3189,17 +3211,25 @@ class TBRepo @Inject constructor(
                             val orderId = responseData.providerOrderId.asValidOrderId()
                                 ?: responseData.externalOrderId.asValidOrderId()
                             val status = responseData.status
-                            
+                            // A declined referral is pushed with its reason and the server closes
+                            // the order: it is stored CLOSED and not done, not as a pending test
+                            // (the form save takes these fields from this row).
+                            val refused = !reasonForRefusal.isNullOrBlank()
+                            val storedStatus = when {
+                                status.equals(OrderStatus.FAILED.name, ignoreCase = true) -> OrderStatus.FAILED.name
+                                refused || status.equals(OrderStatus.CLOSED.name, ignoreCase = true) -> OrderStatus.CLOSED.name
+                                else -> OrderStatus.PENDING.name
+                            }
+
                             val cache = withBenIdLock(benId) {
                             val existing = tbDao.getTbDiagnosticsByBenId(benId)
                             val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
                                 if (testType.equals("XRAY_CHEST", ignoreCase = true)) {
                                     it.copy(
                                         xrayOrderId = orderId,
-                                        xrayOrderStatus = if (status.equals(OrderStatus.FAILED.name, ignoreCase = true))
-                                            OrderStatus.FAILED.name else OrderStatus.PENDING.name,
-                                        isChestXRayDone = true,
-                                        isReferredForDigitalChestXray = true,
+                                        xrayOrderStatus = storedStatus,
+                                        isChestXRayDone = !refused,
+                                        isReferredForDigitalChestXray = !refused,
                                         chestXRayResult = null,
                                         reasonNotConductedChestXray = null,
                                         reasonNotConductedChestXrayOther = null,
@@ -3212,16 +3242,19 @@ class TBRepo @Inject constructor(
                                     // of an MTB-positive result) — reset it here too.
                                     it.copy(
                                         trueNatOrderId = orderId,
-                                        trueNatOrderStatus = if (status.equals(OrderStatus.FAILED.name, ignoreCase = true))
-                                            OrderStatus.FAILED.name else OrderStatus.PENDING.name,
+                                        trueNatOrderStatus = storedStatus,
                                         naatResult = null,
                                         trueNatRifResult = null,
-                                        isReferredForSputum = true,
-                                        isNaatConducted = true,
+                                        isReferredForSputum = !refused,
+                                        isNaatConducted = !refused,
                                         reasonNotConductedNaat = null,
                                         reasonNotConductedNaatOther = null,
                                         rifOrderId = null,
                                         rifOrderStatus = null,
+                                        // The previous order's "RIF not conducted" would otherwise
+                                        // show on the new order and keep its RIF entry shut.
+                                        reasonNotConductedRif = null,
+                                        reasonNotConductedRifOther = null,
                                         isDrTbConfirmed = null,
                                         sputumSubmittedAt = it.sputumSubmittedAt ?: "TB Screening Camp",
                                         syncState = SyncState.UNSYNCED,
@@ -3856,8 +3889,20 @@ class TBRepo @Inject constructor(
             },
             reasonNotConductedNaat = mtbClose?.first ?: if (naatResult != null) null else base.reasonNotConductedNaat,
             reasonNotConductedNaatOther = mtbClose?.second ?: if (naatResult != null) null else base.reasonNotConductedNaatOther,
-            isTBConfirmed = if (mtbResult != null) mtbResult == MtbResult.TB_POSITIVE else base.isTBConfirmed,
-            isConfirmed = if (mtbResult != null) mtbResult == MtbResult.TB_POSITIVE else base.isConfirmed
+            // The results list is the server's whole answer for this order: with no MTB result in
+            // it (Error-2 retest, closed, failed) an earlier MTB Positive no longer confirms TB,
+            // and only a positive liquid culture still does. A legacy flat response says nothing
+            // either way, so the stored value stays.
+            isTBConfirmed = when {
+                mtbResult != null -> mtbResult == MtbResult.TB_POSITIVE || isLiquidCulturePositive(base.liquidCultureResult)
+                perTest.hasResultsList -> isLiquidCulturePositive(base.liquidCultureResult)
+                else -> base.isTBConfirmed
+            },
+            isConfirmed = when {
+                mtbResult != null -> mtbResult == MtbResult.TB_POSITIVE || isLiquidCulturePositive(base.liquidCultureResult)
+                perTest.hasResultsList -> isLiquidCulturePositive(base.liquidCultureResult)
+                else -> base.isConfirmed
+            }
         )
 
         // On an older server the RIF result arrives on its own MDR_RIF order (mergeLegacyRifOrder).
@@ -3922,9 +3967,11 @@ class TBRepo @Inject constructor(
     ): TBDiagnosticsCache {
         if (base.rifManualResultPendingSync == true) return base
         val mtbPositive = MtbResult.fromResultText(base.naatResult) == MtbResult.TB_POSITIVE
-        val currentOrderHasRif = !base.trueNatRifResult.isNullOrBlank() &&
-                base.rifOrderId != null && base.rifOrderId == base.trueNatOrderId
-        if (!mtbPositive || currentOrderHasRif) return base
+        // rifOrderId == trueNatOrderId: the current MTB order carries its own RIF test (set by
+        // mergeTrueNatOrder), whether or not that RIF result is in yet. An old MDR_RIF order in
+        // the same feed batch must not fill the new order's waiting RIF with its old result.
+        val currentOrderCarriesRif = base.rifOrderId != null && base.rifOrderId == base.trueNatOrderId
+        if (!mtbPositive || currentOrderCarriesRif) return base
         val mappedStatus = reducedOrderStatus(status)
         val summary = perTest.rif?.resultSummary?.takeIf { it.isNotBlank() }
         val rifResult = RifResult.fromResultText(summary)
@@ -3937,6 +3984,10 @@ class TBRepo @Inject constructor(
             syncState = SyncState.UNSYNCED
         )
     }
+
+    /** Liquid culture is stored as "Positive" / "Negative" (R.array.tb_test_result). */
+    private fun isLiquidCulturePositive(result: String?): Boolean =
+        result?.trim()?.equals("Positive", ignoreCase = true) == true
 
     /** The vendor's code for an invalid TrueNat run (MTB or RIF); the machine retests the order. */
     private fun isMachineRunError(summary: String): Boolean = summary.trim().equals("Error-2", ignoreCase = true)
