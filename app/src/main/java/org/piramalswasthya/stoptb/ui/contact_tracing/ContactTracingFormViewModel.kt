@@ -779,9 +779,11 @@ class ContactTracingFormViewModel @Inject constructor(
         }
     }
     private suspend fun markBeneficiaryAsConfirmedTbCase(benId: Long) {
-        if (tbRepo.getTBConfirmed(benId) == null) {
+        /*if (tbRepo.getTBConfirmed(benId) == null) {
             tbRepo.saveTBConfirmed(TBConfirmedTreatmentCache(benId = benId))
-        }
+        }*/
+        // Only flag the beneficiary as a confirmed TB case. The treatment record (regimen,
+        // start date, expected completion) is created through the validated TB Confirmed form.
         val tbSuspected = tbRepo.getTBSuspected(benId) ?: TBSuspectedCache(benId = benId)
         tbSuspected.isConfirmed = true
         tbSuspected.isTBConfirmed = true
