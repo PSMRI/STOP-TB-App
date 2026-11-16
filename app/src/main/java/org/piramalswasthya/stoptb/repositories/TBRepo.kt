@@ -387,6 +387,20 @@ class TBRepo @Inject constructor(
     suspend fun saveTBDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache) {
         saveTBDiagnosticsLocked(tbDiagnosticsCache, fromForm = false)
     }
+
+    /**
+     * Saves the general diagnostics form (referralType 0): its own results stay, but while RIF is
+     * not open for entry the form holds no RIF reason, so the stored one is kept.
+     */
+    suspend fun saveTBDiagnosticsFromGeneralForm(form: TBDiagnosticsCache, rifOpenForEntry: Boolean): TBDiagnosticsCache =
+        saveTBDiagnosticsLocked(form, fromForm = false, keepStoredRifReasons = !rifOpenForEntry)
+
+    /** [form] with the stored RIF not-conducted reasons. */
+    internal fun withStoredRifReasons(form: TBDiagnosticsCache, stored: TBDiagnosticsCache): TBDiagnosticsCache =
+        form.copy(
+            reasonNotConductedRif = stored.reasonNotConductedRif,
+            reasonNotConductedRifOther = stored.reasonNotConductedRifOther
+        )
     suspend fun saveTBDiagnosticsFromForm(form: TBDiagnosticsCache): TBDiagnosticsCache =
         saveTBDiagnosticsLocked(form, fromForm = true)
 
@@ -426,7 +440,11 @@ class TBRepo @Inject constructor(
         )
     }
 
-    private suspend fun saveTBDiagnosticsLocked(tbDiagnosticsCache: TBDiagnosticsCache, fromForm: Boolean): TBDiagnosticsCache {
+    private suspend fun saveTBDiagnosticsLocked(
+        tbDiagnosticsCache: TBDiagnosticsCache,
+        fromForm: Boolean,
+        keepStoredRifReasons: Boolean = false
+    ): TBDiagnosticsCache {
         return withContext(Dispatchers.IO) {
             benDao.getBen(tbDiagnosticsCache.benId)?.let { ben ->
                 ben.gpsLatitude?.let { tbDiagnosticsCache.latitude = it }
@@ -440,6 +458,7 @@ class TBRepo @Inject constructor(
                 val cache = when {
                     fresh == null -> tbDiagnosticsCache
                     fromForm -> formRowOverStored(tbDiagnosticsCache, fresh)
+                    keepStoredRifReasons -> withStoredRifReasons(tbDiagnosticsCache, fresh).copy(id = fresh.id)
                     else -> tbDiagnosticsCache.copy(id = fresh.id)
                 }
                 if (fresh != null && !fromForm) {

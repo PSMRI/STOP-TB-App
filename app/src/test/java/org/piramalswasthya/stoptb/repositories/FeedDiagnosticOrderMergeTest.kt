@@ -414,6 +414,22 @@ class FeedDiagnosticOrderMergeTest {
         assertNull(suspected.reasonForRefusalXray)
     }
 
+    // General form (referralType 0): with RIF read-only the form holds no RIF reason, so the
+    // stored ones stay; its own X-ray / MTB results are kept.
+    @Test
+    fun generalFormSaveKeepsStoredRifReasons() {
+        val stored = merge(null, "SPUTUM_TRUENAT",
+            mtbOrder("CLOSED", mtb = "TB Positive", reasonToCloseMDRRIF = "Other: Cartridge expired")).cache
+        assertEquals("Other", stored.reasonNotConductedRif)
+        assertEquals("Cartridge expired", stored.reasonNotConductedRifOther)
+        val form = stored.copy(reasonNotConductedRif = null, reasonNotConductedRifOther = null, chestXRayResult = "Normal")
+        val saved = repo.withStoredRifReasons(form, stored)
+        assertEquals("Other", saved.reasonNotConductedRif)
+        assertEquals("Cartridge expired", saved.reasonNotConductedRifOther)
+        assertEquals("Normal", saved.chestXRayResult)
+        assertEquals("TB Positive", saved.naatResult)
+    }
+
     // The form save keeps the MTB / X-ray close reasons written by the feed while the form was open.
     @Test
     fun formSaveKeepsStoredMtbAndXrayCloseReasons() {

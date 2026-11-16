@@ -667,7 +667,7 @@ class TBSuspectedQuickViewModel @Inject constructor(
                         // The general form (referralType 0) sends no result to the server, so its
                         // row is the source; the referral screens take results from Room.
                         if (referralType == 0) {
-                            tbRepo.saveTBDiagnostics(tbDiagnostics)
+                            tbDiagnostics = tbRepo.saveTBDiagnosticsFromGeneralForm(tbDiagnostics, dataset.canEnterRif())
                         } else {
                             tbDiagnostics = tbRepo.saveTBDiagnosticsFromForm(tbDiagnostics)
                         }
