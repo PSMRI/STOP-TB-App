@@ -305,6 +305,20 @@ class FeedDiagnosticOrderMergeTest {
         assertEquals(true, updated.isTBConfirmed)
     }
 
+    // Found on device: MTB Negative and a positive liquid culture left TB_SUSPECTED unconfirmed
+    // while TB_DIAGNOSTICS was confirmed.
+    @Test
+    fun suspectedIsConfirmedByAPositiveLiquidCulture() {
+        val negative = merge(null, "SPUTUM_TRUENAT", mtbOrder("COMPLETED", mtb = "TB Negative")).cache
+        val existing = repo.suspectedFromDiagnostics(null, benId, negative)!!.copy(syncState = SyncState.SYNCED)
+        assertEquals(false, existing.isTBConfirmed)
+        val withCulture = negative.copy(isLiquidCultureConducted = true, liquidCultureResult = "Positive")
+        val updated = repo.suspectedFromDiagnostics(existing, benId, withCulture)!!
+        assertEquals("TB Negative", updated.sputumTestResult)
+        assertEquals(true, updated.isTBConfirmed)
+        assertEquals(true, updated.isConfirmed)
+    }
+
     private fun mtbOrderWithRifStatus(status: String, mtb: String, rif: String?, rifStatus: String) = OrderResultData(
         externalOrderId = "ext-mtb", orderType = "MTB", status = status,
         results = listOfNotNull(

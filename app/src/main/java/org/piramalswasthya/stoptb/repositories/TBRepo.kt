@@ -3516,8 +3516,12 @@ class TBRepo @Inject constructor(
                 ?: existing?.reasonForRefusalMDRRIF,
             mdrRifResult = mappedMdrRifResult,
             isDRTBConfirmed = mappedIsDRTBConfirmed,
-            isTBConfirmed = mappedSputumTestResult == "TB Positive",
-            isConfirmed = mappedSputumTestResult == "TB Positive",
+            // Confirmed by an MTB Positive or a positive liquid culture, as on TB_DIAGNOSTICS
+            // (formRowOverStored / mergeTrueNatOrder); it used to read the sputum result only.
+            isTBConfirmed = mappedSputumTestResult == "TB Positive" ||
+                isLiquidCulturePositive(diag.liquidCultureResult ?: existing?.liquidCultureResult),
+            isConfirmed = mappedSputumTestResult == "TB Positive" ||
+                isLiquidCulturePositive(diag.liquidCultureResult ?: existing?.liquidCultureResult),
             sputumTestResult = mappedSputumTestResult,
             // TB_SUSPECTED's own copy of these fields stayed null for any beneficiary referred via
             // the quick-entry screen (which only writes them onto TB_DIAGNOSTICS), even though
