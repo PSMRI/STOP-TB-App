@@ -412,7 +412,11 @@ class TBRepo @Inject constructor(
             rifOrderStatus = stored.rifOrderStatus,
             trueNatRifResult = stored.trueNatRifResult,
             isDrTbConfirmed = stored.isDrTbConfirmed,
-            // The form clears these whenever RIF is not open for entry (TBSuspectedQuickDataset).
+            // Close reasons are written by submitManualResult / the feed; the form may hold nulls.
+            reasonNotConductedChestXray = stored.reasonNotConductedChestXray,
+            reasonNotConductedChestXrayOther = stored.reasonNotConductedChestXrayOther,
+            reasonNotConductedNaat = stored.reasonNotConductedNaat,
+            reasonNotConductedNaatOther = stored.reasonNotConductedNaatOther,
             reasonNotConductedRif = stored.reasonNotConductedRif,
             reasonNotConductedRifOther = stored.reasonNotConductedRifOther,
             errorMsgTrueNat = stored.errorMsgTrueNat,
@@ -3227,6 +3231,8 @@ class TBRepo @Inject constructor(
                                         chestXRayResult = null,
                                         reasonNotConductedChestXray = null,
                                         reasonNotConductedChestXrayOther = null,
+                                        // A pending result of the old order must not be replayed onto this one.
+                                        xrayManualResultPendingSync = false,
                                         syncState = SyncState.UNSYNCED,
                                         errorMsgXray = responseBody.data.errorMessage
                                     )
@@ -3249,6 +3255,9 @@ class TBRepo @Inject constructor(
                                         // show on the new order and keep its RIF entry shut.
                                         reasonNotConductedRif = null,
                                         reasonNotConductedRifOther = null,
+                                        // A pending result of the old order must not be replayed onto this one.
+                                        trueNatManualResultPendingSync = false,
+                                        rifManualResultPendingSync = false,
                                         isDrTbConfirmed = null,
                                         // A new order is a new test: not TB confirmed until its
                                         // MTB result arrives, unless liquid culture is positive.
@@ -3822,8 +3831,12 @@ class TBRepo @Inject constructor(
         if (isCompleted && standardized == ChestXrayResult.AI_INVALID) return MergedOrderResult(base, false)
 
         val closeReason = splitOtherReason(data.reasonToCloseXray)
+        // A different order (e.g. a retest the server raised) carries none of the old one's reason.
+        val newOrder = fetchedOrderId != null && fetchedOrderId != base.xrayOrderId
         var merged = base.copy(
             xrayOrderId = fetchedOrderId ?: base.xrayOrderId,
+            reasonNotConductedChestXray = if (newOrder) null else base.reasonNotConductedChestXray,
+            reasonNotConductedChestXrayOther = if (newOrder) null else base.reasonNotConductedChestXrayOther,
             xrayOrderStatus = mappedStatus,
             isReferredForDigitalChestXray = true,
             errorMsgXray = if (mappedStatus == OrderStatus.FAILED.name) data.errorMessage ?: base.errorMsgXray else base.errorMsgXray,
@@ -3833,7 +3846,9 @@ class TBRepo @Inject constructor(
             merged = when {
                 summary != null -> merged.copy(
                     isChestXRayDone = true,
-                    chestXRayResult = standardized?.displayValue ?: summary
+                    chestXRayResult = standardized?.displayValue ?: summary,
+                    reasonNotConductedChestXray = null,
+                    reasonNotConductedChestXrayOther = null
                 )
                 closeReason != null -> merged.copy(
                     isChestXRayDone = false,
@@ -3873,10 +3888,16 @@ class TBRepo @Inject constructor(
     ): TBDiagnosticsCache {
         val mappedStatus = reducedOrderStatus(status)
         val orderId = fetchedOrderId ?: base.trueNatOrderId
+        // A different order (e.g. a retest the server raised) carries none of the old one's reasons.
+        val newOrder = fetchedOrderId != null && fetchedOrderId != base.trueNatOrderId
         var merged = base.copy(
             trueNatOrderId = orderId,
             trueNatOrderStatus = mappedStatus,
             isReferredForSputum = true,
+            reasonNotConductedNaat = if (newOrder) null else base.reasonNotConductedNaat,
+            reasonNotConductedNaatOther = if (newOrder) null else base.reasonNotConductedNaatOther,
+            reasonNotConductedRif = if (newOrder) null else base.reasonNotConductedRif,
+            reasonNotConductedRifOther = if (newOrder) null else base.reasonNotConductedRifOther,
             errorMsgTrueNat = if (mappedStatus == OrderStatus.FAILED.name) data.errorMessage ?: base.errorMsgTrueNat else base.errorMsgTrueNat,
             syncState = SyncState.UNSYNCED
         )
@@ -3902,8 +3923,8 @@ class TBRepo @Inject constructor(
                 mtbClose != null -> false
                 else -> base.isNaatConducted
             },
-            reasonNotConductedNaat = mtbClose?.first ?: if (naatResult != null) null else base.reasonNotConductedNaat,
-            reasonNotConductedNaatOther = mtbClose?.second ?: if (naatResult != null) null else base.reasonNotConductedNaatOther,
+            reasonNotConductedNaat = mtbClose?.first ?: if (naatResult != null) null else merged.reasonNotConductedNaat,
+            reasonNotConductedNaatOther = mtbClose?.second ?: if (naatResult != null) null else merged.reasonNotConductedNaatOther,
             // The results list is the server's whole answer: with no MTB result in it, an earlier MTB
             // Positive no longer confirms TB (only a positive liquid culture does). A flat response keeps it.
             isTBConfirmed = when {

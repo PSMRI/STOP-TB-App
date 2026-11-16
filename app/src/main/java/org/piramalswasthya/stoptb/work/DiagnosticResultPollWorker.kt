@@ -86,7 +86,8 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
 
                 // Statuses: PENDING, IN_PROGRESS, COMPLETED, FAILED, CLOSED, MANUAL_ENTRY, INVALID. IN_PROGRESS is
                 // collapsed into PENDING (TBRepo.reducedOrderStatus); MANUAL_ENTRY has no automated result to wait
-                // for. Every status change arrives through the changes feed.
+                // for. With the feed active every change arrives through it; without it (no feed, or it failed)
+                // INVALID orders are polled too, as they wait for the machine's retest.
                 data class PendingOrder(val benId: Long, val xray: Boolean, val trueNat: Boolean, val rif: Boolean)
 
                 fun hasRealOrderId(orderId: String?) =
@@ -97,7 +98,8 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                             diag.xrayOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) &&
                             hasRealOrderId(diag.xrayOrderId)
                     val trueNatInProgress = tbRepo.isTruenatIntegrated() &&
-                            diag.trueNatOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) &&
+                            (diag.trueNatOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
+                                (!feedActive && diag.trueNatOrderStatus.equals(OrderStatus.INVALID.name, ignoreCase = true))) &&
                             hasRealOrderId(diag.trueNatOrderId)
                     val rifInProgress = tbRepo.isTruenatIntegrated() &&
                             diag.rifOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) &&

@@ -87,6 +87,7 @@ class CreateOrderResetTest {
             trueNatOrderId = "old-mtb", trueNatOrderStatus = OrderStatus.CLOSED.name, naatResult = "TB Positive",
             rifOrderId = "old-mtb", rifOrderStatus = OrderStatus.CLOSED.name,
             reasonNotConductedRif = "Other", reasonNotConductedRifOther = "Machine down",
+            trueNatManualResultPendingSync = true, rifManualResultPendingSync = true,
             syncState = SyncState.SYNCED
         )
         val repo = repoForOrderPush(closed, serverStatus = "PENDING")
@@ -102,6 +103,9 @@ class CreateOrderResetTest {
         assertNull(row.rifOrderStatus)
         assertNull(row.reasonNotConductedRif)
         assertNull(row.reasonNotConductedRifOther)
+        // The old order's pending results must not be replayed onto the new order.
+        assertEquals(false, row.trueNatManualResultPendingSync)
+        assertEquals(false, row.rifManualResultPendingSync)
         // A new order is a new test, not TB confirmed until its result.
         assertEquals(false, row.isTBConfirmed)
         assertEquals(false, row.isConfirmed)

@@ -276,7 +276,7 @@ class TBSuspectedQuickFragment : Fragment() {
             if (submissions.isEmpty()) {
                 // Nothing irreversible is sent (e.g. only a referral was declined): save directly.
                 confirmingSubmit = false
-                viewModel.saveForm()
+                viewModel.saveForm(confirmed = submissions)
             } else {
                 showConfirmSubmitDialog(submissions)
             }
@@ -312,7 +312,8 @@ class TBSuspectedQuickFragment : Fragment() {
             .setNegativeButton(R.string.confirm_result_no) { _, _ -> confirmingSubmit = false }
             .setPositiveButton(R.string.confirm_result_yes) { _, _ ->
                 confirmingSubmit = false
-                viewModel.saveForm()
+                // Sends only what the dialog showed; the form may have changed meanwhile.
+                viewModel.saveForm(confirmed = submissions)
             }
             .show()
     }

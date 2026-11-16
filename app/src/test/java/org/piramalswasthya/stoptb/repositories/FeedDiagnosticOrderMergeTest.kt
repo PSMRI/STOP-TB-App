@@ -376,8 +376,10 @@ class FeedDiagnosticOrderMergeTest {
         val suspected = repo.suspectedFromDiagnostics(null, benId, closed)!!.copy(syncState = SyncState.SYNCED)
         assertEquals("Cartridge unavailable", suspected.reasonForRefusalMTB)
 
+        // A new order through the feed (e.g. raised by the server): the merge itself drops the reason.
         val newOrder = merge(closed, "SPUTUM_TRUENAT", mtbOrder("PENDING", id = "ext-new")).cache
-        val updated = repo.suspectedFromDiagnostics(suspected, benId, newOrder.copy(reasonNotConductedNaat = null))!!
+        assertNull(newOrder.reasonNotConductedNaat)
+        val updated = repo.suspectedFromDiagnostics(suspected, benId, newOrder)!!
         assertNull(updated.reasonForRefusalMTB)
     }
 
@@ -392,8 +394,37 @@ class FeedDiagnosticOrderMergeTest {
         assertEquals("Other", suspected.reasonForRefusalXray)
 
         val newOrder = merge(closed, "XRAY_CHEST", result("PENDING", id = "ext-x-new")).cache
-        val updated = repo.suspectedFromDiagnostics(suspected, benId, newOrder.copy(reasonNotConductedChestXray = null))!!
+        assertNull(newOrder.reasonNotConductedChestXray)
+        val updated = repo.suspectedFromDiagnostics(suspected, benId, newOrder)!!
         assertNull(updated.reasonForRefusalXray)
+    }
+
+    // A result on the same X-ray order replaces its "not conducted" reason.
+    @Test
+    fun anXrayResultClearsTheNotConductedReasonOfTheSameOrder() {
+        val closed = merge(null, "XRAY_CHEST", OrderResultData(
+            externalOrderId = "ext-x", orderType = "XRAY_CHEST", status = "CLOSED", results = emptyList(),
+            reasonToCloseXray = "Power issue")).cache
+        val withResult = merge(closed, "XRAY_CHEST", OrderResultData(
+            externalOrderId = "ext-x", orderType = "XRAY_CHEST", status = "COMPLETED",
+            results = listOf(DiagnosticResultEntry(resultType = "XRAY_CHEST", providerStatus = "COMPLETED", resultSummary = "Normal")))).cache
+        assertEquals("Normal", withResult.chestXRayResult)
+        assertNull(withResult.reasonNotConductedChestXray)
+        val suspected = repo.suspectedFromDiagnostics(null, benId, withResult)!!
+        assertNull(suspected.reasonForRefusalXray)
+    }
+
+    // The form save keeps the MTB / X-ray close reasons written by the feed while the form was open.
+    @Test
+    fun formSaveKeepsStoredMtbAndXrayCloseReasons() {
+        val stored = merge(null, "SPUTUM_TRUENAT",
+            mtbOrder("CLOSED", reasonToCloseMTB = "Other: Sample leaked")).cache
+            .copy(reasonNotConductedChestXray = "Power issue")
+        val form = stored.copy(reasonNotConductedNaat = null, reasonNotConductedNaatOther = null, reasonNotConductedChestXray = null)
+        val saved = repo.formRowOverStored(form, stored)
+        assertEquals("Other", saved.reasonNotConductedNaat)
+        assertEquals("Sample leaked", saved.reasonNotConductedNaatOther)
+        assertEquals("Power issue", saved.reasonNotConductedChestXray)
     }
 
     @Test

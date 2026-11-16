@@ -1469,6 +1469,8 @@
     <string name="error_no_user_logged_in">No user logged in!!</string>
     <string name="error_camp_hub_not_connected">Camp Hub not connected</string>
     <string name="error_rif_part_of_mtb_order">RIF is part of the MTB order; no separate RIF order is created</string>
+    <string name="error_order_changed_reopen">This test\'s order changed while the form was open. Close the form and open it again.</string>
+    <string name="error_form_changed_resubmit">The form changed after you confirmed. Check the values and submit again.</string>
     <string name="error_http_code">HTTP Error %1$d</string>
     <string name="error_no_location_record_found">No location record found</string>
     <string name="error_camp_mode_disabled">Camp Mode is disabled</string>

@@ -1333,6 +1333,8 @@
 
     <!-- TrueNat MTB / RIF results -->
     <string name="error_rif_part_of_mtb_order">RIF, MTB ऑर्डर का ही हिस्सा है; RIF का अलग ऑर्डर नहीं बनता</string>
+    <string name="error_order_changed_reopen">फ़ॉर्म खुला रहते हुए इस टेस्ट का ऑर्डर बदल गया। फ़ॉर्म बंद करके फिर से खोलें।</string>
+    <string name="error_form_changed_resubmit">पुष्टि करने के बाद फ़ॉर्म बदल गया। वैल्यू जाँचें और फिर से सबमिट करें।</string>
     <string name="result_display_mtb_detected">MTB पाया गया (MTB Detected)</string>
     <string name="result_display_mtb_not_detected">MTB नहीं पाया गया (MTB Not Detected)</string>
     <string name="result_display_rif_detected">रिफ प्रतिरोध पाया गया (Rif Resistance Detected)</string>

@@ -372,7 +372,23 @@ class TBSuspectedQuickViewModel @Inject constructor(
         planSubmissions(copy, tbRepo.getTBDiagnosticsById(benId))
     }
 
-    fun saveForm() {
+    /**
+     * The form row and Room point at different orders for this screen's test: the feed replaced
+     * the order while the form was open, so values entered for the old order must not be sent.
+     */
+    private fun orderChangedSinceOpen(mapped: TBDiagnosticsCache, stored: TBDiagnosticsCache?): Boolean {
+        if (stored == null) return false
+        fun valid(id: String?) = id?.trim()?.takeIf { it.isNotEmpty() && !it.equals("N/A", ignoreCase = true) }
+        fun differs(form: String?, room: String?) = valid(form) != null && valid(room) != null && valid(form) != valid(room)
+        return when (referralType) {
+            6 -> differs(mapped.xrayOrderId, stored.xrayOrderId)
+            7 -> differs(mapped.trueNatOrderId, stored.trueNatOrderId)
+            else -> false
+        }
+    }
+
+    /** [confirmed]: the submissions the user saw and confirmed; a different plan is not sent. */
+    fun saveForm(confirmed: List<ManualSubmission>? = null) {
         // Both set on the caller's (main) thread, before the coroutine starts. SAVING used to be
         // posted from inside the IO block below, which left a window where a second tap still
         // saw IDLE and fired a second order/manualResult POST for the same result.
@@ -383,7 +399,17 @@ class TBSuspectedQuickViewModel @Inject constructor(
                 try {
                     dataset.mapValues(tbDiagnostics, 1)
                     val storedAtStart = tbRepo.getTBDiagnosticsById(benId)
+                    if (orderChangedSinceOpen(tbDiagnostics, storedAtStart)) {
+                        _errorMessage.postValue(context.getString(R.string.error_order_changed_reopen))
+                        _state.postValue(State.SAVE_FAILED)
+                        return@withContext
+                    }
                     val plan = planSubmissions(tbDiagnostics, storedAtStart)
+                    if (confirmed != null && plan != confirmed) {
+                        _errorMessage.postValue(context.getString(R.string.error_form_changed_resubmit))
+                        _state.postValue(State.SAVE_FAILED)
+                        return@withContext
+                    }
                     fun planned(orderType: String, isResult: Boolean) =
                         plan.firstOrNull { it.orderType == orderType && (it.wireResult != null) == isResult }
 
@@ -638,7 +664,13 @@ class TBSuspectedQuickViewModel @Inject constructor(
 
                     if (apiSuccess) {
                         tbDiagnostics.syncState = SyncState.UNSYNCED
-                        tbDiagnostics = tbRepo.saveTBDiagnosticsFromForm(tbDiagnostics)
+                        // The general form (referralType 0) sends no result to the server, so its
+                        // row is the source; the referral screens take results from Room.
+                        if (referralType == 0) {
+                            tbRepo.saveTBDiagnostics(tbDiagnostics)
+                        } else {
+                            tbDiagnostics = tbRepo.saveTBDiagnosticsFromForm(tbDiagnostics)
+                        }
                         tbRepo.syncTBSuspectedFromDiagnostics(benId, tbDiagnostics)
 
                         // Enqueued only now that the save has landed — see ordersToPushAfterSave above.
