@@ -293,14 +293,50 @@ class FeedDiagnosticOrderMergeTest {
         assertNull(updated.mdrRifResult)
     }
 
-    // The fallback to the stored value still holds while the order is only waiting for a result.
+    // Product rule (16 Nov 2026): a new MTB order (Create New Order) is a new test. Until its
+    // result arrives the beneficiary is not TB confirmed and the earlier MTB / RIF results go.
     @Test
-    fun suspectedKeepsItsMtbResultWhileTheOrderIsPendingWithoutOne() {
-        val existing = repo.suspectedFromDiagnostics(
-            null, benId, merge(null, "SPUTUM_TRUENAT", mtbOrder("PENDING", mtb = "TB Positive")).cache
-        )!!.copy(syncState = SyncState.SYNCED)
-        val pendingNoResult = merge(null, "SPUTUM_TRUENAT", mtbOrder("PENDING")).cache
-        val updated = repo.suspectedFromDiagnostics(existing, benId, pendingNoResult) ?: existing
+    fun suspectedDropsEarlierResultsWhileANewOrderWaitsForItsResult() {
+        val earlier = merge(null, "SPUTUM_TRUENAT",
+            mtbOrderWithRifStatus("CLOSED", mtb = "TB Positive", rif = "Invalid/Error", rifStatus = "CLOSED")).cache
+        val existing = repo.suspectedFromDiagnostics(null, benId, earlier)!!.copy(syncState = SyncState.SYNCED)
+        assertEquals("TB Positive", existing.sputumTestResult)
+        assertEquals("Invalid/Error", existing.mdrRifResult)
+
+        val newOrder = merge(earlier, "SPUTUM_TRUENAT", mtbOrder("PENDING", id = "ext-new")).cache
+        assertEquals(false, newOrder.isTBConfirmed)
+        val updated = repo.suspectedFromDiagnostics(existing, benId, newOrder)!!
+        assertNull(updated.sputumTestResult)
+        assertNull(updated.naatResult)
+        assertNull(updated.mdrRifResult)
+        assertEquals(false, updated.isTBConfirmed)
+    }
+
+    // Found on amritdemo (HI PUNE): RIF Invalid/Error, Create New Order, MTB Detected on the new
+    // order. TB_SUSPECTED kept the earlier order's RIF "Invalid/Error" while the new RIF was pending.
+    @Test
+    fun suspectedDropsAnEarlierRifResultWhileTheNewOrderWaitsForItsRif() {
+        val earlier = merge(null, "SPUTUM_TRUENAT",
+            mtbOrderWithRifStatus("CLOSED", mtb = "TB Positive", rif = "Invalid/Error", rifStatus = "CLOSED")).cache
+        val existing = repo.suspectedFromDiagnostics(null, benId, earlier)!!.copy(syncState = SyncState.SYNCED)
+        assertEquals("Invalid/Error", existing.mdrRifResult)
+
+        val newOrderMtbPositive = merge(earlier, "SPUTUM_TRUENAT", mtbOrder("PENDING", mtb = "TB Positive", id = "ext-new")).cache
+        assertEquals("ext-new", newOrderMtbPositive.rifOrderId)
+        val updated = repo.suspectedFromDiagnostics(existing, benId, newOrderMtbPositive)!!
+        assertEquals("TB Positive", updated.sputumTestResult)
+        assertNull(updated.mdrRifResult)
+        assertEquals(false, updated.isDRTBConfirmed)
+        assertEquals(true, updated.isTBConfirmed)
+    }
+
+    // Without any MTB order the diagnostics row says nothing about MTB, so the stored value stays.
+    @Test
+    fun suspectedKeepsItsMtbResultWhenThereIsNoMtbOrder() {
+        val withResult = merge(null, "SPUTUM_TRUENAT", mtbOrder("COMPLETED", mtb = "TB Positive")).cache
+        val existing = repo.suspectedFromDiagnostics(null, benId, withResult)!!.copy(syncState = SyncState.SYNCED)
+        val noMtbOrder = merge(null, "XRAY_CHEST", result("PENDING")).cache
+        val updated = repo.suspectedFromDiagnostics(existing, benId, noMtbOrder) ?: existing
         assertEquals("TB Positive", updated.sputumTestResult)
         assertEquals(true, updated.isTBConfirmed)
     }
@@ -317,6 +353,61 @@ class FeedDiagnosticOrderMergeTest {
         assertEquals("TB Negative", updated.sputumTestResult)
         assertEquals(true, updated.isTBConfirmed)
         assertEquals(true, updated.isConfirmed)
+    }
+
+    // Found on amritdemo: after RIF Not Conducted and Create New Order, TB_SUSPECTED kept the
+    // previous order's "RIF not conducted" reason while the new order waited for its RIF.
+    @Test
+    fun suspectedDropsTheRifReasonOfAPreviousOrder() {
+        val closed = merge(null, "SPUTUM_TRUENAT",
+            mtbOrder("CLOSED", mtb = "TB Positive", reasonToCloseMDRRIF = "Sample rejected", id = "ext-old")).cache
+        val suspected = repo.suspectedFromDiagnostics(null, benId, closed)!!.copy(syncState = SyncState.SYNCED)
+        assertEquals("Sample rejected", suspected.reasonForRefusalMDRRIF)
+
+        val newOrderWaitingForRif = merge(closed, "SPUTUM_TRUENAT", mtbOrder("PENDING", mtb = "TB Positive", id = "ext-new")).cache
+        assertNull(newOrderWaitingForRif.reasonNotConductedRif)
+        val updated = repo.suspectedFromDiagnostics(suspected, benId, newOrderWaitingForRif)!!
+        assertNull(updated.reasonForRefusalMDRRIF)
+    }
+
+    // Found on amritdemo (FISH PUNE): MTB Not Conducted, then Create New Order kept the old
+    // "MTB not conducted" reason on TB_SUSPECTED while the new order waited for its result.
+    @Test
+    fun suspectedDropsTheMtbReasonOfAPreviousOrder() {
+        val closed = merge(null, "SPUTUM_TRUENAT",
+            mtbOrder("CLOSED", reasonToCloseMTB = "Cartridge unavailable", id = "ext-old")).cache
+        val suspected = repo.suspectedFromDiagnostics(null, benId, closed)!!.copy(syncState = SyncState.SYNCED)
+        assertEquals("Cartridge unavailable", suspected.reasonForRefusalMTB)
+
+        val newOrder = merge(closed, "SPUTUM_TRUENAT", mtbOrder("PENDING", id = "ext-new")).cache
+        val updated = repo.suspectedFromDiagnostics(suspected, benId, newOrder.copy(reasonNotConductedNaat = null))!!
+        assertNull(updated.reasonForRefusalMTB)
+    }
+
+    // Found on amritdemo (ALPHA PUNE): X-ray Not Conducted, then Create New X-Ray Order kept the
+    // old reason on TB_SUSPECTED while the new X-ray order was pending.
+    @Test
+    fun suspectedDropsTheXrayReasonOfAPreviousOrder() {
+        val closed = merge(null, "XRAY_CHEST", OrderResultData(
+            externalOrderId = "ext-x-old", orderType = "XRAY_CHEST", status = "CLOSED", results = emptyList(),
+            reasonToCloseXray = "Other: Film jammed")).cache
+        val suspected = repo.suspectedFromDiagnostics(null, benId, closed)!!.copy(syncState = SyncState.SYNCED)
+        assertEquals("Other", suspected.reasonForRefusalXray)
+
+        val newOrder = merge(closed, "XRAY_CHEST", result("PENDING", id = "ext-x-new")).cache
+        val updated = repo.suspectedFromDiagnostics(suspected, benId, newOrder.copy(reasonNotConductedChestXray = null))!!
+        assertNull(updated.reasonForRefusalXray)
+    }
+
+    @Test
+    fun suspectedKeepsTheRifReasonWhileTheRifTestIsClosed() {
+        val closed = merge(null, "SPUTUM_TRUENAT",
+            mtbOrder("CLOSED", mtb = "TB Positive", reasonToCloseMDRRIF = "Sample rejected")).cache
+        val suspected = repo.suspectedFromDiagnostics(null, benId, closed)!!.copy(syncState = SyncState.SYNCED)
+        // A later save of the same closed order (reason not carried on this copy) keeps it.
+        val updated = repo.suspectedFromDiagnostics(suspected, benId, closed.copy(reasonNotConductedRif = null))
+            ?: suspected
+        assertEquals("Sample rejected", updated.reasonForRefusalMDRRIF)
     }
 
     private fun mtbOrderWithRifStatus(status: String, mtb: String, rif: String?, rifStatus: String) = OrderResultData(

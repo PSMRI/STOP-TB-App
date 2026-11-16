@@ -102,6 +102,22 @@ class CreateOrderResetTest {
         assertNull(row.rifOrderStatus)
         assertNull(row.reasonNotConductedRif)
         assertNull(row.reasonNotConductedRifOther)
+        // Product rule (16 Nov 2026): a new order is a new test, not TB confirmed until its result.
+        assertEquals(false, row.isTBConfirmed)
+        assertEquals(false, row.isConfirmed)
+    }
+
+    @Test
+    fun newMtbOrderStaysConfirmedOnAPositiveLiquidCulture() = runBlocking {
+        val stored = TBDiagnosticsCache(benId = benId).copy(
+            trueNatOrderId = "old-mtb", trueNatOrderStatus = OrderStatus.CLOSED.name, naatResult = "TB Positive",
+            liquidCultureResult = "Positive", isTBConfirmed = true, isConfirmed = true
+        )
+        val repo = repoForOrderPush(stored, serverStatus = "PENDING")
+
+        repo.createOrder(benId, "SPUTUM_TRUENAT")
+
+        assertEquals(true, savedRows.first().isTBConfirmed)
     }
 
     /** Fix 6: a declined sputum referral is stored CLOSED and not done, not as a pending test. */

@@ -3256,6 +3256,10 @@ class TBRepo @Inject constructor(
                                         reasonNotConductedRif = null,
                                         reasonNotConductedRifOther = null,
                                         isDrTbConfirmed = null,
+                                        // A new order is a new test: not TB confirmed until its
+                                        // MTB result arrives, unless liquid culture is positive.
+                                        isTBConfirmed = isLiquidCulturePositive(it.liquidCultureResult),
+                                        isConfirmed = isLiquidCulturePositive(it.liquidCultureResult),
                                         sputumSubmittedAt = it.sputumSubmittedAt ?: "TB Screening Camp",
                                         syncState = SyncState.UNSYNCED,
                                         errorMsgTrueNat = responseBody.data.errorMessage
@@ -3431,9 +3435,12 @@ class TBRepo @Inject constructor(
         }
 
         val naatResLocal = diag.naatResult
-        val mtbOrderHasNoResult = naatResLocal.isNullOrBlank() &&
-            listOf(OrderStatus.INVALID, OrderStatus.CLOSED, OrderStatus.FAILED)
-                .any { status -> diag.trueNatOrderStatus.equals(status.name, ignoreCase = true) }
+        // The current MTB order has no MTB result: still waiting (a new order from Create New
+        // Order), or marked INVALID / CLOSED / FAILED. Product rule (16 Nov 2026): a new order is
+        // a new test, so an earlier order's MTB / RIF result no longer applies and the
+        // beneficiary is not TB confirmed until this order's result arrives (a positive liquid
+        // culture still confirms). Without an MTB order at all, the stored values stay.
+        val mtbOrderHasNoResult = naatResLocal.isNullOrBlank() && diag.trueNatOrderId.asValidOrderId() != null
         val mappedSputumTestResult = when {
             !naatResLocal.isNullOrBlank() -> {
                 val clean = naatResLocal.trim().lowercase()
@@ -3474,6 +3481,8 @@ class TBRepo @Inject constructor(
         // No MTB result on the order (mtbOrderHasNoResult) means no RIF result either.
         val mtbKnownNotPositive = mtbOrderHasNoResult ||
             MtbResult.fromResultText(diag.naatResult).let { it != null && it != MtbResult.TB_POSITIVE }
+        val currentOrderCarriesRif = diag.trueNatOrderId.asValidOrderId() != null &&
+            diag.rifOrderId == diag.trueNatOrderId
         val mappedMdrRifResult = when {
             mtbKnownNotPositive -> null
             diag.rifOrderStatus.equals("COMPLETED", ignoreCase = true) && diag.trueNatRifResult != null -> {
@@ -3486,6 +3495,10 @@ class TBRepo @Inject constructor(
                     else -> diag.trueNatRifResult
                 }
             }
+            // STOP-800 combined order: the current MTB order carries its own RIF test, so its RIF
+            // result (none yet while it waits) is the only one that applies. An earlier order's
+            // RIF result must not stand in for it. Legacy separate MDR_RIF orders keep the fallback.
+            currentOrderCarriesRif -> diag.trueNatRifResult
             else -> diag.trueNatRifResult ?: existing?.mdrRifResult
         }
 
@@ -3493,6 +3506,7 @@ class TBRepo @Inject constructor(
             mappedMdrRifResult == "DR TB" -> true
             mappedMdrRifResult == "Non DR TB" || mappedMdrRifResult == "Indeterminate" -> false
             mtbKnownNotPositive -> false
+            currentOrderCarriesRif -> false
             else -> existing?.isDRTBConfirmed
         }
 
@@ -3508,12 +3522,29 @@ class TBRepo @Inject constructor(
             sputumSubmittedAt = mappedSputumSubmittedAt,
             isNaatConducted = diag.isNaatConducted ?: existing?.isNaatConducted,
             naatResult = if (mtbOrderHasNoResult) null else diag.naatResult ?: existing?.naatResult,
-            reasonForRefusalXray = diag.reasonNotConductedChestXray ?: existing?.reasonForRefusalXray,
+            // As for MTB and RIF: a previous X-ray order's "not conducted" reason stays only while
+            // the current X-ray order is CLOSED (found on amritdemo, ALPHA PUNE: X-ray Not
+            // Conducted, then Create New X-Ray Order kept the old reason on TB_SUSPECTED).
+            reasonForRefusalXray = diag.reasonNotConductedChestXray
+                ?: if (diag.xrayOrderId.asValidOrderId() != null &&
+                    !diag.xrayOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
+                ) null else existing?.reasonForRefusalXray,
             reasonForRefusalSputum = diag.reasonForDenialSputum ?: existing?.reasonForRefusalSputum,
-            reasonForRefusalMTB = diag.reasonNotConductedNaat ?: existing?.reasonForRefusalMTB,
+            // Same rule as the RIF reason below: a previous order's "MTB not conducted" reason stays
+            // only while the current MTB order is CLOSED (found on amritdemo, FISH PUNE: MTB Not
+            // Conducted, then Create New Order kept the old reason on TB_SUSPECTED).
+            reasonForRefusalMTB = diag.reasonNotConductedNaat
+                ?: if (diag.trueNatOrderId.asValidOrderId() != null &&
+                    !diag.trueNatOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
+                ) null else existing?.reasonForRefusalMTB,
+            // The stored reason is kept only while the RIF test of the current MTB order is closed.
+            // A new MTB order (Create New Order) or a RIF still to come has no "RIF not conducted",
+            // so the previous order's reason must not stay on TB_SUSPECTED (found on amritdemo).
             reasonForRefusalMDRRIF = reasonForRefusalMDRRIF
                 ?: formatNotConductedReason(diag.reasonNotConductedRif, diag.reasonNotConductedRifOther)
-                ?: existing?.reasonForRefusalMDRRIF,
+                ?: if (!diag.trueNatOrderId.isNullOrBlank() &&
+                    !diag.rifOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
+                ) null else existing?.reasonForRefusalMDRRIF,
             mdrRifResult = mappedMdrRifResult,
             isDRTBConfirmed = mappedIsDRTBConfirmed,
             // Confirmed by an MTB Positive or a positive liquid culture, as on TB_DIAGNOSTICS
