@@ -90,14 +90,18 @@ class TBSuspectedQuickFragment : Fragment() {
         viewModel.benAgeGender.observe(viewLifecycleOwner) {
             binding.tvAgeGender.text = it
         }
-        viewModel.showSubmit.observe(viewLifecycleOwner) {
-            val isXrayDone = viewModel.viewOnly && viewModel.referralType == 6 && viewModel.getIsChestXRayDone() == true
-            val isNaatDone = viewModel.viewOnly && viewModel.referralType == 7 && viewModel.getIsNaatConducted() == true
-            if (!(isXrayDone || isNaatDone)) {
-                binding.btnSubmit.visibility = if (it) View.VISIBLE else View.GONE
-                if (!viewModel.viewOnly && (viewModel.referralType == 6 || viewModel.referralType == 7)) {
-                    binding.btnSubmit.text = getString(R.string.btn_submit)
-                }
+        viewModel.showSubmit.observe(viewLifecycleOwner) { show ->
+            // View Result of a test that already has a result: nothing to submit. The first
+            // emission comes before the saved row is read, so a view-only screen keeps Submit
+            // hidden until the row says otherwise (it used to show Submit there and never hide it).
+            val viewedTestDone = viewedTestIsDone()
+            if (viewedTestDone != false) {
+                binding.btnSubmit.visibility = View.GONE
+                return@observe
+            }
+            binding.btnSubmit.visibility = if (show) View.VISIBLE else View.GONE
+            if (!viewModel.viewOnly && (viewModel.referralType == 6 || viewModel.referralType == 7)) {
+                binding.btnSubmit.text = getString(R.string.btn_submit)
             }
         }
         // Shared layout defaults this strip to gone; this screen is the only one with a
@@ -142,12 +146,10 @@ class TBSuspectedQuickFragment : Fragment() {
             }
         }
 
-        val isXrayDone = viewModel.viewOnly && viewModel.referralType == 6 && viewModel.getIsChestXRayDone() == true
-        val isNaatDone = viewModel.viewOnly && viewModel.referralType == 7 && viewModel.getIsNaatConducted() == true
-        if (!(isXrayDone || isNaatDone)) {
-            binding.btnSubmit.setOnClickListener {
-                submitForm()
-            }
+        // Decided at tap time, not here: the saved row is usually not read yet when this runs.
+        binding.btnSubmit.setOnClickListener {
+            if (viewedTestIsDone() != false) return@setOnClickListener
+            submitForm()
         }
         viewModel.state.observe(viewLifecycleOwner) {
             when (it) {
@@ -248,6 +250,22 @@ class TBSuspectedQuickFragment : Fragment() {
 
     /** Guards against a second dialog (or a second save) from a quick double tap. */
     private var confirmingSubmit = false
+
+    /**
+     * Whether this is View Result of an X-ray / TrueNat test that is already done (nothing to
+     * submit). Null while a view-only screen has not read its saved row yet, which callers treat
+     * as "don't offer Submit": the button must not appear, or act, before that is known.
+     * False for every editable screen, so Enter Result / Not Conducted are unaffected.
+     */
+    private fun viewedTestIsDone(): Boolean? {
+        if (!viewModel.viewOnly) return false
+        if (viewModel.referralType != 6 && viewModel.referralType != 7) return false
+        if (!viewModel.isDiagnosticsLoaded()) return null
+        return when (viewModel.referralType) {
+            6 -> viewModel.getIsChestXRayDone() == true
+            else -> viewModel.getIsNaatConducted() == true
+        }
+    }
 
     private fun submitForm() {
         val result = binding.form.rvInputForm.adapter?.let {

@@ -275,6 +275,9 @@ class TBSuspectedQuickViewModel @Inject constructor(
         return if (::tbDiagnostics.isInitialized) tbDiagnostics.isNaatConducted else null
     }
 
+    /** False until the saved diagnostics row has been read; the getters above return null till then. */
+    fun isDiagnosticsLoaded(): Boolean = ::tbDiagnostics.isInitialized
+
     fun repeatTest(orderType: String) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {

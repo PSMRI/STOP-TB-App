@@ -218,6 +218,34 @@ class FeedDiagnosticOrderMergeTest {
         assertEquals(false, updated.isDRTBConfirmed)
     }
 
+    // Found on device: a manual MTB Detected the machine then reported as Error-2 left the
+    // beneficiary "TB confirmed" in TB_SUSPECTED although the order had no MTB result any more.
+    @Test
+    fun suspectedDropsMtbResultWhenTheMachineReportsError2() {
+        val positive = merge(null, "SPUTUM_TRUENAT", mtbOrder("PENDING", mtb = "TB Positive")).cache
+        val suspected = repo.suspectedFromDiagnostics(null, benId, positive)!!
+        assertEquals(true, suspected.isTBConfirmed)
+        val invalid = merge(positive, "SPUTUM_TRUENAT", mtbOrder("INVALID", mtb = "Error-2")).cache
+        assertNull(invalid.naatResult)
+        val updated = repo.suspectedFromDiagnostics(suspected.copy(syncState = SyncState.SYNCED), benId, invalid)!!
+        assertNull(updated.sputumTestResult)
+        assertNull(updated.naatResult)
+        assertEquals(false, updated.isTBConfirmed)
+        assertNull(updated.mdrRifResult)
+    }
+
+    // The fallback to the stored value still holds while the order is only waiting for a result.
+    @Test
+    fun suspectedKeepsItsMtbResultWhileTheOrderIsPendingWithoutOne() {
+        val existing = repo.suspectedFromDiagnostics(
+            null, benId, merge(null, "SPUTUM_TRUENAT", mtbOrder("PENDING", mtb = "TB Positive")).cache
+        )!!.copy(syncState = SyncState.SYNCED)
+        val pendingNoResult = merge(null, "SPUTUM_TRUENAT", mtbOrder("PENDING")).cache
+        val updated = repo.suspectedFromDiagnostics(existing, benId, pendingNoResult) ?: existing
+        assertEquals("TB Positive", updated.sputumTestResult)
+        assertEquals(true, updated.isTBConfirmed)
+    }
+
     private fun mtbOrderWithRifStatus(status: String, mtb: String, rif: String?, rifStatus: String) = OrderResultData(
         externalOrderId = "ext-mtb", orderType = "MTB", status = status,
         results = listOfNotNull(

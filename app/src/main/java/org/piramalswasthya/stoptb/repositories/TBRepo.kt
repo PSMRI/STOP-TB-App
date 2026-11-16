@@ -3398,6 +3398,9 @@ class TBRepo @Inject constructor(
         }
 
         val naatResLocal = diag.naatResult
+        val mtbOrderHasNoResult = naatResLocal.isNullOrBlank() &&
+            listOf(OrderStatus.INVALID, OrderStatus.CLOSED, OrderStatus.FAILED)
+                .any { status -> diag.trueNatOrderStatus.equals(status.name, ignoreCase = true) }
         val mappedSputumTestResult = when {
             !naatResLocal.isNullOrBlank() -> {
                 val clean = naatResLocal.trim().lowercase()
@@ -3407,6 +3410,7 @@ class TBRepo @Inject constructor(
                     else -> null
                 }
             }
+            mtbOrderHasNoResult -> null
             else -> existing?.sputumTestResult
         }
 
@@ -3434,7 +3438,9 @@ class TBRepo @Inject constructor(
 
         // The server's result wins (STOP-800): once the MTB result is known and not positive,
         // no RIF result applies any more, even one TB_SUSPECTED held before.
-        val mtbKnownNotPositive = MtbResult.fromResultText(diag.naatResult).let { it != null && it != MtbResult.TB_POSITIVE }
+        // No MTB result on the order (mtbOrderHasNoResult) means no RIF result either.
+        val mtbKnownNotPositive = mtbOrderHasNoResult ||
+            MtbResult.fromResultText(diag.naatResult).let { it != null && it != MtbResult.TB_POSITIVE }
         val mappedMdrRifResult = when {
             mtbKnownNotPositive -> null
             diag.rifOrderStatus.equals("COMPLETED", ignoreCase = true) && diag.trueNatRifResult != null -> {
@@ -3468,7 +3474,7 @@ class TBRepo @Inject constructor(
             isSputumCollected = mappedIsSputumCollected,
             sputumSubmittedAt = mappedSputumSubmittedAt,
             isNaatConducted = diag.isNaatConducted ?: existing?.isNaatConducted,
-            naatResult = diag.naatResult ?: existing?.naatResult,
+            naatResult = if (mtbOrderHasNoResult) null else diag.naatResult ?: existing?.naatResult,
             reasonForRefusalXray = diag.reasonNotConductedChestXray ?: existing?.reasonForRefusalXray,
             reasonForRefusalSputum = diag.reasonForDenialSputum ?: existing?.reasonForRefusalSputum,
             reasonForRefusalMTB = diag.reasonNotConductedNaat ?: existing?.reasonForRefusalMTB,
