@@ -1,14 +1,15 @@
 package org.piramalswasthya.stoptb.model
 
 /**
- * The only part of TB_SCREENING the beneficiary lists read: the ten symptom answers plus the
+ * The only part of TB_SCREENING the beneficiary lists read: the symptom answers plus the
  * stored asymptomatic fallback, which together decide the "Presumptive / Asymptomatic" label on
- * a card.
+ * a card. The six later questions (chest pain, shortness of breath, fatigue, Others and the two
+ * child-only ones) default to null so older rows and callers keep working.
  *
  * The lists used to observe `SELECT * FROM TB_SCREENING` and materialise the whole 50-column
  * entity for every beneficiary on the device - 9,987 of them on a camp tablet - including four
  * `List<>` columns that each cost a TypeConverter parse per row. None of that ever reached the
- * screen. Projecting to these eleven values keeps the same query observable without the width.
+ * screen. Projecting to these few values keeps the same query observable without the width.
  */
 data class TbScreeningSymptoms(
     val benId: Long,
@@ -22,5 +23,11 @@ data class TbScreeningSymptoms(
     val historyOfTb: Boolean?,
     val takingAntiTBDrugs: Boolean?,
     val familySufferingFromTB: Boolean?,
-    val asymptomatic: String?
+    val asymptomatic: String?,
+    val chestPain: Boolean? = null,
+    val shortnessOfBreath: Boolean? = null,
+    val fatigue: Boolean? = null,
+    val otherSymptoms: Boolean? = null,
+    val failureToGainWeightInChildren: Boolean? = null,
+    val decreasedActivityOrPlayfulnessInChildren: Boolean? = null
 )
