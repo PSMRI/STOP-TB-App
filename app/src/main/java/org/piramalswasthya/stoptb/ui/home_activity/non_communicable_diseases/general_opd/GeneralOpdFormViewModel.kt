@@ -72,6 +72,9 @@ class GeneralOpdFormViewModel @Inject constructor(
     val medicines: LiveData<List<OpdMedicineDraft>> = _medicines
     private val _prescriptionVisible = MutableLiveData(false)
     val prescriptionVisible: LiveData<Boolean> = _prescriptionVisible
+
+    private val _notesVisible = MutableLiveData(false)
+    val notesVisible: LiveData<Boolean> = _notesVisible
     private val _notes = MutableLiveData<String>()
     val notes: LiveData<String> = _notes
     private val _savedChiefComplaintText = MutableLiveData<String>()
@@ -154,6 +157,7 @@ class GeneralOpdFormViewModel @Inject constructor(
                 _notes.value = savedStateHandle.get<String>("opdNotes") ?: generalOpdCache.notes.orEmpty()
                 _prescriptionVisible.value = dataset.hasChiefComplaint() ||
                     _medicines.value.orEmpty().any { it.hasData() }
+                _notesVisible.value = dataset.hasChiefComplaint()
                 // Show cached options immediately; a failed network refresh must not block the form.
                 if (existing == null && !viewOnly) {
                     if (drugMasterRepo.refreshMasters()) _drugMasters.value = drugMasterRepo.getCachedMasters()
@@ -168,6 +172,7 @@ class GeneralOpdFormViewModel @Inject constructor(
             savedStateHandle["opdChiefComplaints"] = ArrayList(generalOpdCache.chiefComplaints.orEmpty())
             _prescriptionVisible.value = dataset.hasChiefComplaint() ||
                 _medicines.value.orEmpty().any { it.hasData() }
+            _notesVisible.value = dataset.hasChiefComplaint()
         }
     }
 
@@ -189,7 +194,9 @@ class GeneralOpdFormViewModel @Inject constructor(
             val suffix = if (unit in listOf("day", "week", "month") && row.durationCount != 1) "s" else ""
             "${row.durationCount} $unit$suffix"
         }.distinct().singleOrNull()
-        generalOpdCache.notes = _notes.value?.trim()?.takeIf { it.isNotEmpty() }
+        generalOpdCache.notes = if (dataset.hasChiefComplaint()) {
+            _notes.value?.trim()?.takeIf { it.isNotEmpty() }
+        } else null
         val cache = generalOpdCache.copy(syncState = SyncState.UNSYNCED)
         _state.value = State.SAVING
         viewModelScope.launch {

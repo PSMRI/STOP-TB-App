@@ -21,6 +21,7 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
     private val pref = PreferenceManager.getInstance(context)
 
     private companion object {
+        const val REAUTHENTICATION_REQUIRED = "reauthentication_required"
         const val CHANGES_FEED_TOKEN = "changes_feed_token"
         const val COUNSELLING_SCHEMA_STORE_FORMAT_KEY = "counselling_schema_store_format"
         const val CHANGES_FEED_SCOPE = "changes_feed_scope"
@@ -134,6 +135,24 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
             logs.reset(signedIn = false)
             pref.edit().clear().apply()
         }
+    }
+
+    fun isReauthenticationRequired(): Boolean =
+        pref.getBoolean(REAUTHENTICATION_REQUIRED, false)
+
+    fun setReauthenticationRequired(required: Boolean) {
+        pref.edit().putBoolean(REAUTHENTICATION_REQUIRED, required).commit()
+    }
+
+    /** End the expired session without deleting the current user's unsynced records or cursors. */
+    fun clearAuthenticationForReauthentication() {
+        pref.edit()
+            .remove(context.getString(R.string.PREF_primary_API_KEY))
+            .remove(context.getString(R.string.PREF_primary_JWT_API_KEY))
+            .remove(context.getString(R.string.PREF_primary_REFRESH_TOKEN))
+            .remove(context.getString(R.string.PREF_rem_me_pwd))
+            .putBoolean(REAUTHENTICATION_REQUIRED, true)
+            .commit()
     }
 
     fun deleteLoginCred() {
@@ -564,6 +583,18 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
 
     fun setLastCheckedTime(benId: Long, orderType: String, time: Long) {
         pref.edit().putLong("last_checked_time_${benId}_${orderType}", time).apply()
+    }
+
+    /**
+     * The result the user entered by hand for a test (XRAY_CHEST / SPUTUM_TRUENAT / MDR_RIF), in the
+     * server's wording; a different server result later shows "Updated by device". Null if none.
+     */
+    fun getManualEnteredResult(benId: Long, orderType: String): String? =
+        pref.getString("manual_entered_result_${benId}_${orderType}", null)
+
+    fun setManualEnteredResult(benId: Long, orderType: String, result: String?) {
+        val key = "manual_entered_result_${benId}_${orderType}"
+        pref.edit().apply { if (result == null) remove(key) else putString(key, result) }.apply()
     }
 
     fun getRifNotConductedReason(benId: Long): String? {

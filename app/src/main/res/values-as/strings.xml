@@ -875,6 +875,40 @@
     <string name="form_submitted_successfully">ফৰ্ম সফলতাৰে দাখিল কৰা হৈছে</string>
 
 
+    <!-- TrueNat MTB / RIF results -->
+    <string name="error_rif_part_of_mtb_order">RIF, MTB অৰ্ডাৰৰ এটা অংশ; RIF ৰ বাবে বেলেগ অৰ্ডাৰ সৃষ্টি নহয়</string>
+    <string name="error_order_changed_reopen">ফৰ্মখন খোলা থকাৰ সময়ত এই পৰীক্ষাৰ অৰ্ডাৰ সলনি হ\'ল। ফৰ্মখন বন্ধ কৰি পুনৰ খোলক।</string>
+    <string name="error_form_changed_resubmit">নিশ্চিত কৰাৰ পিছত ফৰ্মখন সলনি হ\'ল। মানসমূহ পৰীক্ষা কৰি পুনৰ জমা দিয়ক।</string>
+    <string name="result_display_mtb_detected">MTB পোৱা গৈছে (MTB Detected)</string>
+    <string name="result_display_mtb_not_detected">MTB পোৱা নগ\'ল (MTB Not Detected)</string>
+    <string name="result_display_rif_detected">ৰিফ প্ৰতিৰোধ পোৱা গৈছে (Rif Resistance Detected)</string>
+    <string name="result_display_rif_not_detected">ৰিফ প্ৰতিৰোধ পোৱা নগ\'ল (Rif Resistance Not Detected)</string>
+    <string name="result_display_indeterminate">অনিৰ্ণীত (Indeterminate)</string>
+    <string name="result_display_invalid_error">অবৈধ/ত্ৰুটি (Invalid/Error)</string>
+    <string name="confirm_test_xray">বুকুৰ এক্স-ৰে</string>
+    <string name="confirm_test_mtb">TrueNat MTB</string>
+    <string name="confirm_test_rif">TrueNat RIF</string>
+    <string name="confirm_result_title">%1$s ফলাফল নিশ্চিত কৰক</string>
+    <string name="confirm_not_conducted_title">%1$s কৰা হোৱা নাই — নিশ্চিত কৰক</string>
+    <string name="confirm_result_line">%1$s: %2$s</string>
+    <string name="confirm_not_conducted_value">কৰা হোৱা নাই — %1$s</string>
+    <string name="confirm_result_ben_line">%1$s · হিতাধিকাৰী আইডি %2$s · %3$s</string>
+    <string name="confirm_result_question">আপুনি %1$s ৰ বাবে এই ফলাফল জমা দিব বিচাৰে নেকি? ছেভ কৰাৰ পিছত ইয়াক সলনি কৰিব নোৱাৰি।</string>
+    <string name="confirm_result_yes">হয়, জমা দিয়ক</string>
+    <string name="confirm_result_no">নহয়</string>
+    <string name="order_status_rif_block_label">RIF পৰীক্ষা</string>
+    <string name="order_status_mtb_result">MTB: %1$s</string>
+    <string name="order_status_rif_result">RIF: %1$s</string>
+    <string name="order_status_waiting_rif">ডিভাইচৰ পৰা RIF ফলাফলৰ বাবে অপেক্ষা</string>
+    <string name="order_status_enter_rif_result">RIF ফলাফল লিখক</string>
+    <string name="order_status_rif_not_conducted_button">RIF কৰা হোৱা নাই</string>
+    <string name="order_status_rif_not_conducted">RIF কৰা হোৱা নাই — %1$s</string>
+    <string name="order_status_rif_closed">RIF বন্ধ (ফলাফল লিখা হোৱা নাই)</string>
+    <string name="order_status_feed_auto_update">কেম্প হাবৰ পৰা স্বয়ংক্ৰিয়ভাৱে আপডেট হয়</string>
+    <string name="order_status_invalid_retest">অবৈধ — মেচিনত পুনৰ পৰীক্ষা চলি আছে</string>
+    <string name="order_status_rif_failed">মেচিনত RIF পৰীক্ষা বিফল হ\'ল</string>
+    <string name="order_status_updated_by_device_suffix">%1$s · ডিভাইচে আপডেট কৰিছে</string>
+    <string name="order_status_xray_updated_by_device">ডিভাইচে ফলাফল আপডেট কৰিছে: %1$s</string>
 </resources>
 
 
