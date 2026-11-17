@@ -722,6 +722,7 @@ data class TBSuspectedDTO(
 
 data class TBConfirmedTreatmentDTO(
     val id: Long, val benId: Long, val regimenType: String?,
+    val treatmentType: String? = null, val dsTbRegimen: String? = null, val pmdtRegimen: String? = null,
     val treatmentStartDate: String?, val expectedTreatmentCompletionDate: String?,
     val followUpDate: String?, val monthlyFollowUpDone: String?,
     val anyDiscomfort: Boolean?, val sideEffects: List<String>?,
@@ -733,6 +734,7 @@ data class TBConfirmedTreatmentDTO(
 ) {
     fun toCache(): TBConfirmedTreatmentCache = TBConfirmedTreatmentCache(
         benId = benId, regimenType = regimenType,
+        treatmentType = treatmentType, dsTbRegimen = dsTbRegimen, pmdtRegimen = pmdtRegimen,
         treatmentStartDate = getLongFromDateMultipleSupport(treatmentStartDate) ?: System.currentTimeMillis(),
         expectedTreatmentCompletionDate = getLongFromDateMultipleSupport(expectedTreatmentCompletionDate),
         followUpDate = getLongFromDateMultipleSupport(followUpDate),
