@@ -272,6 +272,22 @@
                                 android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
                                 android:textColor="?attr/colorOnPrimary"
                                 tools:text="3546464466" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/padding_small"
+                                android:text="@string/nikshay_id"
+                                android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                                android:textColor="?attr/colorOnPrimary" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@{benWithTb.ben.nikshayIdDisplay}"
+                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                android:textColor="?attr/colorOnPrimary"
+                                tools:text="N/A" />
                         </LinearLayout>
 
                         <LinearLayout

@@ -186,6 +186,9 @@ class SuspectedTBDataset(
                 prefillMissingFromDiagnostics(diagnostics)
             }
         }
+        if (nikshayId.value.isNullOrBlank()) {
+            nikshayId.value = ben?.nikshayId?.takeIf { it.isNotBlank() }
+        }
 
         diagnostics?.let { diag ->
             if (!diag.chestXRayResult.isNullOrBlank()) {

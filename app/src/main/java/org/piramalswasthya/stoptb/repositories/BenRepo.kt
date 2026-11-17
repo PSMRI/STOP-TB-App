@@ -2757,6 +2757,8 @@ class BenRepo @Inject constructor(
                                 weight = serverBen.weight ?: existingBen.weight,
                                 bmi = serverBen.bmi ?: existingBen.bmi,
                                 temperature = serverBen.temperature ?: existingBen.temperature,
+                                // Pull often omits it; keep the known ID instead of wiping it.
+                                nikshayId = serverBen.nikshayId?.takeIf { it.isNotBlank() } ?: existingBen.nikshayId,
                                 placeOfCurrentLiving = livingSource.placeOfCurrentLiving,
                                 otherPlaceOfCurrentLiving = livingSource.otherPlaceOfCurrentLiving,
                                 institutionName = livingSource.institutionName,

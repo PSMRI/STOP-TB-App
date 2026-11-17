@@ -125,6 +125,7 @@ class PullTBFromAmritWorker @AssistedInject constructor(
                     } catch (e: Exception) {
                         Timber.e(e, "Could not select Contact of Known TB Patients for household members")
                     }
+                    tbRepo.backfillNikshayIdsOnce()
 
                     val endTime = System.currentTimeMillis()
                     val timeTaken = TimeUnit.MILLISECONDS.toSeconds(endTime - startTime)
