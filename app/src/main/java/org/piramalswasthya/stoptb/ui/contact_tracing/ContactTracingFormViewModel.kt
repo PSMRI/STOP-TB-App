@@ -351,9 +351,11 @@ class ContactTracingFormViewModel @Inject constructor(
         applyAttEligibility(byUuid)
     }
 
-    /** TPT_FOLLOW_UP PRE_SUBMIT rules; run after every evaluateAllConditions. See [TptRegimenGate]. */
+    /** TPT_FOLLOW_UP PRE_SUBMIT rules; run after every evaluateAllConditions. See [TptRegimenGate].
+     * Skipped in history mode: saved visits are read-only and must display exactly as stored. */
     private fun applyTptFollowUpRules() {
-        if (currentFormType != FormType.TPT_FOLLOW_UP || currentSectionPhase != SectionPhase.PRE_SUBMIT) return
+        if (currentFormType != FormType.TPT_FOLLOW_UP || currentSectionPhase != SectionPhase.PRE_SUBMIT ||
+            isHistoryMode) return
         TptRegimenGate.apply(questionsByUuid)
     }
 
