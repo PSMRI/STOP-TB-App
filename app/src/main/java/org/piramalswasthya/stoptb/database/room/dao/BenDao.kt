@@ -1142,16 +1142,6 @@ interface BenDao {
         isPregnant: Int = 0,
     ): Flow<Int>
 
-    @Query("""
-        SELECT COUNT(*) FROM BEN_BASIC_CACHE
-        WHERE villageId IN (:assignedVillageIds)
-          AND isDeactivate = 0 AND isDeath = 0
-          AND UPPER(COALESCE(gender, '')) = 'FEMALE'
-          AND reproductiveStatusId = 1
-          AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN IFNULL(regDate, 0) >= 100000000000 THEN regDate WHEN IFNULL(regDate, 0) > 0 THEN regDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-    """)
-    fun getDashboardPregnantCount(assignedVillageIds: List<Int>, startTime: Long, endTime: Long): Flow<Int>
-
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage AND isDeactivate=0 AND rchId IS NOT NULL AND rchId != ''")
     fun getAllBenWithRchCount(selectedVillage: Int): Flow<Int>
 

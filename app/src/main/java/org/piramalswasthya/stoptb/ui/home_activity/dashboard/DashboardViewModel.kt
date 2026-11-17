@@ -297,7 +297,7 @@ class DashboardViewModel @Inject constructor(
             totalQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "", 0, 0) },
             maleQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0, 0) },
             femaleQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0, 0) },
-            pregnantQuery = { benDao.getDashboardPregnantCount(assignedVillageIds, startTime, endTime) },
+            pregnantQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0, 0, 1) },
             childrenQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "", 1, 0) },
             othersQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0, 0) },
             seniorCitizenQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "", 0, 1) },

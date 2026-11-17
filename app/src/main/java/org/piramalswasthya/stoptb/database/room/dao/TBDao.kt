@@ -299,10 +299,15 @@ interface TBDao {
         AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
         AND (:endTime = :endTime)
         AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
+        AND (:isPregnant = 0 OR (UPPER(COALESCE(b.gender, '')) = 'FEMALE' AND (
+            b.gen_reproductiveStatusId = 1 OR EXISTS (
+                SELECT 1 FROM BEN_VITALS v WHERE v.benId = b.beneficiaryId AND v.keyPopulationRiskFactors LIKE '%PREGNANCY%'
+            )
+        )))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
         AND (:isSeniorCitizen  = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
     """)
-    fun getDashboardTbScreeningCount(assignedVillageIds: List<Int>, villageName: String, startTime: Long, endTime: Long, gender: String, isChild: Int,    isSeniorCitizen: Int
+    fun getDashboardTbScreeningCount(assignedVillageIds: List<Int>, villageName: String, startTime: Long, endTime: Long, gender: String, isChild: Int, isSeniorCitizen: Int, isPregnant: Int = 0
     ): Flow<Int>
 
 
