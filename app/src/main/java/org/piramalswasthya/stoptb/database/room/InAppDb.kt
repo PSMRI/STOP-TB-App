@@ -1983,6 +1983,17 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_69_70 = object : Migration(69, 70) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "TB_CONFIRMED_TREATMENT", "treatmentType"))
+                    database.execSQL("ALTER TABLE TB_CONFIRMED_TREATMENT ADD COLUMN treatmentType TEXT")
+                if (!columnExists(database, "TB_CONFIRMED_TREATMENT", "dsTbRegimen"))
+                    database.execSQL("ALTER TABLE TB_CONFIRMED_TREATMENT ADD COLUMN dsTbRegimen TEXT")
+                if (!columnExists(database, "TB_CONFIRMED_TREATMENT", "pmdtRegimen"))
+                    database.execSQL("ALTER TABLE TB_CONFIRMED_TREATMENT ADD COLUMN pmdtRegimen TEXT")
+            }
+        }
+
         private fun recreateBenBasicCacheView(
             database: SupportSQLiteDatabase,
             excludeDoorLocked: Boolean = false
@@ -2241,7 +2252,7 @@ abstract class InAppDb : RoomDatabase() {
 
 
         // Bump together with a new MIGRATION_x_y added to MIGRATIONS below.
-        const val DB_VERSION = 69
+        const val DB_VERSION = 70
 
         // Oldest schema version that can be migrated in place.
         const val OLDEST_MIGRATABLE_VERSION = 2
@@ -2315,7 +2326,8 @@ abstract class InAppDb : RoomDatabase() {
             MIGRATION_65_66,
             MIGRATION_66_67,
             MIGRATION_67_68,
-            MIGRATION_68_69
+            MIGRATION_68_69,
+            MIGRATION_69_70
         )
 
         fun getInstance(appContext: Context): InAppDb {

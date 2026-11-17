@@ -621,6 +621,8 @@
     <string name="last_home_visit_date">Last Home Visit Date</string>
 
     <string name="regimen_type">Regimen Type</string>
+    <string name="type_of_treatment">Type of Treatment</string>
+    <string name="ds_tb_regimen_value">2 HRZE/4HRE</string>
     <string name="monthly_follow_up_done">Monthly follow up done</string>
     <string name="any_discomfort">Any discomfort</string>
     <string name="side_effects">Side Effects</string>
@@ -654,12 +656,17 @@
 
     <!-- Arrays for TB Confirmed Treatment -->
     <string-array name="tb_regimen_types">
-        <item>DS-TB (6 Months)</item>
-        <item>Shorter Regimen (9–12 Months)</item>
-        <item>Longer Regimen (18–24 Months)</item>
-        <item>BPaL Regimen (6 Months)</item>
-        <item>INH Mono (6 Month)</item>
+        <item>DS TB</item>
+        <item>PMDT</item>
     </string-array>
+    <string-array name="tb_pmdt_regimens">
+        <item>Regimen for H mono/Poly (6–9 months)</item>
+        <item>Longer M/XDR-TB Regimen (18–20 months)</item>
+        <item>Shorter MDR/RR TB Regimen (9–11 months)</item>
+        <item>BPaLM/BPaL Regimen (6–10 months)</item>
+    </string-array>
+    <string name="ds_tb_regimen">DS TB Regimen</string>
+    <string name="pmdt_regimen">PMDT Regimen</string>
 
 
     <string name="remarks">Remarks</string>
