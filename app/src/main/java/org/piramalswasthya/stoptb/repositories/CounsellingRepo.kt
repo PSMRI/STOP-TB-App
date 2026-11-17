@@ -130,7 +130,7 @@ class CounsellingRepo @Inject constructor(
                 val overviewData = CounsellingOverviewData(
                     benId = benId,
                     patientName = "${ben.firstName ?: ""} ${ben.lastName ?: ""}".trim(),
-                    nikshayId = ben.nikshayId ?: "",
+                    nikshayId = ben.nikshayId?.takeIf { it.isNotBlank() } ?: "N/A",
                     counsellingDate = displayDateStr,
                     counsellingOfficer = loggedInUser,
                     regDate = ben.regDate,
