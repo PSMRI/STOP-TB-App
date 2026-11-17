@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.adapters
 
+import android.content.Context
 import org.piramalswasthya.stoptb.helpers.DiagnosticResultLabels
 import android.graphics.Color
 import android.graphics.Typeface
@@ -51,7 +52,7 @@ data class ButtonConfig(
     val type: DiagnosticOrderType?
 )
 
-private fun String?.isMissingOrderId(): Boolean =
+internal fun String?.isMissingOrderId(): Boolean =
     isNullOrBlank() || equals("N/A", ignoreCase = true)
 
 // How long after a screening is saved a camp hub that creates referral orders may still be
@@ -139,16 +140,6 @@ class BenListAdapter(
             }
         }
 
-        // Approximate number of message characters shown before truncation and "See more" is appended.
-        private val ERROR_MSG_COLLAPSED_BODY_LENGTH = 30
-
-        private fun compactAge(age: String): String {
-            val years = Regex("\\d+\\s+Years?", RegexOption.IGNORE_CASE).find(age)
-            val months = Regex("\\d+\\s+Months?", RegexOption.IGNORE_CASE).find(age)
-            val days = Regex("\\d+\\s+Days?", RegexOption.IGNORE_CASE).find(age)
-            return years?.value ?: months?.value ?: days?.value ?: age
-        }
-
         private fun formatDenialReason(reason: String?, other: String?): String {
             if (reason.isNullOrBlank()) return ""
             return reason.split("|").joinToString("\n") { r ->
@@ -159,9 +150,6 @@ class BenListAdapter(
                 }
             }
         }
-
-        private fun normalizedName(name: String): String =
-            name.trim().replace(Regex("\\s+"), " ").lowercase(java.util.Locale.ROOT)
 
         private fun bindErrorMsg(text: String?) {
             if (text.isNullOrBlank()) {
@@ -761,17 +749,6 @@ class BenListAdapter(
                 binding.tvSymptomsStatus.text = if (hasTbScreening) "Screened" else "Unscreened"
                 binding.tvSymptomsStatus.visibility = View.GONE
 
-                fun formatScreeningResult(value: String?): String {
-                    val displayValue = value?.trim()?.takeUnless {
-                        it.isEmpty() || it.equals("N/A", ignoreCase = true)
-                    }
-                    return if (displayValue == null) {
-                        context.getString(R.string.ben_card_result_title)
-                    } else {
-                        context.getString(R.string.ben_card_result, displayValue)
-                    }
-                }
-
                 val context = binding.root.context
 
                 val symptomsResultText = when (isPresumptive) {
@@ -780,7 +757,7 @@ class BenListAdapter(
                     null -> ""
                 }
 
-                binding.tvSymptomsResult.text = formatScreeningResult(symptomsResultText)
+                binding.tvSymptomsResult.text = context.formatScreeningResult(symptomsResultText)
                 binding.tvSymptomsResult.visibility =
                     if (showRedesignedCard) View.VISIBLE else View.GONE
 
@@ -820,7 +797,7 @@ class BenListAdapter(
                 )
                 binding.tvXrayStatus.text = if (xrayResult.isNullOrBlank()) "Unscreened" else "Screened"
                 binding.tvXrayStatus.visibility = View.GONE
-                binding.tvXrayResult.text = formatScreeningResult(xrayResult)
+                binding.tvXrayResult.text = context.formatScreeningResult(xrayResult)
                 binding.tvXrayResult.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
 
                 // ---------------------------------------------------------
@@ -834,7 +811,7 @@ class BenListAdapter(
                 binding.tvTruenatStatus.text = if (truenatResult.isNullOrBlank()) "Unscreened" else "Screened"
                 binding.tvTruenatStatus.visibility = View.GONE
                 // The app's wording ("MTB Detected"), not the server's ("TB Positive").
-                binding.tvTruenatResult.text = formatScreeningResult(
+                binding.tvTruenatResult.text = context.formatScreeningResult(
                     DiagnosticResultLabels.mtb(binding.root.context, truenatResult) ?: truenatResult
                 )
                 binding.tvTruenatResult.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
@@ -1679,6 +1656,32 @@ class BenListAdapter(
         if (changedHouseholds.isNotEmpty()) {
             currentList.forEachIndexed { index, item ->
                 if (item.hhId in changedHouseholds) notifyItemChanged(index)
+            }
+        }
+    }
+
+    companion object {
+
+        // Approximate number of message characters shown before truncation and "See more" is appended.
+        const val ERROR_MSG_COLLAPSED_BODY_LENGTH = 30
+        fun compactAge(age: String): String {
+            val years = Regex("\\d+\\s+Years?", RegexOption.IGNORE_CASE).find(age)
+            val months = Regex("\\d+\\s+Months?", RegexOption.IGNORE_CASE).find(age)
+            val days = Regex("\\d+\\s+Days?", RegexOption.IGNORE_CASE).find(age)
+            return years?.value ?: months?.value ?: days?.value ?: age
+        }
+
+        fun normalizedName(name: String): String =
+            name.trim().replace(Regex("\\s+"), " ").lowercase(java.util.Locale.ROOT)
+
+        fun Context.formatScreeningResult(value: String?): String {
+            val displayValue = value?.trim()?.takeUnless {
+                it.isEmpty() || it.equals("N/A", ignoreCase = true)
+            }
+            return if (displayValue == null) {
+                getString(R.string.ben_card_result_title)
+            } else {
+                getString(R.string.ben_card_result, displayValue)
             }
         }
     }
