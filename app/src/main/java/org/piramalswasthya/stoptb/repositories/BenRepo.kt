@@ -2296,6 +2296,7 @@ class BenRepo @Inject constructor(
                         ?: jsonObject.optStringOrNull("nikshayID")
                         ?: stopTBDetailsObj.optStringOrNull("nikshayId")
                         ?: stopTBDetailsObj.optStringOrNull("nikshayID")
+                        ?.trim()?.takeIf { !it.equals("N/A", ignoreCase = true) }
 
                     val benGpsPairs = listOf(
                         demographicsObj.optDoubleOrNull("latitude") to demographicsObj.optDoubleOrNull("longitude"),

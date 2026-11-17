@@ -71,19 +71,20 @@ interface BenDao {
     suspend fun updateNikshayId(benId: Long, nikshayId: String): Int
 
     // Fills a missing beneficiary Nikshay ID from the latest TB diagnostics, else TB suspected, record.
+    // Same rule as TBRepo.linkNikshayIdToBen: trimmed, blank and "N/A" skipped.
     @Query("""
         UPDATE BENEFICIARY SET nikshayId = COALESCE(
-            (SELECT d.nikshayId FROM TB_DIAGNOSTICS d
-                WHERE d.benId = BENEFICIARY.beneficiaryId AND TRIM(IFNULL(d.nikshayId, '')) != ''
+            (SELECT TRIM(d.nikshayId) FROM TB_DIAGNOSTICS d
+                WHERE d.benId = BENEFICIARY.beneficiaryId AND UPPER(TRIM(IFNULL(d.nikshayId, ''))) NOT IN ('', 'N/A')
                 ORDER BY d.visitDate DESC, d.id DESC LIMIT 1),
-            (SELECT s.nikshayId FROM TB_SUSPECTED s
-                WHERE s.benId = BENEFICIARY.beneficiaryId AND TRIM(IFNULL(s.nikshayId, '')) != ''
+            (SELECT TRIM(s.nikshayId) FROM TB_SUSPECTED s
+                WHERE s.benId = BENEFICIARY.beneficiaryId AND UPPER(TRIM(IFNULL(s.nikshayId, ''))) NOT IN ('', 'N/A')
                 ORDER BY s.visitDate DESC, s.id DESC LIMIT 1)
         )
-        WHERE TRIM(IFNULL(nikshayId, '')) = ''
+        WHERE UPPER(TRIM(IFNULL(nikshayId, ''))) IN ('', 'N/A')
         AND (
-            EXISTS (SELECT 1 FROM TB_DIAGNOSTICS d WHERE d.benId = BENEFICIARY.beneficiaryId AND TRIM(IFNULL(d.nikshayId, '')) != '')
-            OR EXISTS (SELECT 1 FROM TB_SUSPECTED s WHERE s.benId = BENEFICIARY.beneficiaryId AND TRIM(IFNULL(s.nikshayId, '')) != '')
+            EXISTS (SELECT 1 FROM TB_DIAGNOSTICS d WHERE d.benId = BENEFICIARY.beneficiaryId AND UPPER(TRIM(IFNULL(d.nikshayId, ''))) NOT IN ('', 'N/A'))
+            OR EXISTS (SELECT 1 FROM TB_SUSPECTED s WHERE s.benId = BENEFICIARY.beneficiaryId AND UPPER(TRIM(IFNULL(s.nikshayId, ''))) NOT IN ('', 'N/A'))
         )
     """)
     suspend fun backfillNikshayIdFromTbRecords(): Int

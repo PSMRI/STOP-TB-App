@@ -446,7 +446,7 @@ interface TBDao {
     // polling writes there and would re-run this count.
     @Query("""
         SELECT COUNT(*) FROM beneficiary b
-        WHERE TRIM(IFNULL(b.nikshayId, '')) != ''
+        WHERE UPPER(TRIM(IFNULL(b.nikshayId, ''))) NOT IN ('', 'N/A')
         AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
         AND (:startTime = 0 OR :endTime = 0 OR EXISTS (
             SELECT 1 FROM TB_SUSPECTED ts WHERE ts.benId = b.beneficiaryId

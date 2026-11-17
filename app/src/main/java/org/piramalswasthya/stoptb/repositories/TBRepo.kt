@@ -756,6 +756,9 @@ class TBRepo @Inject constructor(
         try {
             val updated = benDao.backfillNikshayIdFromTbRecords()
             Timber.d("Nikshay ID backfill updated $updated beneficiaries")
+        } catch (e: CancellationException) {
+            nikshayBackfillDone.set(false)
+            throw e
         } catch (e: Exception) {
             nikshayBackfillDone.set(false)
             Timber.e(e, "Nikshay ID backfill failed")
