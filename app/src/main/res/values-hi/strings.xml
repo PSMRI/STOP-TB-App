@@ -1374,6 +1374,7 @@
     <string name="no_reasons_specified">कोई कारण नहीं बताया गया</string>
     <string name="data_update_successful">डेटा सफलतापूर्वक अपडेट किया गया</string>
     <string name="icon_title_missing_data_ben">अधूरे डेटा वाले लाभार्थी</string>
+    <string name="tpt_regimen_requires_start_date">कृपया पहले टीपीटी शुरू होने की तारीख दर्ज करें</string>
 </resources>
 
 
