@@ -78,6 +78,9 @@ class PullMissingDataFromAmritWorker @AssistedInject constructor(
                     page++
                     setProgressAsync(workDataOf(PROGRESS to page, NUM_PAGES to totalPages))
                 } while (page < totalPages)
+                // All pages pulled: clear the resume page so the next pull starts from page 0.
+                // An interrupted pull never reaches here and still resumes from its saved page.
+                preferenceDao.setFirstSyncMissingDataLastSyncedPage(0)
 
                 val endTime = System.currentTimeMillis()
                 val timeTaken = TimeUnit.MILLISECONDS.toSeconds(endTime - startTime)

@@ -22,6 +22,7 @@ import com.google.android.material.color.MaterialColors
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.BenListAdapter
 import org.piramalswasthya.stoptb.adapters.BenListAdapter.Companion.formatScreeningResult
+import org.piramalswasthya.stoptb.adapters.isMissingOrderId
 import org.piramalswasthya.stoptb.configuration.TBScreeningDataset
 import org.piramalswasthya.stoptb.databinding.ItemMissingDataBenBinding
 import org.piramalswasthya.stoptb.helpers.getDateFromLong
@@ -82,6 +83,7 @@ class MissingDataBenAdapter(val onItemClick: (MissingDataBenItem) -> Unit) :
         }
 
         tvRedesignAbhaLabelId.isVisible = !benItem.abhaId.isNullOrEmpty()
+        tvRedesignAbhaId.text = benItem.abhaId.orEmpty()
         tvRedesignAbhaId.isVisible = !benItem.abhaId.isNullOrEmpty()
 
         val hasTbScreening = tbScreeningBenIds.contains(benItem.benId)
@@ -158,12 +160,20 @@ class MissingDataBenAdapter(val onItemClick: (MissingDataBenItem) -> Unit) :
                 xrayResult.equals("Normal", ignoreCase = true)
 
         llXrayTile.visibility = if (isPregnantFemale) View.GONE else View.VISIBLE
-        llTruenatTile.visibility = if (isNegativeXray) View.GONE else View.VISIBLE
+        // Same rule as BenListAdapter: a Normal X-ray hides the TrueNat tile only for an
+        // asymptomatic, unreferred beneficiary with no MTB order or result.
+        val hasTrueNat = isPresumptive == true || isPregnantFemale ||
+                tbDiagForStatus?.isReferredForSputum == true ||
+                !tbDiagForStatus?.trueNatOrderId.isMissingOrderId() ||
+                !tbDiagForStatus?.trueNatOrderStatus.isNullOrBlank() ||
+                !tbDiagForStatus?.naatResult.isNullOrBlank()
+        llTruenatTile.visibility = if (isNegativeXray && !hasTrueNat) View.GONE else View.VISIBLE
 
         llScreeningStatus.weightSum = listOf(
             true,
             !isPregnantFemale,
-            !isNegativeXray
+            // Must match the TrueNat tile's visibility above, or a shown tile gets no width.
+            !isNegativeXray || hasTrueNat
         ).count { it }.toFloat()
         ivXray.setImageResource(
             if (!xrayResult.isNullOrBlank()) R.drawable.circle_check else R.drawable.circle_uncheck

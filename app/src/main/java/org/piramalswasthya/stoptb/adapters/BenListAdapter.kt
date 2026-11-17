@@ -52,7 +52,7 @@ data class ButtonConfig(
     val type: DiagnosticOrderType?
 )
 
-private fun String?.isMissingOrderId(): Boolean =
+internal fun String?.isMissingOrderId(): Boolean =
     isNullOrBlank() || equals("N/A", ignoreCase = true)
 
 // How long after a screening is saved a camp hub that creates referral orders may still be

@@ -107,12 +107,6 @@ class NewBenRegFragment : Fragment() {
     private var fusedLocationClient: FusedLocationProviderClient? = null
     private var activeCancellationTokenSource: CancellationTokenSource? = null
 
-    private var isEditingExisting = false
-    private var updateLocationRequested = false
-
-    private var originalLocationState: LocationState? = null
-
-    private var originalCampSite = false
     private var suppressRadioCallbacks = false
     private var fetchTimeoutJob: Job? = null
 
@@ -187,7 +181,7 @@ class NewBenRegFragment : Fragment() {
         binding.cardLocation.visibility = View.VISIBLE
         setupLocationSection()
         if (viewModel.isStandalone && viewModel.recordExists.value == false
-            && !isEditingExisting && viewModel.getIsConsentAgreed()) {
+            && !viewModel.isEditingExisting && viewModel.getIsConsentAgreed()) {
             captureLocationSilently()
         }
 
@@ -328,7 +322,9 @@ class NewBenRegFragment : Fragment() {
             adapter.notifyDataSetChanged()
         }
 
-        if (viewModel.isDataUpdateFlow) {
+        // Also runs for a view recreated mid-edit: the session lives in the ViewModel, so this
+        // only restores the controls and keeps a location update already in progress.
+        if (viewModel.isDataUpdateFlow || viewModel.isEditingExisting) {
             viewLifecycleOwner.lifecycleScope.launch {
                 viewModel.isLoading.first { !it }
                 fabEditClickEvent()
@@ -339,15 +335,13 @@ class NewBenRegFragment : Fragment() {
     }
 
     private fun fabEditClickEvent() {
-        isEditingExisting = true
-        originalLocationState = viewModel.locationState.value
-        originalCampSite = viewModel.isCampSite.value
-        updateLocationRequested = false
+        viewModel.startEditSession()
 
-        viewModel.setLocationOverridden(false)
         suppressRadioCallbacks = true
-        binding.rbUpdateNo.isChecked = true
-        binding.rgCampSite.check(if (originalCampSite) R.id.rb_camp_yes else R.id.rb_camp_no)
+        if (viewModel.locationOverridden) binding.rbUpdateYes.isChecked = true
+        else binding.rbUpdateNo.isChecked = true
+        // Equals the original camp-site choice until the user picks "update = Yes" and changes it
+        binding.rgCampSite.check(if (viewModel.isCampSite.value) R.id.rb_camp_yes else R.id.rb_camp_no)
         suppressRadioCallbacks = false
         viewModel.setRecordExist(false)
         viewModel.enableEditMode()
@@ -412,7 +406,7 @@ class NewBenRegFragment : Fragment() {
 
     private fun isLocationEditable(): Boolean {
         if (viewModel.recordExists.value != false) return false
-        return if (isEditingExisting) updateLocationRequested && !viewModel.isCampSite.value
+        return if (viewModel.isEditingExisting) viewModel.locationOverridden && !viewModel.isCampSite.value
         else viewModel.isStandalone
     }
 
@@ -420,12 +414,12 @@ class NewBenRegFragment : Fragment() {
         if (_binding == null) return
         val editing = viewModel.recordExists.value == false
         binding.llUpdateLocation.visibility =
-            if (editing && isEditingExisting) View.VISIBLE else View.GONE
+            if (editing && viewModel.isEditingExisting) View.VISIBLE else View.GONE
         binding.llCampSiteChoice.visibility =
-            if (editing && isEditingExisting && updateLocationRequested) View.VISIBLE else View.GONE
+            if (editing && viewModel.isEditingExisting && viewModel.locationOverridden) View.VISIBLE else View.GONE
         // A new member of a household inherits the household location, so no refresh there
         binding.btnRefreshLocation.visibility =
-            if (viewModel.isStandalone || isEditingExisting) View.VISIBLE else View.GONE
+            if (viewModel.isStandalone || viewModel.isEditingExisting) View.VISIBLE else View.GONE
         binding.btnRefreshLocation.isEnabled =
             isLocationEditable() && viewModel.locationState.value !is LocationState.Fetching
     }
@@ -433,8 +427,8 @@ class NewBenRegFragment : Fragment() {
     private fun updateSubmitButtonState() {
         if (_binding == null) return
         val locationOk = when {
-            isEditingExisting && !updateLocationRequested -> true
-            viewModel.isStandalone || isEditingExisting -> viewModel.isLocationValid()
+            viewModel.isEditingExisting && !viewModel.locationOverridden -> true
+            viewModel.isStandalone || viewModel.isEditingExisting -> viewModel.isLocationValid()
             else -> true
         }
         binding.btnSubmit.isEnabled = locationOk
@@ -451,8 +445,7 @@ class NewBenRegFragment : Fragment() {
     }
 
     private fun onUpdateLocationChanged(yes: Boolean) {
-        if (yes == updateLocationRequested) return
-        updateLocationRequested = yes
+        if (yes == viewModel.locationOverridden) return
         viewModel.setLocationOverridden(yes)
         if (yes) {
             suppressRadioCallbacks = true
@@ -463,8 +456,8 @@ class NewBenRegFragment : Fragment() {
             if (!viewModel.isCampSite.value) captureLocationSilently()
         } else {
             cancelLocationFetch()
-            viewModel.onCampSiteChanged(originalCampSite)
-            originalLocationState?.let { viewModel.restoreLocationState(it) }
+            viewModel.onCampSiteChanged(viewModel.originalCampSite)
+            viewModel.originalLocationState?.let { viewModel.restoreLocationState(it) }
         }
         updateCampSiteBox()
         updateLocationControls()
@@ -889,7 +882,7 @@ class NewBenRegFragment : Fragment() {
             if (alertBinding.checkBox.isChecked) {
                 viewModel.setConsentAgreed()
                 alertDialog.dismiss()
-                if (viewModel.isStandalone && viewModel.recordExists.value == false && !isEditingExisting) {
+                if (viewModel.isStandalone && viewModel.recordExists.value == false && !viewModel.isEditingExisting) {
                     captureLocationSilently()
                 }
             } else {

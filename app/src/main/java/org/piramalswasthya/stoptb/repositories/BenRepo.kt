@@ -1141,6 +1141,13 @@ class BenRepo @Inject constructor(
             )
             if (response.isSuccessful && response.code() == 200) {
                 val responseBody = response.body()
+                // No pagination means the page count is unknown; returning 0 would end the pull
+                // as complete with later pages never fetched. Fail so the worker retries the page.
+                val pagination = responseBody?.pagination
+                if (pagination == null) {
+                    Timber.e("getMissingDataBeneficiaries page $pageNumber: HTTP 200 without pagination, treating as failed")
+                    return -1
+                }
                 val dtoList = responseBody?.data ?: emptyList()
                 if (dtoList.isNotEmpty()) {
                     val missingInfoList = dtoList.map { dto ->
@@ -1152,7 +1159,7 @@ class BenRepo @Inject constructor(
                     }
                     db.dataMissingBenInfoDao.insertAll(missingInfoList)
                 }
-                responseBody?.pagination?.totalPages ?: 0
+                pagination.totalPages
             } else {
                 Timber.e("getMissingDataBeneficiaries API failed with HTTP ${response.code()}")
                 -1

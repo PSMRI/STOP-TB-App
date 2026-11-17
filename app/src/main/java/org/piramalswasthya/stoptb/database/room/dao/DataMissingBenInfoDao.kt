@@ -54,9 +54,9 @@ interface DataMissingBenInfoDao {
 
             b.regDate,
 
-            b.firstName AS benName,
+            COALESCE(b.firstName, '') AS benName,
             b.lastName AS benSurname,
-            b.gender,
+            COALESCE(b.gender, '') AS gender,
             b.dob,
 
             b.familyHeadRelationPosition AS relToHeadId,

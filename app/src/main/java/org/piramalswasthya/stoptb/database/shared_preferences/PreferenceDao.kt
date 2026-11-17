@@ -207,6 +207,9 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         // Village changed — reset sync page counter so pull starts from page 0 for new village
         if (oldVillageId != null && oldVillageId != newVillageId) {
             editor.putInt(context.getString(R.string.PREF_first_pull_amrit_last_synced_page), 0)
+            // The missing-data resume page belongs to the old village too; a pull interrupted
+            // there must not make the new village's pull skip its first pages.
+            editor.putInt(context.getString(R.string.PREF_first_pull_missing_data_last_synced_page), 0)
             editor.putLong(context.getString(R.string.PREF_full_load_pull_progress), Konstants.defaultTimeStamp)
         }
         editor.apply()
