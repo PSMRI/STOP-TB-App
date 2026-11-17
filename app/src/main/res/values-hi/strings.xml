@@ -719,13 +719,22 @@
         <item>गैर-मातृ मृत्यु</item>
     </string-array>
 
+    <!-- Arrays for TB Confirmed Treatment -->
     <string-array name="tb_regimen_types">
-        <item>डीएस-टीबी (6 महीने)</item>
-        <item>छोटा रेजिमेन (9–12 महीने)</item>
-        <item>लंबा रेजिमेन (18–24 महीने)</item>
-        <item>बीपीएएल रेजिमेन (6 महीने)</item>
-        <item>आईएनएच मोनो (6 महीने)</item>
+        <item>डीएस टीबी (DS TB)</item>
+        <item>पीएमडीटी (PMDT)</item>
     </string-array>
+
+    <string-array name="tb_pmdt_regimens">
+        <item>एच मोनो/पॉली टीबी के लिए उपचार पद्धति (6–9 महीने)</item>
+        <item>लंबी MDR/XDR-TB उपचार पद्धति (18–20 महीने)</item>
+        <item>छोटी MDR/RR-TB उपचार पद्धति (9–11 महीने)</item>
+        <item>BPaLM/BPaL उपचार पद्धति (6–10 महीने)</item>
+    </string-array>
+
+    <string name="ds_tb_regimen">डीएस टीबी उपचार पद्धति</string>
+    <string name="pmdt_regimen">पीएमडीटी उपचार पद्धति</string>
+
 
     <string name="btn_cancel">रद्द करें</string>
     <string name="filter_sort_by">क्रमबद्ध करें</string>
