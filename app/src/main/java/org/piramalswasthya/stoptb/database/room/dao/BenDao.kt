@@ -1128,6 +1128,9 @@ interface BenDao {
         AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(gender, '')) NOT IN ('MALE', 'FEMALE')))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) < 15))
         AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) >= 60))
+        AND (:isPregnant = 0 OR (UPPER(COALESCE(gender, '')) = 'FEMALE' AND (
+            reproductiveStatusId = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS v WHERE v.benId = BEN_BASIC_CACHE.benId AND v.keyPopulationRiskFactors LIKE '%PREGNANCY%')
+        )))
     """)
     fun getDashboardAbhaCount(
         assignedVillageIds: List<Int>,
@@ -1136,6 +1139,7 @@ interface BenDao {
         gender: String,
         isChild: Int,
         isSeniorCitizen: Int,
+        isPregnant: Int = 0,
     ): Flow<Int>
 
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage AND isDeactivate=0 AND rchId IS NOT NULL AND rchId != ''")
@@ -1647,6 +1651,9 @@ interface BenDao {
           AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
           AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
           AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
+          AND (:isPregnant = 0 OR (UPPER(COALESCE(b.gender, '')) = 'FEMALE' AND (
+              b.reproductiveStatusId = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS v WHERE v.benId = b.benId AND v.keyPopulationRiskFactors LIKE '%PREGNANCY%')
+          )))
           AND (
                 (
                     ts.isConfirmed = 1
@@ -1671,7 +1678,8 @@ interface BenDao {
         endTime: Long,
         gender: String,
         isChild: Int,
-        isSeniorCitizen: Int
+        isSeniorCitizen: Int,
+        isPregnant: Int = 0
     ): Flow<Int>
 
     @Transaction
