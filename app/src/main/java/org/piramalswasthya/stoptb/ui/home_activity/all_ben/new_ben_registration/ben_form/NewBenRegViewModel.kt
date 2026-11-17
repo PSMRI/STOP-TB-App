@@ -60,6 +60,7 @@ class NewBenRegViewModel @Inject constructor(
     val hhId          = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).hhId
     val relToHeadId   = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).relToHeadId
     val benIdFromArgs = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
+    val isDataUpdateFlow = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).isEditModeUp
     private val genderFromArgs = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).gender
 
     // StopTB has no HoF / spouse / child concept — kept for nav-graph compat
@@ -113,8 +114,28 @@ class NewBenRegViewModel @Inject constructor(
     val isCampSite: StateFlow<Boolean> = _isCampSite.asStateFlow()
 
     // True once the user chose "update the location details = Yes" for this record
-    private var locationOverridden = false
+    var locationOverridden = false
+        private set
     fun setLocationOverridden(value: Boolean) { locationOverridden = value }
+
+    // Edit session of an existing record. Held here rather than in the Fragment so a recreated
+    // view resumes the session instead of restarting it, which would drop a location captured
+    // before the recreation and take the captured one as the "original".
+    var isEditingExisting = false
+        private set
+    var originalLocationState: LocationState? = null
+        private set
+    var originalCampSite = false
+        private set
+
+    // Starts the edit session once; later calls (e.g. from a recreated view) leave it as is.
+    fun startEditSession() {
+        if (isEditingExisting) return
+        isEditingExisting = true
+        originalLocationState = _locationState.value
+        originalCampSite = _isCampSite.value
+        locationOverridden = false
+    }
 
     private val _isGpsUnavailable = MutableStateFlow(false)
     val isGpsUnavailable: StateFlow<Boolean> = _isGpsUnavailable.asStateFlow()
@@ -694,6 +715,10 @@ class NewBenRegViewModel @Inject constructor(
                     spouseLinkBenId?.let { linkedBenId ->
                         benRepo.updateBeneficiarySpouseAdded(hhId, linkedBenId, SyncState.UNSYNCED)
                         updateLinkedSpouseNameIfBlank(linkedBenId, ben)
+                    }
+
+                    if (isDataUpdateFlow) {
+                        benRepo.updateBenMissingDataStatus(ben.beneficiaryId)
                     }
 
                     _state.postValue(State.SAVE_SUCCESS)

@@ -477,6 +477,7 @@ class TBRepo @Inject constructor(
                     }
                 }
                 val savedId = tbDao.saveTbDiagnostics(cache)
+                linkNikshayIdToBen(cache.benId, cache.nikshayId)
                 if (cache.isKnownTbCase()) {
                     knownTbHouseholdId = benDao.getBen(cache.benId)?.householdId
                 }
@@ -504,6 +505,7 @@ class TBRepo @Inject constructor(
                 ben.gpsLongitude?.let { tbSuspectedCache.longitude = it }
             }
             val savedId = tbDao.saveTbSuspected(tbSuspectedCache)
+            linkNikshayIdToBen(tbSuspectedCache.benId, tbSuspectedCache.nikshayId)
             SyncDailyStore.record("TB_SUSPECTED", listOf(savedId), "SAVE", "SUCCESS")
             if (tbSuspectedCache.isTBConfirmed == true || tbSuspectedCache.isConfirmed) {
                 benDao.getBen(tbSuspectedCache.benId)?.householdId
@@ -744,6 +746,30 @@ class TBRepo @Inject constructor(
             }
             -1
         }
+    }
+
+    private val nikshayBackfillDone = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    // Once per process: fill beneficiaries whose Nikshay ID only sits on TB records pulled earlier.
+    suspend fun backfillNikshayIdsOnce() = withContext(Dispatchers.IO) {
+        if (!nikshayBackfillDone.compareAndSet(false, true)) return@withContext
+        try {
+            val updated = benDao.backfillNikshayIdFromTbRecords()
+            Timber.d("Nikshay ID backfill updated $updated beneficiaries")
+        } catch (e: CancellationException) {
+            nikshayBackfillDone.set(false)
+            throw e
+        } catch (e: Exception) {
+            nikshayBackfillDone.set(false)
+            Timber.e(e, "Nikshay ID backfill failed")
+        }
+    }
+
+    // The UI reads the Nikshay ID from BENEFICIARY, so copy it there from TB records.
+    private suspend fun linkNikshayIdToBen(benId: Long, nikshayId: String?) {
+        val value = nikshayId?.trim()?.takeIf { it.isNotEmpty() && !it.equals("N/A", ignoreCase = true) }
+            ?: return
+        benDao.updateNikshayId(benId, value)
     }
 
     private suspend fun logTbSkip(module: String, item: JSONObject?, index: Int?, reason: String,
@@ -1309,6 +1335,7 @@ class TBRepo @Inject constructor(
                     ) {
                         benDao.getBen(tbDiagnosticsDTO.benId)?.let {
                             tbDao.saveTbDiagnostics(cache)
+                            linkNikshayIdToBen(cache.benId, cache.nikshayId)
                             tbDiagnosticsList.add(cache)
                         }
                     }
@@ -1404,6 +1431,7 @@ class TBRepo @Inject constructor(
                             syncState = SyncState.SYNCED
                         )
                         tbDao.saveTbDiagnostics(cache)
+                        linkNikshayIdToBen(ben.beneficiaryId, cache.nikshayId)
                         tbDiagnosticsList.add(cache)
                     }
                 }
@@ -1554,6 +1582,7 @@ class TBRepo @Inject constructor(
                             val beneficiary = benDao.getBen(tbSuspectedDTO.benId)
                             if (beneficiary != null) {
                                 tbDao.saveTbSuspected(cache)
+                                linkNikshayIdToBen(beneficiary.beneficiaryId, cache.nikshayId)
                                 tbSuspectedList.add(cache)
                             } else {
                                 logSyncSkip("TB_SUSPECTED", "PULL", "BENEFICIARY_NOT_FOUND_LOCALLY",

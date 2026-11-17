@@ -456,13 +456,17 @@ interface TBDao {
     """)
     fun getDashboardTbConfirmedCount(assignedVillageIds: List<Int>, villageName: String, startTime: Long, endTime: Long, gender: String, isChild: Int, isSeniorCitizen: Int): Flow<Int>
 
-    // NIKSHAY IDs count with time + village filter
+    // NIKSHAY IDs count (beneficiaries with an ID) with time + village filter.
+    // Date window: a TB_SUSPECTED visit in range. TB_DIAGNOSTICS is left out on purpose, since
+    // polling writes there and would re-run this count.
     @Query("""
-        SELECT COUNT(*) FROM TB_SUSPECTED ts
-        INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-        WHERE ts.nikshayId IS NOT NULL AND ts.nikshayId != ''
+        SELECT COUNT(*) FROM beneficiary b
+        WHERE UPPER(TRIM(IFNULL(b.nikshayId, ''))) NOT IN ('', 'N/A')
         AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-        AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
+        AND (:startTime = 0 OR :endTime = 0 OR EXISTS (
+            SELECT 1 FROM TB_SUSPECTED ts WHERE ts.benId = b.beneficiaryId
+            AND (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime
+        ))
         AND (:endTime = :endTime)
         AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))

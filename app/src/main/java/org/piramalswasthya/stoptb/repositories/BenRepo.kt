@@ -432,6 +432,39 @@ class BenRepo @Inject constructor(
         ben.isDraft = false
     }
 
+    suspend fun updateBenMissingDataStatus(beneficiaryId: Long) = withContext(Dispatchers.IO) {
+        val status = processNewBen(beneficiaryId)
+        val update = status && updateNikshaySyncStatus(beneficiaryId)
+        if(update) {
+            db.dataMissingBenInfoDao.updateStatus(beneficiaryId, MissingDataInfoStatus.UPDATED)
+        } else {
+            throw Exception("Failed to update missing data status")
+        }
+    }
+
+    suspend fun updateNikshaySyncStatus(beneficiaryId: Long, isUpdated: Boolean = true): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val request = UpdateNikshaySyncStatusRequest(
+                    beneficiaryId = beneficiaryId,
+                    isUpdated = isUpdated
+                )
+                val response = tmcNetworkApiService.updateNikshaySyncStatus(request)
+                if (response.isSuccessful && response.code() == 200) {
+                    val body = response.body()
+                    val success = body?.status.equals("SUCCESS", ignoreCase = true) || (body?.data?.isUpdated == true)
+                    success
+                } else {
+                    Timber.e("updateNikshaySyncStatus failed with code: ${response.code()}")
+                    false
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Exception in updateNikshaySyncStatus")
+                false
+            }
+        }
+    }
+
     suspend fun persistRecord(ben: BenRegCache, updateIfExists: Boolean = false) {
         withContext(Dispatchers.IO) {
 
@@ -685,16 +718,21 @@ class BenRepo @Inject constructor(
             return false
         }
     }
-    suspend fun processNewBen(): Boolean = processNewBenMutex.withLock {
+    suspend fun processNewBen(beneficiaryId: Long? = null): Boolean = processNewBenMutex.withLock {
         withContext(Dispatchers.IO) {
             val user =
                 preferenceDao.getLoggedInUser()
                     ?: throw IllegalStateException("No user logged in!!")
 
-            benDao.resetSyncingToUnsynced()
-            benDao.requeueTempBeneficiariesForRegistration()
+            if (beneficiaryId == null) {
+                benDao.resetSyncingToUnsynced()
+                benDao.requeueTempBeneficiariesForRegistration()
+            }
 
-            val benList = benDao.getAllUnprocessedBen()
+            val benList = beneficiaryId?.let {
+                benDao.getUnprocessedBenForBeneficiary(it)
+            } ?: benDao.getAllUnprocessedBen()
+
             Timber.d("YTR 419 $benList")
 
             // Registration is already one request per beneficiary, so a rejected
@@ -718,7 +756,11 @@ class BenRepo @Inject constructor(
 
             logSyncModule("BENEFICIARY_REGISTRATION", "PUSH", syncPushOutcome(benList.size, registered),
                 "pending" to benList.size, "registered" to registered, "remaining" to benList.size - registered)
-            val readyBens = benDao.getAllBenForSyncWithServer().filter {
+            val updateBenList = beneficiaryId?.let {
+                benDao.getBenForSyncWithServerForBeneficiary(it)
+            } ?: benDao.getAllBenForSyncWithServer()
+
+            val readyBens = updateBenList.filter {
                 if (it.beneficiaryId <= 0L || it.benRegId <= 0L) {
                     logSyncSkip("BENEFICIARY", "PUSH", "SERVER_REGISTRATION_ID_NOT_AVAILABLE",
                         "benId" to it.beneficiaryId, "benRegId" to it.benRegId, "householdId" to it.householdId)
@@ -728,13 +770,16 @@ class BenRepo @Inject constructor(
                 } else true
             }
 
+
             // A beneficiary is sent together with its household and kid record;
             // a household's members form one group, which is accepted or
             // rejected as a unit. Groups with a rejected member that is still
             // waiting out its retry delay sit this cycle out (they stay UNSYNCED).
             fun groupKey(ben: BenRegCache) = ben.householdId?.takeIf { hh -> hh > 0L } ?: -ben.beneficiaryId
+            // A single-beneficiary push is user-initiated, so it doesn't wait out the retry delay.
             val (waiting, dueMembers) = readyBens.groupBy(::groupKey).values.partition { members ->
-                members.any { syncRetryStore.isWaiting(SyncRetryStore.ENTITY_BENEFICIARY, it.beneficiaryId) }
+                beneficiaryId == null &&
+                    members.any { syncRetryStore.isWaiting(SyncRetryStore.ENTITY_BENEFICIARY, it.beneficiaryId) }
             }
             if (waiting.isNotEmpty()) {
                 Timber.w("Beneficiary push: ${waiting.size} group(s) waiting to retry: ${waiting.flatten().map { it.beneficiaryId }}")
@@ -788,7 +833,10 @@ class BenRepo @Inject constructor(
             val markedHhIds = attemptedHhIds.filter { householdDao.getHousehold(it)?.processed == "P" }
             logSyncModule("HOUSEHOLD", "PUSH", syncPushOutcome(attemptedHhIds.size, markedHhIds.size),
                 "submitted" to attemptedHhIds.size, "locallyMarkedSynced" to markedHhIds.size)
-            return@withContext rejected.isEmpty()
+            // For a single beneficiary, succeed only if it actually reached the server: it may
+            // have been skipped (e.g. left SYNCING by an earlier failed push) without being rejected.
+            return@withContext rejected.isEmpty() &&
+                (beneficiaryId == null || benDao.getBen(beneficiaryId)?.syncState == SyncState.SYNCED)
         }
     }
 
@@ -882,7 +930,7 @@ class BenRepo @Inject constructor(
                         val syncedHhIds = hhIds.filter { householdDao.getHousehold(it.toLong())?.processed == "P" }
                         SyncDailyStore.record("BENEFICIARY", syncedBenIds, "PUSH", "SUCCESS")
                         SyncDailyStore.record("HOUSEHOLD", syncedHhIds, "PUSH", "SUCCESS")
-                        
+
                         return true
                     } else if (responseStatusCode == 5002 || responseStatusCode == 401) {
                         val user = preferenceDao.getLoggedInUser()
@@ -1076,6 +1124,49 @@ class BenRepo @Inject constructor(
         } catch (e: java.lang.Exception) {
             Timber.e("Caught exception $e here")
             return false
+        }
+    }
+
+    suspend fun getMissingDataBeneficiariesFromServerForWorker(pageNumber: Int): Int {
+        val user = preferenceDao.getLoggedInUser() ?: return -1
+        val locationRecord = preferenceDao.getLocationRecord() ?: return -1
+        val providerServiceMapID = user.serviceMapId
+        val villageID = locationRecord.village.id
+
+        return try {
+            val response = tmcNetworkApiService.getMissingDataBeneficiaries(
+                providerServiceMapID = providerServiceMapID,
+                villageID = villageID,
+                pageNo = pageNumber
+            )
+            if (response.isSuccessful && response.code() == 200) {
+                val responseBody = response.body()
+                // No pagination means the page count is unknown; returning 0 would end the pull
+                // as complete with later pages never fetched. Fail so the worker retries the page.
+                val pagination = responseBody?.pagination
+                if (pagination == null) {
+                    Timber.e("getMissingDataBeneficiaries page $pageNumber: HTTP 200 without pagination, treating as failed")
+                    return -1
+                }
+                val dtoList = responseBody?.data ?: emptyList()
+                if (dtoList.isNotEmpty()) {
+                    val missingInfoList = dtoList.map { dto ->
+                        DataMissingBenInfo(
+                            beneficiaryId = dto.beneficiaryId,
+                            status = if (dto.isUpdated) MissingDataInfoStatus.UPDATED else MissingDataInfoStatus.MISSING,
+                            reason = dto.reason?.joinToString(MISSING_DATA_REASON_SEPARATOR) ?: ""
+                        )
+                    }
+                    db.dataMissingBenInfoDao.insertAll(missingInfoList)
+                }
+                pagination.totalPages
+            } else {
+                Timber.e("getMissingDataBeneficiaries API failed with HTTP ${response.code()}")
+                -1
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error fetching missing beneficiary data from server")
+            -1
         }
     }
 
@@ -2296,6 +2387,7 @@ class BenRepo @Inject constructor(
                         ?: jsonObject.optStringOrNull("nikshayID")
                         ?: stopTBDetailsObj.optStringOrNull("nikshayId")
                         ?: stopTBDetailsObj.optStringOrNull("nikshayID")
+                        ?.trim()?.takeIf { !it.equals("N/A", ignoreCase = true) }
 
                     val benGpsPairs = listOf(
                         demographicsObj.optDoubleOrNull("latitude") to demographicsObj.optDoubleOrNull("longitude"),
@@ -2757,6 +2849,8 @@ class BenRepo @Inject constructor(
                                 weight = serverBen.weight ?: existingBen.weight,
                                 bmi = serverBen.bmi ?: existingBen.bmi,
                                 temperature = serverBen.temperature ?: existingBen.temperature,
+                                // Pull often omits it; keep the known ID instead of wiping it.
+                                nikshayId = serverBen.nikshayId?.takeIf { it.isNotBlank() } ?: existingBen.nikshayId,
                                 placeOfCurrentLiving = livingSource.placeOfCurrentLiving,
                                 otherPlaceOfCurrentLiving = livingSource.otherPlaceOfCurrentLiving,
                                 institutionName = livingSource.institutionName,

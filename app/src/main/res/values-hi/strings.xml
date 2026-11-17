@@ -1364,6 +1364,16 @@
     <string name="order_status_rif_failed">मशीन पर RIF जाँच विफल हुई</string>
     <string name="order_status_updated_by_device_suffix">%1$s · डिवाइस द्वारा अपडेट किया गया</string>
     <string name="order_status_xray_updated_by_device">डिवाइस द्वारा परिणाम अपडेट किया गया: %1$s</string>
+
+    <!-- Missing-data beneficiaries -->
+    <string name="home_card_missing_data_ben_title">अधूरे डेटा वाले लाभार्थी</string>
+    <string name="home_card_missing_data_ben_subtitle">लाभार्थियों की अधूरी जानकारी देखें और अपडेट करें</string>
+    <string name="update_details">विवरण अपडेट करें</string>
+    <string name="label_update">अपडेट करें</string>
+    <string name="label_reason_mssing_data">अधूरे डेटा के कारण:</string>
+    <string name="no_reasons_specified">कोई कारण नहीं बताया गया</string>
+    <string name="data_update_successful">डेटा सफलतापूर्वक अपडेट किया गया</string>
+    <string name="icon_title_missing_data_ben">अधूरे डेटा वाले लाभार्थी</string>
 </resources>
 
 

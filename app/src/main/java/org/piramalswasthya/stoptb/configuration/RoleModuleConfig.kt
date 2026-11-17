@@ -16,8 +16,8 @@ object RoleModuleConfig {
 
     val privilegesByRole: Map<AppRole, ModulePrivilege> = mapOf(
         AppRole.REGISTRAR to ModulePrivilege(
-            homeModules = setOf(AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.NON_HOUSEHOLD),
-            multiRoleHomeModules = setOf(AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.NON_HOUSEHOLD),
+            homeModules = setOf(AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.MISSING_DATA_BENEFICIARIES, AppModule.NON_HOUSEHOLD),
+            multiRoleHomeModules = setOf(AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.MISSING_DATA_BENEFICIARIES, AppModule.NON_HOUSEHOLD),
             syncShowCounsellingStatusRow = false,
             syncBottomSheetRowFilter = SyncRowFilter.REGISTRAR_ROWS_ONLY,
             examineRowSet = ExamineRowSet.ANTHROPOMETRY_AND_TB_SCREENING_ONLY,
