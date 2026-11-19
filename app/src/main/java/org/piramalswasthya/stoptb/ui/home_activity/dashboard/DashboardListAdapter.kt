@@ -272,8 +272,8 @@ internal class DashboardListAdapter(
             binding.donutScreenedDemo.setChart(
                 segments = listOf(
                     DonutChartView.Segment(data.male.toFloat(), color(binding.root, R.color.dashboard_demo_male)),
-                    DonutChartView.Segment(data.female.toFloat(), color(binding.root, R.color.dashboard_demo_female)),
-                    DonutChartView.Segment(0f, color(binding.root, R.color.dashboard_demo_pregnant)),
+                    DonutChartView.Segment((data.female - data.pregnant).coerceAtLeast(0).toFloat(), color(binding.root, R.color.dashboard_demo_female)),
+                    DonutChartView.Segment(data.pregnant.toFloat(), color(binding.root, R.color.dashboard_demo_pregnant)),
                     DonutChartView.Segment(data.children.toFloat(), color(binding.root, R.color.dashboard_demo_children)),
                     DonutChartView.Segment(data.seniorCitizen.toFloat(), color(binding.root, R.color.dashboard_demo_senior)),
                     DonutChartView.Segment(data.others.toFloat(), color(binding.root, R.color.dashboard_demo_transgender)),
@@ -281,7 +281,7 @@ internal class DashboardListAdapter(
             )
             bindDemoCount(binding.rowScreenedMale, data.male, null)
             bindDemoCount(binding.rowScreenedFemale, data.female, null)
-            bindDemoCount(binding.rowScreenedPregnant, 0, null)
+            bindDemoCount(binding.rowScreenedPregnant, data.pregnant, null)
             bindDemoCount(binding.rowScreenedChildren, data.children, null)
             bindDemoCount(binding.rowScreenedSenior, data.seniorCitizen, null)
             bindDemoCount(binding.rowScreenedTransgender, data.others, null)
@@ -358,7 +358,7 @@ internal class DashboardListAdapter(
             val open = openDemoRows.getOrPut(item.id) { mutableSetOf() }
             bindDemoRowState(details.rowMale, item.data.male, item.classifications, 0, open)
             bindDemoRowState(details.rowFemale, item.data.female, item.classifications, 1, open)
-            bindDemoRowState(details.rowPregnant, 0, item.classifications, 2, open)
+            bindDemoRowState(details.rowPregnant, item.data.pregnant, null, 2, open)
             bindDemoRowState(details.rowChildren, item.data.children, item.classifications, 3, open)
             bindDemoRowState(details.rowSenior, item.data.seniorCitizen, item.classifications, 4, open)
             bindDemoRowState(details.rowTransgender, item.data.others, item.classifications, 5, open)

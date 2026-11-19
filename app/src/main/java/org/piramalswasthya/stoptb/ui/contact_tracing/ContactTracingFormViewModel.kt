@@ -351,6 +351,14 @@ class ContactTracingFormViewModel @Inject constructor(
         applyAttEligibility(byUuid)
     }
 
+    /** TPT_FOLLOW_UP PRE_SUBMIT rules; run after every evaluateAllConditions. See [TptRegimenGate].
+     * Skipped in history mode: saved visits are read-only and must display exactly as stored. */
+    private fun applyTptFollowUpRules() {
+        if (currentFormType != FormType.TPT_FOLLOW_UP || currentSectionPhase != SectionPhase.PRE_SUBMIT ||
+            isHistoryMode) return
+        TptRegimenGate.apply(questionsByUuid)
+    }
+
     /** A test done at the camp shows its result (read-only, saved as text) and never asks the
      * manual "conducted?" / result pair. Not done at camp — no result, or an invalid one
      * ("AI Invalid Result" / "Invalid/Error") — hides and clears the camp field and asks the PHI pair. */
@@ -580,6 +588,7 @@ class ContactTracingFormViewModel @Inject constructor(
                 builtQuestions.forEach { it.lockedAnswer = it.questionUuid in locked && !it.editableAfterSubmit }
             }
             applyContactFollowUpRules(builtQuestions)
+            applyTptFollowUpRules()
             ensureContactFollowUpDate(builtQuestions)
             // Submit only reopens when something on screen can still be filled in.
             if (lockedQuestionUuids != null && builtQuestions.any {
@@ -636,6 +645,7 @@ class ContactTracingFormViewModel @Inject constructor(
         evaluateAllConditions(allSectionQuestions)
         applyContactFollowUpRules(allSectionQuestions)
         clearHiddenContactFollowUpAnswers(allSectionQuestions)
+        applyTptFollowUpRules()
 
         updateExpectedCompletionDateIfNeeded(question)
         allSectionQuestions.filter { it.visible }.forEach { q -> refreshErrorIfNeeded(q) }
@@ -779,9 +789,11 @@ class ContactTracingFormViewModel @Inject constructor(
         }
     }
     private suspend fun markBeneficiaryAsConfirmedTbCase(benId: Long) {
-        if (tbRepo.getTBConfirmed(benId) == null) {
+        /*if (tbRepo.getTBConfirmed(benId) == null) {
             tbRepo.saveTBConfirmed(TBConfirmedTreatmentCache(benId = benId))
-        }
+        }*/
+        // Only flag the beneficiary as a confirmed TB case. The treatment record (regimen,
+        // start date, expected completion) is created through the validated TB Confirmed form.
         val tbSuspected = tbRepo.getTBSuspected(benId) ?: TBSuspectedCache(benId = benId)
         tbSuspected.isConfirmed = true
         tbSuspected.isTBConfirmed = true

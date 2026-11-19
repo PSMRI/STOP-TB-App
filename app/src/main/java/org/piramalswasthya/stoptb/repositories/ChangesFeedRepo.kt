@@ -94,6 +94,7 @@ class ChangesFeedRepo @Inject constructor(
                     // The server doesn't have the feed yet: use the full pull.
                     404, 405, 501 -> {
                         preferenceDao.setChangesFeedActive(false)
+                        preferenceDao.setHubCreatesReferralOrders(false)
                         return@withContext Outcome.UNSUPPORTED
                     }
                     // Hub busy or unreachable through a proxy: retry later.
@@ -123,9 +124,11 @@ class ChangesFeedRepo @Inject constructor(
             }
             if (!data.optBoolean("supported", false)) {
                 preferenceDao.setChangesFeedActive(false)
+                preferenceDao.setHubCreatesReferralOrders(false)
                 return@withContext Outcome.UNSUPPORTED
             }
             preferenceDao.setChangesFeedActive(true)
+            preferenceDao.setHubCreatesReferralOrders(data.optBoolean("createsReferralOrders", false))
 
             val items = data.optJSONArray("items") ?: JSONArray()
             applyPage(items)

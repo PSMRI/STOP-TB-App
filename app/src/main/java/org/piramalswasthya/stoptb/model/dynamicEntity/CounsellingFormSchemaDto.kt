@@ -71,7 +71,9 @@ data class CounsellingQuestionDto(
     // Contact Follow Up / TPT PRE_SUBMIT: a compatible saved answer that must not be changed.
     @Transient var lockedAnswer: Boolean = false,
     // Runtime-only override for field editability; null falls back to default adapter behavior.
-    @Transient var isFieldEditable: Boolean? = null
+    @Transient var isFieldEditable: Boolean? = null,
+    // Runtime-only: when set, tapping a disabled option shows this string as a toast (e.g. TPT Regimen).
+    @Transient var disabledOptionHintRes: Int? = null
 ) {
     companion object {
         val ALWAYS_EDITABLE_UUIDS = setOf(

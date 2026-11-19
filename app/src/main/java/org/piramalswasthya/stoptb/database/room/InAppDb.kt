@@ -20,6 +20,7 @@ import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.BeneficiaryIdsAvailDao
 import org.piramalswasthya.stoptb.database.room.dao.CbacDao
 import org.piramalswasthya.stoptb.database.room.dao.ChiefComplaintMasterDao
+import org.piramalswasthya.stoptb.database.room.dao.DataMissingBenInfoDao
 import org.piramalswasthya.stoptb.database.room.dao.DrugMasterDao
 import org.piramalswasthya.stoptb.database.room.dao.FilariaDao
 import org.piramalswasthya.stoptb.database.room.dao.HouseholdDao
@@ -77,6 +78,8 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.SectionResponseEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionResponseEntity
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.DynamicFormMetadataDao
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.CounsellingFormResponseDao
+import org.piramalswasthya.stoptb.model.DataMissingBenInfo
+import org.piramalswasthya.stoptb.model.MissingDataInfoStatusConverter
 
 
 @Database(
@@ -119,7 +122,8 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         OptionConditionEntity::class,
         FormResponseEntity::class,
         SectionResponseEntity::class,
-        QuestionResponseEntity::class
+        QuestionResponseEntity::class,
+        DataMissingBenInfo::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
     version = InAppDb.DB_VERSION, exportSchema = true
@@ -129,8 +133,8 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
     SyncStateConverter::class,
     StringListConverter::class,
     GenderConverter::class,
-    ScreeningStatusConverter::class
-
+    ScreeningStatusConverter::class,
+    MissingDataInfoStatusConverter::class
 )
 abstract class InAppDb : RoomDatabase() {
     abstract fun syncVillageCountsDao(): org.piramalswasthya.stoptb.database.room.dao.SyncVillageCountsDao
@@ -138,6 +142,7 @@ abstract class InAppDb : RoomDatabase() {
     abstract val benIdGenDao: BeneficiaryIdsAvailDao
     abstract val householdDao: HouseholdDao
     abstract val benDao: BenDao
+    abstract val dataMissingBenInfoDao: DataMissingBenInfoDao
     abstract val cbacDao: CbacDao
     abstract val chiefComplaintMasterDao: ChiefComplaintMasterDao
     abstract val drugMasterDao: DrugMasterDao
@@ -1962,12 +1967,27 @@ abstract class InAppDb : RoomDatabase() {
         }
 
         private val MIGRATION_67_68 = object : Migration(67, 68) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+            CREATE TABLE IF NOT EXISTS DATA_MISSING_BEN_INFO (
+                beneficiaryId INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                PRIMARY KEY(beneficiaryId)
+            )
+            """.trimIndent()
+                )
+            }
+        }
+
+        private val MIGRATION_68_69 = object : Migration(68, 69) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 recreateBenBasicCacheView(database)
             }
         }
 
-        private val MIGRATION_68_69 = object : Migration(68, 69) {
+        private val MIGRATION_69_70 = object : Migration(69, 70) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 if (!columnExists(database, "HOUSEHOLD", "isDoorLocked")) {
                     database.execSQL(
@@ -1983,7 +2003,7 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_69_70 = object : Migration(69, 70) {
+        private val MIGRATION_70_71 = object : Migration(70, 71) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 if (!columnExists(database, "TB_CONFIRMED_TREATMENT", "treatmentType"))
                     database.execSQL("ALTER TABLE TB_CONFIRMED_TREATMENT ADD COLUMN treatmentType TEXT")
@@ -2252,7 +2272,7 @@ abstract class InAppDb : RoomDatabase() {
 
 
         // Bump together with a new MIGRATION_x_y added to MIGRATIONS below.
-        const val DB_VERSION = 70
+        const val DB_VERSION = 71
 
         // Oldest schema version that can be migrated in place.
         const val OLDEST_MIGRATABLE_VERSION = 2
@@ -2327,7 +2347,8 @@ abstract class InAppDb : RoomDatabase() {
             MIGRATION_66_67,
             MIGRATION_67_68,
             MIGRATION_68_69,
-            MIGRATION_69_70
+            MIGRATION_69_70,
+            MIGRATION_70_71
         )
 
         fun getInstance(appContext: Context): InAppDb {

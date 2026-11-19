@@ -99,6 +99,14 @@
 
 
     </LinearLayout>
+    <TextView
+        android:id="@+id/tv_session_expired"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="@dimen/padding_normal"
+        android:text="@string/session_expired_sync_message"
+        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+        android:visibility="gone" />
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv_sync"
         android:layout_width="match_parent"

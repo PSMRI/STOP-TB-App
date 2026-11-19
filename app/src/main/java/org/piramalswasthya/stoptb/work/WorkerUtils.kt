@@ -281,6 +281,15 @@ object WorkerUtils {
             Timber.d("Pull [$triggerSource] skipped: existing unique pull chain is already active")
             return activePullInfos.map { it.id }
         }
+        // A forced pull (Refresh) used to REPLACE the chain even while it was downloading, which
+        // cancelled the run in progress, so repeated presses during a long first download kept
+        // throwing work away. A running pull already reads the feed until it is caught up, so a
+        // press while it runs keeps it; force replaces only a queued or backing-off chain.
+        if (activePullInfos.any { it.state == WorkInfo.State.RUNNING }) {
+            Timber.d("Pull [$triggerSource] kept: a pull is already running")
+            return activePullInfos.map { it.id }
+        }
+        val policy = if (force) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP
 
         Timber.i("Pull [$triggerSource] enqueued")
         val pullRunData = Data.Builder()
@@ -293,6 +302,7 @@ object WorkerUtils {
 
         // StopTB pull chain:
         // Beneficiaries → Referrals + TB data → Mark complete
+        //               ↘ Missing beneficiary data (parallel branch)
         val campMode = isCampModeEnabled(context)
         val pullWorkRequest = if (campMode) {
             campSyncRequestBuilder<PullFromAmritWorker>()
@@ -302,7 +312,7 @@ object WorkerUtils {
 
         val afterFoundation = workManager.beginUniqueWork(
             pullWorkerUniqueName,
-            if (force) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
+            policy,
             pullWorkRequest
         )
 
@@ -314,14 +324,26 @@ object WorkerUtils {
             }).setInputData(pullRunData).addTag("pull_group5_tb").build(),
         )
 
+        // release-2.4: Nikshay missing-data disabled, re-enable later (restore the commented lines below)
+        // val groupMissingData = listOf(
+        //     (if (campMode) {
+        //         campSyncRequestBuilder<PullMissingDataFromAmritWorker>()
+        //     } else {
+        //         syncRequestBuilder<PullMissingDataFromAmritWorker>()
+        //     }).setInputData(pullRunData).addTag("pull_missing_data").build()
+        // )
+
         val setSyncCompleteWorker = OneTimeWorkRequestBuilder<UpdatePrefForPullCompleteWorker>()
             .setInputData(pullRunData)
             .build()
 
-        val chainTB = afterFoundation.then(groupTB)
+        val chainTB = afterFoundation.then(groupTB).then(setSyncCompleteWorker)
+        // val chainMissingData = afterFoundation.then(groupMissingData)
 
         SyncDiagnostics.prepareRun(syncRunId, "PULL")
-        chainTB.then(setSyncCompleteWorker).enqueue()
+        // WorkContinuation.combine(listOf(chainTB, chainMissingData)).enqueue()
+        chainTB.enqueue()
+        // val ids = listOf(pullWorkRequest.id, setSyncCompleteWorker.id) + groupTB.map { it.id } + groupMissingData.map { it.id }
         val ids = listOf(pullWorkRequest.id, setSyncCompleteWorker.id) + groupTB.map { it.id }
         SyncDiagnostics.observeRun(context, syncRunId, "PULL", triggerSource, ids, logSessionId)
         return ids
@@ -354,15 +376,10 @@ object WorkerUtils {
         val now = SystemClock.elapsedRealtime()
         if (!force && now - lastCampQuickPullAt < campQuickPullDebounceMs) return
 
-        // Pull and push are safe to overlap, but a full pull competing with an
-        // upload slows both on the camp hub. The auto-pull loop retries shortly.
-        if (!force && getActiveUniqueWorkInfos(WorkManager.getInstance(context), pushWorkerUniqueName)
-                .any { it.state == WorkInfo.State.RUNNING }
-        ) {
-            Timber.d("Pull [AUTO_PULL] skipped: push chain is running")
-            return
-        }
-
+        // Pull and push are safe to overlap. This used to skip the pull while any upload ran, but
+        // with the changes feed a pull is a small delta, and with uploads running most of the time
+        // records from other tablets stopped arriving. The pull goes ahead; the unique pull chain
+        // still stops two pulls overlapping.
         lastCampQuickPullAt = now
         triggerAmritPullWorker(context, triggerSource = "AUTO_PULL")
     }

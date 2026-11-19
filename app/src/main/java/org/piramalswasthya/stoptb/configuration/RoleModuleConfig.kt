@@ -16,6 +16,9 @@ object RoleModuleConfig {
 
     val privilegesByRole: Map<AppRole, ModulePrivilege> = mapOf(
         AppRole.REGISTRAR to ModulePrivilege(
+            // release-2.4: Nikshay missing-data disabled, re-enable later (restore the commented lines below)
+            // homeModules = setOf(AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.MISSING_DATA_BENEFICIARIES, AppModule.NON_HOUSEHOLD),
+            // multiRoleHomeModules = setOf(AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.MISSING_DATA_BENEFICIARIES, AppModule.NON_HOUSEHOLD),
             homeModules = setOf(AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.NON_HOUSEHOLD),
             multiRoleHomeModules = setOf(AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.NON_HOUSEHOLD),
             syncShowCounsellingStatusRow = false,
