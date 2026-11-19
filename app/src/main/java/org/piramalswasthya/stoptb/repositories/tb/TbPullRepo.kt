@@ -402,7 +402,7 @@ class TbPullRepo @Inject constructor(
                         if (merged.triggerTrueNat) {
                             WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, listOf("SPUTUM_TRUENAT"))
                         }
-                        val synced = merged.cache.copy(syncState = SyncState.SYNCED)
+                        val synced = merged.cache.copy(syncState = syncStateAfterServerMerge(existing))
                         if (synced != existing) tbDao.saveTbDiagnostics(synced)
                         val existingSuspected = tbDao.getTbSuspected(benId)
                         val suspected = diagnosticOrderRepo.suspectedFromDiagnostics(existingSuspected, benId, synced)
@@ -434,6 +434,11 @@ class TbPullRepo @Inject constructor(
             }
         }
         preferenceDao.removeFeedSkippedOrders(appliedSkipKeys)
+        // Rows this page skipped because an order id was missing are fetched by the poll worker
+        // once their grace period ends; make sure it is running.
+        if ((preferenceDao.getFeedSkippedOrders() - skippedBefore).isNotEmpty()) {
+            WorkerUtils.triggerDiagnosticResultPollWorker(context)
+        }
 
         if (applied > 0) {
             // Pushes whatever TB_SUSPECTED rows are waiting, including ones an earlier failed
@@ -534,11 +539,22 @@ class TbPullRepo @Inject constructor(
         )
     }
 
+    /**
+     * True when this feed row must not be applied because the tablet created an order for this
+     * test moments ago. When either order id is missing we cannot tell whether the row is that
+     * new order or an older one, so the pair is recorded and DiagnosticResultPollWorker fetches
+     * order/result for it once the grace period ends; otherwise its result would be lost, as the
+     * feed token moves past this row.
+     */
     private suspend fun isOlderThanLocalOrder(benId: Long, localType: String, data: OrderResultData, now: Long): Boolean {
         val createdAt = diagnosticOrderRepo.orderCreatedTimestamps["${benId}_$localType"] ?: return false
         if (now - createdAt >= diagnosticOrderRepo.ORDER_STATUS_GRACE_PERIOD_MS) return false
-        val feedOrderId = data.externalOrderId.asValidOrderId() ?: return true
-        val localOrderId = localOrderIdFor(benId, localType) ?: return true
+        val feedOrderId = data.externalOrderId.asValidOrderId()
+        val localOrderId = localOrderIdFor(benId, localType)
+        if (feedOrderId == null || localOrderId == null) {
+            preferenceDao.addFeedSkippedOrder(diagnosticOrderRepo.feedSkippedKey(benId, localType))
+            return true
+        }
         return feedOrderId != localOrderId
     }
 

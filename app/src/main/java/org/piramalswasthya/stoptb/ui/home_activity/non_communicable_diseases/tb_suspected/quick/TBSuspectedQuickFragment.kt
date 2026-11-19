@@ -272,7 +272,19 @@ class TBSuspectedQuickFragment : Fragment() {
         if (result != -1 || confirmingSubmit) return
         confirmingSubmit = true
         viewLifecycleOwner.lifecycleScope.launch {
-            val submissions = viewModel.previewSubmissions()
+            // An uncaught failure here (e.g. the Room read) would crash the app and leave the
+            // guard set; show it and let the user submit again.
+            val submissions = try {
+                viewModel.previewSubmissions()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                confirmingSubmit = false
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Could not prepare the submission preview")
+                confirmingSubmit = false
+                Toast.makeText(requireContext(), R.string.quick_refresh_failed, Toast.LENGTH_LONG).show()
+                return@launch
+            }
             if (submissions.isEmpty()) {
                 // Nothing irreversible is sent (e.g. only a referral was declined): save directly.
                 confirmingSubmit = false

@@ -346,8 +346,10 @@ class TBSuspectedQuickViewModel @Inject constructor(
                     else -> null
                 }
                 if (mtb != null) return listOf(mtb)
-                // RIF goes on its own save, once MTB Detected is on the server.
-                if (!dataset.canEnterRif()) return emptyList()
+                // RIF goes on its own save, once MTB Detected is on the server. Checked against the
+                // row read now as well: the feed may have stored a RIF result or closed the order
+                // since the form loaded.
+                if (!dataset.canEnterRif() || !rifStillOpen(stored)) return emptyList()
                 val enteredRif = RifResult.fromResultText(mapped.trueNatRifResult)
                 when {
                     dataset.rifConducted.value == dataset.noValue -> listOf(
@@ -359,6 +361,15 @@ class TBSuspectedQuickViewModel @Inject constructor(
             }
             else -> emptyList()
         }
+    }
+
+    /** [stored] (Room, read now) still takes a manual RIF result. */
+    private fun rifStillOpen(stored: TBDiagnosticsCache?): Boolean {
+        if (stored == null) return false
+        if (!stored.trueNatRifResult.isNullOrBlank()) return false
+        if (stored.rifOrderStatus.equals("CLOSED", ignoreCase = true)) return false
+        return !stored.trueNatOrderStatus.equals("COMPLETED", ignoreCase = true) &&
+            !stored.trueNatOrderStatus.equals("CLOSED", ignoreCase = true)
     }
 
     /**

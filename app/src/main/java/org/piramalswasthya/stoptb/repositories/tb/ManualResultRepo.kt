@@ -108,7 +108,10 @@ class ManualResultRepo @Inject constructor(
         orderType: String,
         resultSummary: String? = null,
         reasonForRefusal: String? = null,
-        isRetryAfterOrderCreation: Boolean = false
+        isRetryAfterOrderCreation: Boolean = false,
+        // The order this result belongs to. Null: the order on the row now. The result is not
+        // sent, nor its answer saved, once the row has moved to a different order.
+        expectedOrderId: String? = null
     ):NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
             val ben = benDao.getBen(benId)
@@ -124,6 +127,12 @@ class ManualResultRepo @Inject constructor(
             if (preferenceDao.isCampModeEnabled() && !preferenceDao.isCampHubConnected()) {
                 saveManualResultPendingSync(benId, orderType, wireResult, reasonForRefusal)
                 return@withContext NetworkResponse.Success(PENDING_SYNC)
+            }
+
+            val orderIdAtStart = expectedOrderId.asValidOrderId()
+                ?: currentOrderId(tbDao.getTbDiagnosticsByBenId(benId), orderType)
+            if (orderMovedOn(benId, orderType, orderIdAtStart)) {
+                return@withContext NetworkResponse.Error(context.getString(R.string.error_order_changed_reopen))
             }
 
             try {
@@ -144,7 +153,7 @@ class ManualResultRepo @Inject constructor(
                     if (responseBody.statusCode == 200) {
                         // The legacy envelope can signal an error via body statusCode even on
                         // HTTP 200 (e.g. "order already COMPLETED"), so check both.
-                        saveAcceptedManualResult(benId, orderType, wireResult, reasonForRefusal, responseBody.data)
+                        saveAcceptedManualResult(benId, orderType, wireResult, reasonForRefusal, responseBody.data, orderIdAtStart)
                         return@withContext NetworkResponse.Success(context.getString(R.string.diagnostic_manual_result_success))
                     } else {
                         val errMsg = responseBody.errorMessage ?: context.getString(R.string.error_manual_result_rejected)
@@ -193,6 +202,22 @@ class ManualResultRepo @Inject constructor(
         }
     }
 
+    /** The order a manual result for [orderType] belongs to: RIF is a test on the MTB order. */
+    private fun currentOrderId(diag: TBDiagnosticsCache?, orderType: String): String? = when {
+        diag == null -> null
+        orderType.equals("XRAY_CHEST", ignoreCase = true) -> diag.xrayOrderId.asValidOrderId()
+        orderType.equals("MDR_RIF", ignoreCase = true) ->
+            diag.trueNatOrderId.asValidOrderId() ?: diag.rifOrderId.asValidOrderId()
+        else -> diag.trueNatOrderId.asValidOrderId()
+    }
+
+    /** The row now holds a different order for [orderType] than [orderId]. */
+    private suspend fun orderMovedOn(benId: Long, orderType: String, orderId: String?): Boolean {
+        if (orderId == null) return false
+        val current = currentOrderId(tbDao.getTbDiagnosticsByBenId(benId), orderType) ?: return false
+        return current != orderId
+    }
+
     /** The server's wording for a result the form picked (it may hold an older local synonym). */
     private fun toServerResultWording(orderType: String, resultSummary: String?): String? {
         if (resultSummary.isNullOrBlank()) return null
@@ -212,12 +237,24 @@ class ManualResultRepo @Inject constructor(
         orderType: String,
         wireResult: String?,
         reasonForRefusal: String?,
-        data: OrderResultData
+        data: OrderResultData,
+        orderIdAtStart: String?
     ) {
-        preferenceDao.setManualEnteredResult(benId, orderType, wireResult)
         val fetchedOrderId = data.externalOrderId.asValidOrderId()
         benIdLocks.withLock(benId) {
-            val cleared = tbDao.getTbDiagnosticsByBenId(benId)?.let { diag ->
+            val fresh = tbDao.getTbDiagnosticsByBenId(benId)
+            val current = currentOrderId(fresh, orderType)
+            // A new order was created while this request was in flight, or the server answered
+            // for a different order: this answer must not be written onto the current order.
+            if (current != null && ((orderIdAtStart != null && current != orderIdAtStart) ||
+                    (fetchedOrderId != null && fetchedOrderId != current))
+            ) {
+                Timber.w("Manual $orderType result for benId=$benId answered for order $fetchedOrderId " +
+                    "(sent for $orderIdAtStart); the row is on $current now, so it is not saved")
+                return@withLock
+            }
+            preferenceDao.setManualEnteredResult(benId, orderType, wireResult)
+            val cleared = fresh?.let { diag ->
                 when {
                     orderType.equals("XRAY_CHEST", ignoreCase = true) -> diag.copy(xrayManualResultPendingSync = false)
                     orderType.equals("MDR_RIF", ignoreCase = true) -> diag.copy(rifManualResultPendingSync = false)
@@ -444,50 +481,41 @@ class ManualResultRepo @Inject constructor(
         return withContext(Dispatchers.IO) {
             var stillPending = false
             // Only rows with a manual result pending sync; every branch below requires one.
-            for (diag in tbLocalRepo.getDiagnosticsWithPendingManualResult()) {
-                if (diag.xrayManualResultPendingSync == true) {
-                    val resultSummary = ChestXrayResult.fromResultText(diag.chestXRayResult)?.displayValue
-                    val reason = if (resultSummary == null)
-                        formatNotConductedReason(diag.reasonNotConductedChestXray, diag.reasonNotConductedChestXrayOther) else null
-                    if (resultSummary != null || reason != null) {
-                        val response = submitManualResult(diag.benId, "XRAY_CHEST", resultSummary, reason)
-                        when {
-                            response.data == PENDING_SYNC -> stillPending = true
-                            response is NetworkResponse.Error -> clearStuckPendingSync(diag.benId, "XRAY_CHEST", response.message)
-                            // Accepted at last - raise the follow-on orders the form could not
-                            // raise at entry time, because back then nothing had accepted it yet.
-                            else -> cascadeAcceptedReplay(diag.benId, "XRAY_CHEST", resultSummary)
-                        }
+            for (pending in tbLocalRepo.getDiagnosticsWithPendingManualResult()) {
+                for (orderType in listOf("XRAY_CHEST", "SPUTUM_TRUENAT", "MDR_RIF")) {
+                    // Read fresh for each test: an earlier replay, the feed or a new order may
+                    // have changed the row since the list above was read.
+                    val diag = tbDao.getTbDiagnosticsByBenId(pending.benId) ?: break
+                    val (isPending, resultSummary, reason) = when (orderType) {
+                        "XRAY_CHEST" -> Triple(
+                            diag.xrayManualResultPendingSync == true,
+                            ChestXrayResult.fromResultText(diag.chestXRayResult)?.displayValue,
+                            formatNotConductedReason(diag.reasonNotConductedChestXray, diag.reasonNotConductedChestXrayOther)
+                        )
+                        "SPUTUM_TRUENAT" -> Triple(
+                            diag.trueNatManualResultPendingSync == true,
+                            MtbResult.fromResultText(diag.naatResult)?.displayValue,
+                            formatNotConductedReason(diag.reasonNotConductedNaat, diag.reasonNotConductedNaatOther)
+                        )
+                        else -> Triple(
+                            diag.rifManualResultPendingSync == true,
+                            RifResult.fromResultText(diag.trueNatRifResult)?.displayValue,
+                            formatNotConductedReason(diag.reasonNotConductedRif, diag.reasonNotConductedRifOther)
+                        )
                     }
-                }
-                if (diag.trueNatManualResultPendingSync == true) {
-                    val resultSummary = MtbResult.fromResultText(diag.naatResult)?.displayValue
-                    val reason = if (resultSummary == null)
-                        formatNotConductedReason(diag.reasonNotConductedNaat, diag.reasonNotConductedNaatOther) else null
-                    if (resultSummary != null || reason != null) {
-                        val response = submitManualResult(diag.benId, "SPUTUM_TRUENAT", resultSummary, reason)
-                        when {
-                            response.data == PENDING_SYNC -> stillPending = true
-                            response is NetworkResponse.Error -> clearStuckPendingSync(diag.benId, "SPUTUM_TRUENAT", response.message)
-                            // Accepted at last - raise the follow-on orders the form could not
-                            // raise at entry time, because back then nothing had accepted it yet.
-                            else -> cascadeAcceptedReplay(diag.benId, "SPUTUM_TRUENAT", resultSummary)
-                        }
-                    }
-                }
-                if (diag.rifManualResultPendingSync == true) {
-                    val resultSummary = RifResult.fromResultText(diag.trueNatRifResult)?.displayValue
-                    val reason = if (resultSummary == null)
-                        formatNotConductedReason(diag.reasonNotConductedRif, diag.reasonNotConductedRifOther) else null
-                    if (resultSummary != null || reason != null) {
-                        val response = submitManualResult(diag.benId, "MDR_RIF", resultSummary, reason)
-                        when {
-                            response.data == PENDING_SYNC -> stillPending = true
-                            response is NetworkResponse.Error -> clearStuckPendingSync(diag.benId, "MDR_RIF", response.message)
-                            // Accepted at last - raise the follow-on orders the form could not
-                            // raise at entry time, because back then nothing had accepted it yet.
-                            else -> cascadeAcceptedReplay(diag.benId, "MDR_RIF", resultSummary)
-                        }
+                    if (!isPending) continue
+                    val closeReason = if (resultSummary == null) reason else null
+                    if (resultSummary == null && closeReason == null) continue
+                    val response = submitManualResult(
+                        diag.benId, orderType, resultSummary, closeReason,
+                        expectedOrderId = currentOrderId(diag, orderType)
+                    )
+                    when {
+                        response.data == PENDING_SYNC -> stillPending = true
+                        response is NetworkResponse.Error -> clearStuckPendingSync(diag.benId, orderType, response.message)
+                        // Accepted at last - raise the follow-on orders the form could not
+                        // raise at entry time, because back then nothing had accepted it yet.
+                        else -> cascadeAcceptedReplay(diag.benId, orderType, resultSummary)
                     }
                 }
             }

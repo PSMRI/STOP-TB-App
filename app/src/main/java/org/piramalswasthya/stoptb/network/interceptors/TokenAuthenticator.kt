@@ -5,9 +5,11 @@ import okhttp3.Authenticator
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.Route
+import org.json.JSONException
 import org.json.JSONObject
 import org.piramalswasthya.stoptb.crypt.CryptoUtil
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.helpers.AUTH_REJECTED_STATUS_CODES
 import org.piramalswasthya.stoptb.helpers.TokenExpiryManager
 import org.piramalswasthya.stoptb.network.AmritApiService
 import org.piramalswasthya.stoptb.network.TmcRefreshTokenRequest
@@ -83,9 +85,19 @@ class TokenAuthenticator @Inject constructor(
                                 tokenExpiryManager.onRefreshFailed()
                             return@runBlocking null
                         }
-                        val data = JSONObject(login.body()?.string().orEmpty())
-                            .optJSONObject("data") ?: run {
-                            tokenExpiryManager.onRefreshFailed()
+                        // Only a real refusal clears the login. A malformed or partial body is
+                        // transient: the next sync tries again with the saved credentials.
+                        val body = try {
+                            JSONObject(login.body()?.string().orEmpty())
+                        } catch (e: JSONException) {
+                            Timber.w(e, "Login response could not be parsed; will retry")
+                            return@runBlocking null
+                        }
+                        val data = body.optJSONObject("data") ?: run {
+                            val status = body.optInt("statusCode", -1)
+                            if (status in AUTH_REJECTED_STATUS_CODES || status == 401 || status == 403)
+                                tokenExpiryManager.onRefreshFailed()
+                            else Timber.w("Login response without data (statusCode=$status); will retry")
                             return@runBlocking null
                         }
                         // Never replace this tablet's identity with another user's session.
@@ -96,7 +108,7 @@ class TokenAuthenticator @Inject constructor(
                         val jwt = data.optString("jwtToken")
                         val newRefresh = data.optString("refreshToken")
                         if (jwt.isBlank() || newRefresh.isBlank()) {
-                            tokenExpiryManager.onRefreshFailed()
+                            Timber.w("Login response without tokens; will retry")
                             return@runBlocking null
                         }
                         pref.registerJWTAmritToken(jwt)
@@ -112,8 +124,8 @@ class TokenAuthenticator @Inject constructor(
                     Timber.w(e, "Authentication network error")
                     null
                 } catch (e: Exception) {
+                    // Not an authentication refusal (those are handled above): keep the login.
                     Timber.e(e, "Token refresh failed")
-                    tokenExpiryManager.onRefreshFailed()
                     null
                 }
             }

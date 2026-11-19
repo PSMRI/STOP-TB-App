@@ -405,26 +405,37 @@ class TbLocalRepo @Inject constructor(
         withContext(Dispatchers.IO) {
             val screenings = tbDao.getScreeningsForKnownTbContacts(householdId?.takeIf { it > 0L } ?: 0L)
             var updated = 0
+            var failed = 0
             for (candidate in screenings) {
                 // Re-read inside a transaction and change only the risk-factor fields: the list
                 // above is a snapshot, and a form save in between must not be undone by writing
                 // that older row back.
-                val changed = database.withTransaction {
-                    val screening = tbDao.getTbScreeningById(candidate.id) ?: return@withTransaction false
-                    val selection = KeyPopulationRiskFactorAutoSelect.addContactOfKnownTb(
-                        screening.keyPopulationRiskFactorIds,
-                        screening.keyPopulationRiskFactors
-                    ) ?: return@withTransaction false
-                    screening.keyPopulationRiskFactorIds = selection.ids
-                    screening.keyPopulationRiskFactors = selection.codes
-                    screening.syncState = SyncState.UNSYNCED
-                    tbDao.saveTbScreening(screening)
-                    true
+                // One failed save must not stop the other contacts; the next TB pull runs this
+                // for every household again, so a failed row is retried there.
+                val changed = try {
+                    database.withTransaction {
+                        val screening = tbDao.getTbScreeningById(candidate.id) ?: return@withTransaction false
+                        val selection = KeyPopulationRiskFactorAutoSelect.addContactOfKnownTb(
+                            screening.keyPopulationRiskFactorIds,
+                            screening.keyPopulationRiskFactors
+                        ) ?: return@withTransaction false
+                        screening.keyPopulationRiskFactorIds = selection.ids
+                        screening.keyPopulationRiskFactors = selection.codes
+                        screening.syncState = SyncState.UNSYNCED
+                        tbDao.saveTbScreening(screening)
+                        true
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    failed++
+                    Timber.e(e, "Contact of Known TB not applied to screening id=${candidate.id}")
+                    false
                 }
                 if (changed) updated++
             }
-            if (updated > 0) {
-                Timber.d("Selected Contact of Known TB Patients on $updated screening record(s)")
+            if (updated > 0 || failed > 0) {
+                Timber.d("Selected Contact of Known TB Patients on $updated screening record(s), $failed failed")
             }
         }
     }

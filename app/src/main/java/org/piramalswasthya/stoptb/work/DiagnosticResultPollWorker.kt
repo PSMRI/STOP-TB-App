@@ -136,10 +136,15 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 // not a device is integrated or any order still looks pending (an order saved
                 // without an order id is not in pendingOrders). A pair is cleared only once its
                 // fetch succeeds; the worker keeps rescheduling while any remain.
-                // The feed leaves no orders to fetch one by one; entries an older build recorded are dropped.
-                val hasSkippedFeedOrders = false
-                if (feedActive) {
-                    preferenceDao.removeFeedSkippedOrders(preferenceDao.getFeedSkippedOrders().toList())
+                var hasSkippedFeedOrders = false
+                if (feedEnabled) {
+                    tbRepo.feedSkippedOrdersPastGrace().forEach { (benId, type) ->
+                        Timber.d("Fetching $type result for benId=$benId skipped by the feed")
+                        if (tbRepo.fetchOrderResult(benId, type) is NetworkResponse.Success) {
+                            tbRepo.ackFeedSkippedOrder(benId, type)
+                        }
+                    }
+                    hasSkippedFeedOrders = preferenceDao.getFeedSkippedOrders().isNotEmpty()
                 }
 
                 if (!tbRepo.isXrayIntegrated() && !tbRepo.isTruenatIntegrated()) {

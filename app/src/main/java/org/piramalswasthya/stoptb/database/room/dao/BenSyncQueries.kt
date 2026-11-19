@@ -66,4 +66,8 @@ interface BenSyncQueries {
 
     @Query("UPDATE BENEFICIARY SET syncState = 0 WHERE syncState = 1")
     suspend fun resetSyncingToUnsynced()
+
+    /** [resetSyncingToUnsynced] for one beneficiary (a targeted push). */
+    @Query("UPDATE BENEFICIARY SET syncState = 0 WHERE syncState = 1 AND beneficiaryId = :benId")
+    suspend fun resetSyncingToUnsyncedFor(benId: Long)
 }
