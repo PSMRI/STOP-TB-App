@@ -296,8 +296,8 @@
     <string name="cat_hrp">HRP</string>
     <string name="cat_maternal">MATERNAL</string>
     <string-array name="tb_truenat_mtb_result">
-        <item>MTB Positive</item>
-        <item>MTB Negative</item>
+        <item>MTB Detected</item>
+        <item>MTB Not Detected</item>
         <item>Invalid/Error</item>
     </string-array>
     <string-array name="tb_truenat_rif_result">

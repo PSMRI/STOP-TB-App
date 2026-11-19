@@ -135,9 +135,9 @@ object ImageUtils {
 
     /**
      * Writes a JPEG that stays at or under [MAX_REGISTRATION_IMAGE_BYTES].
-     * Photos that are already small enough are copied as-is so quality is not
-     * reduced a second time. Larger photos are scaled and re-encoded, keeping
-     * the highest quality that still fits the cap.
+     * A JPEG that is already small enough is copied as-is so quality is not
+     * reduced a second time. Every other decodable photo, including HEIF, is
+     * re-encoded as JPEG at the highest quality that still fits the cap.
      */
     fun compressToJpeg(
         context: Context,
@@ -202,9 +202,8 @@ object ImageUtils {
     }
 
     private fun writeCompressedJpeg(sourceBytes: ByteArray, destination: File): Boolean {
-        if (!looksLikeImage(sourceBytes)) return false
         val rotation = readRotationDegrees(sourceBytes)
-        if (sourceBytes.size <= MAX_REGISTRATION_IMAGE_BYTES && rotation == 0) {
+        if (isJpeg(sourceBytes) && sourceBytes.size <= MAX_REGISTRATION_IMAGE_BYTES && rotation == 0) {
             writeReplacing(destination, sourceBytes)
             return destination.length() in 1..MAX_REGISTRATION_IMAGE_BYTES
         }
@@ -299,9 +298,12 @@ object ImageUtils {
         }
     }
 
+    private fun isJpeg(bytes: ByteArray): Boolean =
+        bytes.size >= MIN_IMAGE_BYTES && bytes[0] == 0xFF.toByte() && bytes[1] == 0xD8.toByte()
+
     private fun looksLikeImage(bytes: ByteArray): Boolean {
         if (bytes.size < MIN_IMAGE_BYTES) return false
-        if (bytes[0] == 0xFF.toByte() && bytes[1] == 0xD8.toByte()) return true
+        if (isJpeg(bytes)) return true
         if (bytes[0] == 0x89.toByte() && bytes[1] == 0x50.toByte() &&
             bytes[2] == 0x4E.toByte() && bytes[3] == 0x47.toByte()
         ) return true

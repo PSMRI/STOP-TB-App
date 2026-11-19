@@ -66,8 +66,28 @@ interface BenDao {
     @Update
     suspend fun updateBen(ben: BenRegCache)
 
-    @Query("UPDATE BENEFICIARY SET nikshayId = :nikshayId WHERE beneficiaryId = :benId")
-    suspend fun updateNikshayId(benId: Long, nikshayId: String)
+    // No-op when unchanged, so BENEFICIARY observers aren't invalidated. Leaves syncState alone.
+    @Query("UPDATE BENEFICIARY SET nikshayId = :nikshayId WHERE beneficiaryId = :benId AND IFNULL(nikshayId, '') != :nikshayId")
+    suspend fun updateNikshayId(benId: Long, nikshayId: String): Int
+
+    // Fills a missing beneficiary Nikshay ID from the latest TB diagnostics, else TB suspected, record.
+    // Same rule as TBRepo.linkNikshayIdToBen: trimmed, blank and "N/A" skipped.
+    @Query("""
+        UPDATE BENEFICIARY SET nikshayId = COALESCE(
+            (SELECT TRIM(d.nikshayId) FROM TB_DIAGNOSTICS d
+                WHERE d.benId = BENEFICIARY.beneficiaryId AND UPPER(TRIM(IFNULL(d.nikshayId, ''))) NOT IN ('', 'N/A')
+                ORDER BY d.visitDate DESC, d.id DESC LIMIT 1),
+            (SELECT TRIM(s.nikshayId) FROM TB_SUSPECTED s
+                WHERE s.benId = BENEFICIARY.beneficiaryId AND UPPER(TRIM(IFNULL(s.nikshayId, ''))) NOT IN ('', 'N/A')
+                ORDER BY s.visitDate DESC, s.id DESC LIMIT 1)
+        )
+        WHERE UPPER(TRIM(IFNULL(nikshayId, ''))) IN ('', 'N/A')
+        AND (
+            EXISTS (SELECT 1 FROM TB_DIAGNOSTICS d WHERE d.benId = BENEFICIARY.beneficiaryId AND UPPER(TRIM(IFNULL(d.nikshayId, ''))) NOT IN ('', 'N/A'))
+            OR EXISTS (SELECT 1 FROM TB_SUSPECTED s WHERE s.benId = BENEFICIARY.beneficiaryId AND UPPER(TRIM(IFNULL(s.nikshayId, ''))) NOT IN ('', 'N/A'))
+        )
+    """)
+    suspend fun backfillNikshayIdFromTbRecords(): Int
 
     @Query("UPDATE BENEFICIARY SET loc_village_id = :villageId, loc_village_name = :villageName, loc_village_nameHindi = :villageNameHindi, loc_village_nameAssamese = :villageNameAssamese, pinCode = :pinCode, residentialAreaId = :residentialAreaId, residentialArea = :residentialArea WHERE householdId = :householdId")
     suspend fun updateVillageOfHouseholdMembers(
@@ -355,6 +375,7 @@ interface BenDao {
                     SELECT tbs.benId FROM TB_SCREENING tbs
                     WHERE
                         tbs.recommendedForTruenatTest = 1
+                        OR tbs.referredForSputumCollection = 1
                         OR (
                             tbs.bloodInSputum = 1
                             OR tbs.coughMoreThan2Weeks = 1
@@ -550,6 +571,7 @@ interface BenDao {
                     SELECT tbs.benId FROM TB_SCREENING tbs
                     WHERE
                         tbs.recommendedForTruenatTest = 1
+                        OR tbs.referredForSputumCollection = 1
                         OR (
                             tbs.bloodInSputum = 1
                             OR tbs.coughMoreThan2Weeks = 1
@@ -870,6 +892,7 @@ interface BenDao {
                     SELECT tbs.benId FROM TB_SCREENING tbs
                     WHERE
                         tbs.recommendedForTruenatTest = 1
+                        OR tbs.referredForSputumCollection = 1
                         OR (
                             tbs.bloodInSputum = 1
                             OR tbs.coughMoreThan2Weeks = 1
@@ -1150,6 +1173,9 @@ interface BenDao {
         AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(gender, '')) NOT IN ('MALE', 'FEMALE')))
         AND (:isChild = 0 OR (CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) < 15))
         AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) >= 60))
+        AND (:isPregnant = 0 OR (UPPER(COALESCE(gender, '')) = 'FEMALE' AND (
+            reproductiveStatusId = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS v WHERE v.benId = BEN_BASIC_CACHE.benId AND v.keyPopulationRiskFactors LIKE '%PREGNANCY%')
+        )))
     """)
     fun getDashboardAbhaCount(
         assignedVillageIds: List<Int>,
@@ -1158,6 +1184,7 @@ interface BenDao {
         gender: String,
         isChild: Int,
         isSeniorCitizen: Int,
+        isPregnant: Int = 0,
     ): Flow<Int>
 
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage AND isDeactivate=0 AND rchId IS NOT NULL AND rchId != ''")
@@ -1295,6 +1322,9 @@ interface BenDao {
     @Query("SELECT * FROM BENEFICIARY WHERE isDraft = 0 AND processed = 'N' AND syncState =:unsynced ")
     suspend fun getAllUnprocessedBen(unsynced: SyncState = SyncState.UNSYNCED): List<BenRegCache>
 
+    @Query("SELECT * FROM BENEFICIARY WHERE isDraft = 0 AND processed = 'N' AND syncState =:unsynced AND beneficiaryId = :benId")
+    suspend fun getUnprocessedBenForBeneficiary(benId: Long, unsynced: SyncState = SyncState.UNSYNCED): List<BenRegCache>
+
     @Query("SELECT * FROM BENEFICIARY WHERE isDraft = 0 AND (processed = 'N' OR processed = 'U') AND syncState =:unsynced ")
     suspend fun getAllUnsyncedBen(unsynced: SyncState = SyncState.UNSYNCED): List<BenRegCache>
 
@@ -1318,6 +1348,9 @@ interface BenDao {
 
     @Query("SELECT * FROM BENEFICIARY WHERE beneficiaryId IN (:benIds) AND syncState = 1")
     suspend fun getSyncingBens(benIds: List<Long>): List<BenRegCache>
+
+    @Query("SELECT * FROM BENEFICIARY WHERE isDraft = 0 AND processed = 'U' AND syncState =:unsynced AND beneficiaryId = :benId")
+    suspend fun getBenForSyncWithServerForBeneficiary(benId: Long, unsynced: SyncState = SyncState.UNSYNCED): List<BenRegCache>
 
     @Query("UPDATE BENEFICIARY SET processed = 'P' , syncState = 2 WHERE beneficiaryId in (:benId) AND syncState = 1")
     suspend fun benSyncedWithServer(vararg benId: Long)
@@ -1437,6 +1470,7 @@ interface BenDao {
               SELECT tbs.benId FROM TB_SCREENING tbs
               WHERE
                 tbs.recommendedForTruenatTest = 1
+                OR tbs.referredForSputumCollection = 1
                 OR (
                   tbs.bloodInSputum = 1
                   OR tbs.coughMoreThan2Weeks = 1
@@ -1655,6 +1689,9 @@ interface BenDao {
           AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
           AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
           AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
+          AND (:isPregnant = 0 OR (UPPER(COALESCE(b.gender, '')) = 'FEMALE' AND (
+              b.reproductiveStatusId = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS v WHERE v.benId = b.benId AND v.keyPopulationRiskFactors LIKE '%PREGNANCY%')
+          )))
           AND (
                 (
                     ts.isConfirmed = 1
@@ -1679,7 +1716,8 @@ interface BenDao {
         endTime: Long,
         gender: String,
         isChild: Int,
-        isSeniorCitizen: Int
+        isSeniorCitizen: Int,
+        isPregnant: Int = 0
     ): Flow<Int>
 
     @Transaction
@@ -1835,7 +1873,8 @@ interface BenDao {
      *
      * Recently created first, the same order as the All Beneficiaries list
      * (searchBenPagedWithoutTbTables), so a worker finds the person they just registered at the
-     * top. benId DESC breaks ties so the order is total.
+     * top. A pull stores createdDate = 0 when the server sends none, so NULLIF lets regDate
+     * stand in for it. benId DESC breaks ties so the order is total.
      *
      * This replaces the earlier benId ASC order. benId is a server-assigned id, not a date, so
      * ASC put new registrations at the bottom. ASC was chosen because rows inserted ahead of the
@@ -1848,7 +1887,7 @@ interface BenDao {
         SELECT * FROM BEN_BASIC_CACHE
         WHERE villageId = :selectedVillage AND isDeactivate = 0 AND isNonHH = 1
         AND (:query = '' OR benName LIKE '%' || :query || '%' OR benSurname LIKE '%' || :query || '%' OR (IFNULL(benName, '') || ' ' || IFNULL(benSurname, '')) LIKE '%' || :query || '%' OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%')
-        ORDER BY COALESCE(createdDate, regDate, 0) DESC, benId DESC
+        ORDER BY COALESCE(NULLIF(createdDate, 0), regDate, 0) DESC, benId DESC
     """)
     fun searchNonHHBeneficiariesPaged(selectedVillage: Int, query: String): PagingSource<Int, BenBasicCache>
 

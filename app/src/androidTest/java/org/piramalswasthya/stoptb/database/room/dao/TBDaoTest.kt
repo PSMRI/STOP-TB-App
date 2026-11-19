@@ -102,7 +102,12 @@ class TBDaoTest {
         println(">>> [TEARDOWN] In-memory SQLite database closed <<<")
     }
 
-    private suspend fun insertBeneficiary(benId: Long, age: Int = 30) {
+    private suspend fun insertBeneficiary(
+        benId: Long,
+        age: Int = 30,
+        gender: Gender = Gender.MALE,
+        reproductiveStatusId: Int = 0,
+    ) {
         val dob = System.currentTimeMillis() - (age.toLong() * 365 * 24 * 60 * 60 * 1000)
         val ben = BenRegCache(
             beneficiaryId = benId,
@@ -121,11 +126,31 @@ class TBDaoTest {
             ),
             syncState = SyncState.SYNCED,
             isDraft = false,
-            gender = Gender.MALE,
+            gender = gender,
+            genDetails = if (reproductiveStatusId == 0) null else BenRegGen(reproductiveStatusId = reproductiveStatusId),
             dob = dob
         )
         benDao.upsert(ben)
         println("  -> [DB INSERT] Beneficiary (ID: $benId, Village: $villageId) inserted.")
+    }
+
+    @Test
+    fun dashboardPregnantScreenings_includeVitalsAndUseScreeningVisitDate() = runBlocking {
+        val selectedVisit = 1_800_000_000_000L
+        val olderVisit = 1_700_000_000_000L
+        insertBeneficiary(8101L, gender = Gender.FEMALE, reproductiveStatusId = 1) // Registered only
+        insertBeneficiary(8102L, gender = Gender.FEMALE, reproductiveStatusId = 1)
+        insertBeneficiary(8103L, gender = Gender.FEMALE)
+        insertBeneficiary(8104L, gender = Gender.FEMALE, reproductiveStatusId = 2)
+        tbDao.saveTbScreening(TBScreeningCache(benId = 8102L, visitDate = selectedVisit))
+        tbDao.saveTbScreening(TBScreeningCache(benId = 8103L, visitDate = olderVisit))
+        tbDao.saveTbScreening(TBScreeningCache(benId = 8104L, visitDate = selectedVisit))
+        db.vitalDao.saveVitals(VitalCache(benId = 8103L, benRegId = 0, keyPopulationRiskFactors = listOf("PREGNANCY")))
+
+        assertEquals(2, tbDao.getDashboardTbScreeningCount(assignedVillages, "", 0, 0, "FEMALE", 0, 0, 1).first())
+        assertEquals(3, tbDao.getDashboardTbScreeningCount(assignedVillages, "", 0, 0, "FEMALE", 0, 0).first())
+        assertEquals(1, tbDao.getDashboardTbScreeningCount(assignedVillages, "", selectedVisit - 1, selectedVisit + 1, "FEMALE", 0, 0, 1).first())
+        assertEquals(0, tbDao.getDashboardTbScreeningCount(listOf(999), "", 0, 0, "FEMALE", 0, 0, 1).first())
     }
 
     @Test

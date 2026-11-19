@@ -12,6 +12,7 @@ import org.piramalswasthya.stoptb.model.FormElement
 import org.piramalswasthya.stoptb.model.InputType
 import org.piramalswasthya.stoptb.model.OrderStatus
 import org.piramalswasthya.stoptb.model.RifResult
+import org.piramalswasthya.stoptb.model.MtbResult
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.VitalCache
@@ -391,9 +392,9 @@ class TBSuspectedQuickDataset(
         }
 
         // ── RIF Conducted & Results ───────────────────────────────────────
-        val isRifConductedVal = saved?.rifOrderStatus.equals("COMPLETED", ignoreCase = true) ||
-                saved?.rifOrderStatus.equals("PENDING", ignoreCase = true) ||
-                !saved?.trueNatRifResult.isNullOrBlank()
+        // A PENDING RIF status only means "waiting for RIF on the MTB order"; the answer is
+        // pre-filled only once a RIF result exists.
+        val isRifConductedVal = !saved?.trueNatRifResult.isNullOrBlank()
         // RIF order lifecycle redesign: "Not Conducted" is now a Closed order/manualResult
         // closure (see TBRepo.submitManualResult) using RIF's own reasonNotConductedRif/Other
         // columns, not the old rifOrderStatus == "NOT_CONDUCTED" (never a real wire value) +
@@ -799,18 +800,8 @@ class TBSuspectedQuickDataset(
                 trueNatConducted.value = if (index == 0) yesValue else noValue
                 syncFieldStates()
                 if (index == 0) {
+                    // RIF never opens on the save that enters MTB; see showRifSection().
                     val addItems = mutableListOf<FormElement>(trueNatResult)
-                    val isTruenatDevIntegrated = preferenceDao.getTruenatIntegrated()
-                    if (isTruenatDevIntegrated) {
-                        val isRifCompleted = diagnosticsCache?.rifOrderStatus.equals("COMPLETED", ignoreCase = true)
-                        if (isMtbDetected() && isRifCompleted) {
-                            addItems.add(trueNatRifResult)
-                        }
-                    } else {
-                        if (isMtbDetected()) {
-                            addItems.add(trueNatRifResult)
-                        }
-                    }
                     triggerDependants(
                         source = trueNatConducted,
                         removeItems = listOf(reasonNotConductedNaat, reasonNotConductedNaatOther),
@@ -830,14 +821,8 @@ class TBSuspectedQuickDataset(
             trueNatResult.id -> {
                 trueNatResult.value = trueNatResult.entries?.getOrNull(index)
                 syncFieldStates()
-                val isMtb = isMtbDetected()
-                val isTruenatDevIntegrated = preferenceDao.getTruenatIntegrated()
-                val shouldShowRif = if (isTruenatDevIntegrated) {
-                    val isRifCompleted = diagnosticsCache?.rifOrderStatus.equals("COMPLETED", ignoreCase = true)
-                    isMtb && isRifCompleted
-                } else {
-                    isMtb
-                }
+                // Picking MTB Detected does not open RIF; it opens once that result is saved (showRifSection()).
+                val shouldShowRif = showRifSection()
                 val addItems = if (shouldShowRif) listOf(trueNatRifResult) else emptyList()
                 val removeItems = if (!shouldShowRif) {
                     resetField(trueNatRifResult)
@@ -997,7 +982,7 @@ class TBSuspectedQuickDataset(
                     if (isYes(trueNatConducted))
                         getEnglishValueInArray(R.array.tb_truenat_mtb_result, trueNatResult.value)
                     else null
-                val showRifSection = shouldShowTrueNatConducted() && isYes(trueNatConducted) && isMtbDetected()
+                val showRifSection = canEnterRif()
                 form.trueNatRifResult =
                     if (showRifSection && isYes(rifConducted))
                         getEnglishValueInArray(R.array.tb_truenat_rif_result, trueNatRifResult.value)
@@ -1098,13 +1083,7 @@ class TBSuspectedQuickDataset(
                             if (isYes(trueNatConducted)) {
                                 add(trueNatResult)
 
-                                val isRifCompleted = diagnosticsCache?.rifOrderStatus.equals("COMPLETED", ignoreCase = true)
-                                val showRif = if (referralMode) {
-                                    isRifCompleted && isMtbDetected()
-                                } else {
-                                    isMtbDetected()
-                                }
-                                if (showRif) {
+                                if (showRifSection()) {
                                     add(rifConducted)
                                     if (isYes(rifConducted)) {
                                         add(trueNatRifResult)
@@ -1160,7 +1139,7 @@ class TBSuspectedQuickDataset(
         }
         lockDigitalChestXray = referralMode || !saved.chestXRayResult.isNullOrBlank()
         lockTrueNat = referralMode || !saved.naatResult.isNullOrBlank()
-        lockRif = referralMode || !saved.trueNatRifResult.isNullOrBlank() || saved.rifOrderStatus.equals("COMPLETED", ignoreCase = true)
+        lockRif = !canEnterRif()
         lockLiquidCulture = referralMode || !saved.liquidCultureResult.isNullOrBlank()
     }
 
@@ -1415,14 +1394,11 @@ class TBSuspectedQuickDataset(
             }
         }
 
-        // Only force RIF fields once an order actually exists — not the save that queues it.
-        val showRif = if (referralMode) {
-            diagnosticsCache?.rifOrderStatus.equals("COMPLETED", ignoreCase = true) && isMtbDetected()
-        } else {
-            !diagnosticsCache?.rifOrderStatus.isNullOrBlank() && isMtbDetected()
-        }
+        val showRif = showRifSection()
         val rifStatus = diagnosticsCache?.rifOrderStatus
-        val isRifFailed = rifStatus.equals("FAILED", ignoreCase = true)
+        // A failed RIF test can still get a hand-entered result, so it shows "Referral Failed"
+        // only when RIF can't be entered here.
+        val isRifFailed = rifStatus.equals("FAILED", ignoreCase = true) && !canEnterRif()
         val canForceRifConducted = manualEntryAction != null && showRif && !lockRif && !isRifFailed
         if (canForceRifConducted) {
             rifConducted.value = if (manualEntryAction == OrderAction.COMPLETE.name) yesValue else noValue
@@ -1561,6 +1537,37 @@ class TBSuspectedQuickDataset(
             return false
         }
         return clean.contains("positive") || clean.contains("detected")
+    }
+
+    /** The MTB result already saved for this order — not the one being picked on this screen. */
+    private fun savedMtbPositive(): Boolean =
+        MtbResult.fromResultText(diagnosticsCache?.naatResult) == MtbResult.TB_POSITIVE
+
+    /**
+     * RIF is entered on its own save, after MTB Detected is saved and on the server (which rejects
+     * RIF otherwise), while the order still waits for it (PENDING with a vendor, MANUAL_ENTRY without).
+     */
+    fun canEnterRif(): Boolean {
+        val saved = diagnosticsCache ?: return false
+        if (referralMode || !savedMtbPositive()) return false
+        if (saved.trueNatManualResultPendingSync == true) return false
+        if (!saved.trueNatRifResult.isNullOrBlank()) return false
+        if (saved.rifOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)) return false
+        // PENDING / MANUAL_ENTRY: waiting for RIF. INVALID: the RIF run was invalid and is being
+        // retested. FAILED: the vendor's RIF test failed. The server takes a manual RIF on all four.
+        val status = saved.trueNatOrderStatus
+        return status.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
+                status.equals(OrderStatus.MANUAL_ENTRY.name, ignoreCase = true) ||
+                status.equals(OrderStatus.INVALID.name, ignoreCase = true) ||
+                status.equals(OrderStatus.FAILED.name, ignoreCase = true)
+    }
+
+    /** The RIF section shows when it can be entered, or (read-only) once it has a result or was closed. */
+    private fun showRifSection(): Boolean {
+        val saved = diagnosticsCache ?: return false
+        if (!savedMtbPositive()) return false
+        return canEnterRif() || !saved.trueNatRifResult.isNullOrBlank() ||
+                !saved.reasonNotConductedRif.isNullOrBlank()
     }
 
     private fun isPositive(value: String?): Boolean {
@@ -1708,8 +1715,8 @@ class TBSuspectedQuickDataset(
     private fun mapMtbResultForUi(value: String?): String? {
         if (value == null) return null
         return when {
-            value.equals("TB Positive", ignoreCase = true) || value.equals("MTB detected", ignoreCase = true) || value.equals("MTB Positive", ignoreCase = true) -> "MTB Positive"
-            value.equals("TB Negative", ignoreCase = true) || value.equals("MTB not detected", ignoreCase = true) || value.equals("MTB Negative", ignoreCase = true) -> "MTB Negative"
+            value.equals("TB Positive", ignoreCase = true) || value.equals("MTB detected", ignoreCase = true) || value.equals("MTB Positive", ignoreCase = true) -> "MTB Detected"
+            value.equals("TB Negative", ignoreCase = true) || value.equals("MTB not detected", ignoreCase = true) || value.equals("MTB Negative", ignoreCase = true) -> "MTB Not Detected"
             value.equals("Invalid", ignoreCase = true) || value.equals("Invalid/Error", ignoreCase = true) -> "Invalid/Error"
             else -> value
         }

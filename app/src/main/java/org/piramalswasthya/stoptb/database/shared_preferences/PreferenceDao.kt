@@ -21,6 +21,7 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
     private val pref = PreferenceManager.getInstance(context)
 
     private companion object {
+        const val REAUTHENTICATION_REQUIRED = "reauthentication_required"
         const val CHANGES_FEED_TOKEN = "changes_feed_token"
         const val COUNSELLING_SCHEMA_STORE_FORMAT_KEY = "counselling_schema_store_format"
         const val CHANGES_FEED_SCOPE = "changes_feed_scope"
@@ -28,6 +29,8 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         const val CHANGES_FEED_ACTIVE = "changes_feed_active"
         const val VILLAGE_DEFAULTS_KEY = "village_defaults_by_village_id"
         const val VILLAGE_MASTER_DEFAULTS_KEY = "village_master_defaults_by_village_id"
+        const val HUB_CREATES_REFERRAL_ORDERS = "hub_creates_referral_orders"
+        const val FEED_SKIPPED_ORDERS = "feed_skipped_orders"
     }
 
     fun deleteAmritToken() {
@@ -134,6 +137,24 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         }
     }
 
+    fun isReauthenticationRequired(): Boolean =
+        pref.getBoolean(REAUTHENTICATION_REQUIRED, false)
+
+    fun setReauthenticationRequired(required: Boolean) {
+        pref.edit().putBoolean(REAUTHENTICATION_REQUIRED, required).commit()
+    }
+
+    /** End the expired session without deleting the current user's unsynced records or cursors. */
+    fun clearAuthenticationForReauthentication() {
+        pref.edit()
+            .remove(context.getString(R.string.PREF_primary_API_KEY))
+            .remove(context.getString(R.string.PREF_primary_JWT_API_KEY))
+            .remove(context.getString(R.string.PREF_primary_REFRESH_TOKEN))
+            .remove(context.getString(R.string.PREF_rem_me_pwd))
+            .putBoolean(REAUTHENTICATION_REQUIRED, true)
+            .commit()
+    }
+
     fun deleteLoginCred() {
         val editor = pref.edit()
         val prefUserKey = context.getString(R.string.PREF_rem_me_uname)
@@ -186,6 +207,9 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         // Village changed — reset sync page counter so pull starts from page 0 for new village
         if (oldVillageId != null && oldVillageId != newVillageId) {
             editor.putInt(context.getString(R.string.PREF_first_pull_amrit_last_synced_page), 0)
+            // The missing-data resume page belongs to the old village too; a pull interrupted
+            // there must not make the new village's pull skip its first pages.
+            editor.putInt(context.getString(R.string.PREF_first_pull_missing_data_last_synced_page), 0)
             editor.putLong(context.getString(R.string.PREF_full_load_pull_progress), Konstants.defaultTimeStamp)
         }
         editor.apply()
@@ -290,6 +314,42 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         pref.edit().putBoolean(CHANGES_FEED_ACTIVE, active).apply()
     }
 
+    // True once the server's changes feed reported that it creates the X-ray / TrueNat orders a
+    // screening refers for. Until then (older hub, no feed, central server) the tablet keeps
+    // placing those orders itself.
+    fun hubCreatesReferralOrders(): Boolean = pref.getBoolean(HUB_CREATES_REFERRAL_ORDERS, false)
+
+    fun setHubCreatesReferralOrders(value: Boolean) {
+        pref.edit().putBoolean(HUB_CREATES_REFERRAL_ORDERS, value).apply()
+    }
+
+    // Orders whose changes-feed row was skipped, as "benId|orderType". Kept on disk because the
+    // feed token has already moved past that row: if the app is killed before the result is
+    // fetched directly, nothing else would bring it back.
+    @Synchronized
+    fun getFeedSkippedOrders(): Set<String> =
+        pref.getStringSet(FEED_SKIPPED_ORDERS, null)?.toSet() ?: emptySet()
+
+    @Synchronized
+    fun addFeedSkippedOrder(entry: String) {
+        val current = getFeedSkippedOrders()
+        if (entry !in current) pref.edit().putStringSet(FEED_SKIPPED_ORDERS, current + entry).apply()
+    }
+
+    @Synchronized
+    fun removeFeedSkippedOrders(entries: Collection<String>) {
+        if (entries.isEmpty()) return
+        val current = getFeedSkippedOrders()
+        val remaining = current - entries.toSet()
+        if (remaining.size != current.size) pref.edit().putStringSet(FEED_SKIPPED_ORDERS, remaining).apply()
+    }
+
+    @Synchronized
+    fun removeFeedSkippedOrder(entry: String) {
+        val current = getFeedSkippedOrders()
+        if (entry in current) pref.edit().putStringSet(FEED_SKIPPED_ORDERS, current - entry).apply()
+    }
+
     // When visit categories, chief complaints and drug masters were last downloaded. Cleared at
     // logout with everything else, so the first pull after login always refreshes them.
     fun getMastersRefreshedAt(): Long = pref.getLong(MASTERS_REFRESHED_AT, 0L)
@@ -307,6 +367,18 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
 
     fun getFirstSyncLastSyncedPage(): Int {
         val prefKey = context.getString(R.string.PREF_first_pull_amrit_last_synced_page)
+        return pref.getInt(prefKey, 0)
+    }
+
+    fun setFirstSyncMissingDataLastSyncedPage(page: Int) {
+        val editor = pref.edit()
+        val prefKey = context.getString(R.string.PREF_first_pull_missing_data_last_synced_page)
+        editor.putInt(prefKey, page)
+        editor.apply()
+    }
+
+    fun getFirstSyncMissingDataLastSyncedPage(): Int {
+        val prefKey = context.getString(R.string.PREF_first_pull_missing_data_last_synced_page)
         return pref.getInt(prefKey, 0)
     }
 
@@ -356,7 +428,10 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
     fun setCampHubUrl(url: String) {
         val key = context.getString(R.string.PREF_camp_hub_url)
         val previous = runCatching { pref.getString(key, null) }.getOrNull()
-        if (pref.edit().putString(key, url).commit()) {
+        val editor = pref.edit().putString(key, url)
+        // A different hub has not said it creates referral orders yet.
+        if (previous != url) editor.putBoolean(HUB_CREATES_REFERRAL_ORDERS, false)
+        if (editor.commit()) {
             org.piramalswasthya.stoptb.helpers.CampConnectionDiagnostics.addressChanged(context, previous, url)
         }
     }
@@ -380,7 +455,12 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
 
     fun setCampHubConnected(connected: Boolean) {
         val key = context.getString(R.string.PREF_camp_hub_connected)
-        pref.edit().putBoolean(key, connected).commit()
+        val editor = pref.edit().putBoolean(key, connected)
+        // Hubs share one address, so a reconnect may be to a different (older) laptop. Until its
+        // changes feed answers again the tablet places screening orders itself; the hub's
+        // duplicate check absorbs any overlap.
+        if (connected && !pref.getBoolean(key, false)) editor.putBoolean(HUB_CREATES_REFERRAL_ORDERS, false)
+        editor.commit()
     }
 
     fun isCampHubConnected(): Boolean {
@@ -506,6 +586,18 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
 
     fun setLastCheckedTime(benId: Long, orderType: String, time: Long) {
         pref.edit().putLong("last_checked_time_${benId}_${orderType}", time).apply()
+    }
+
+    /**
+     * The result the user entered by hand for a test (XRAY_CHEST / SPUTUM_TRUENAT / MDR_RIF), in the
+     * server's wording; a different server result later shows "Updated by device". Null if none.
+     */
+    fun getManualEnteredResult(benId: Long, orderType: String): String? =
+        pref.getString("manual_entered_result_${benId}_${orderType}", null)
+
+    fun setManualEnteredResult(benId: Long, orderType: String, result: String?) {
+        val key = "manual_entered_result_${benId}_${orderType}"
+        pref.edit().apply { if (result == null) remove(key) else putString(key, result) }.apply()
     }
 
     fun getRifNotConductedReason(benId: Long): String? {

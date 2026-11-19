@@ -22,6 +22,8 @@ import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.RadioButton
 import android.widget.TextView
+import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
 import com.google.android.flexbox.FlexboxLayout
 import com.google.android.material.textfield.TextInputLayout
@@ -237,6 +239,10 @@ object QuestionRenderer {
     }
 
 
+    private fun showDisabledOptionHint(context: Context, @StringRes hintRes: Int) {
+        Toast.makeText(context, hintRes, Toast.LENGTH_SHORT).show()
+    }
+
     // ?? Radio (single-select)
     fun showRadio(
         binding: ItemCounsellingRadioBinding,
@@ -276,8 +282,17 @@ object QuestionRenderer {
                     question.value = opt.optionValue
                     onValueChanged(question)
                 }
+                // A disabled view swallows taps; let a hinted disabled option's tap reach the container.
+                if (isEditable && !opt.enabled && question.disabledOptionHintRes != null) isClickable = false
             }
             container.addView(rb)
+        }
+        // Reset first: the container is recycled across questions.
+        container.setOnClickListener(null)
+        container.isClickable = false
+        val hintRes = question.disabledOptionHintRes
+        if (isEditable && hintRes != null && question.options.orEmpty().any { !it.enabled }) {
+            container.setOnClickListener { showDisabledOptionHint(it.context, hintRes) }
         }
         if (!question.errorMessage.isNullOrEmpty()) {
             binding.tvError.text = question.errorMessage
@@ -602,6 +617,15 @@ object QuestionRenderer {
             binding.actDropdown.setOnItemClickListener { _, _, position, _ ->
                 if (!isEditable) return@setOnItemClickListener
                 val opt = options[position]
+                val hintRes = question.disabledOptionHintRes
+                if (!opt.enabled && hintRes != null) {
+                    // Keep the previous selection on screen and explain why this one can't be picked.
+                    binding.actDropdown.setText(
+                        options.firstOrNull { it.optionValue == question.value }?.optionLabel ?: "", false
+                    )
+                    showDisabledOptionHint(binding.root.context, hintRes)
+                    return@setOnItemClickListener
+                }
                 question.value = opt.optionValue
                 onValueChanged(question)
             }

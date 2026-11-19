@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
+import org.piramalswasthya.stoptb.helpers.DiagnosticResultLabels
 import org.piramalswasthya.stoptb.helpers.applyManagedFlowBackPolicyOnResume
 import org.piramalswasthya.stoptb.helpers.blockBackNavigationInManagedFlow
 import org.piramalswasthya.stoptb.helpers.setAutoFlowBackNavigationBlocked
@@ -89,14 +90,17 @@ class TBSuspectedQuickFragment : Fragment() {
         viewModel.benAgeGender.observe(viewLifecycleOwner) {
             binding.tvAgeGender.text = it
         }
-        viewModel.showSubmit.observe(viewLifecycleOwner) {
-            val isXrayDone = viewModel.viewOnly && viewModel.referralType == 6 && viewModel.getIsChestXRayDone() == true
-            val isNaatDone = viewModel.viewOnly && viewModel.referralType == 7 && viewModel.getIsNaatConducted() == true
-            if (!(isXrayDone || isNaatDone)) {
-                binding.btnSubmit.visibility = if (it) View.VISIBLE else View.GONE
-                if (!viewModel.viewOnly && (viewModel.referralType == 6 || viewModel.referralType == 7)) {
-                    binding.btnSubmit.text = getString(R.string.btn_submit)
-                }
+        viewModel.showSubmit.observe(viewLifecycleOwner) { show ->
+            // View Result of a test that already has a result: nothing to submit. Submit stays hidden
+            // until the saved row is read, since the first emission comes before it.
+            val viewedTestDone = viewedTestIsDone()
+            if (viewedTestDone != false) {
+                binding.btnSubmit.visibility = View.GONE
+                return@observe
+            }
+            binding.btnSubmit.visibility = if (show) View.VISIBLE else View.GONE
+            if (!viewModel.viewOnly && (viewModel.referralType == 6 || viewModel.referralType == 7)) {
+                binding.btnSubmit.text = getString(R.string.btn_submit)
             }
         }
         // Shared layout defaults this strip to gone; this screen is the only one with a
@@ -141,12 +145,10 @@ class TBSuspectedQuickFragment : Fragment() {
             }
         }
 
-        val isXrayDone = viewModel.viewOnly && viewModel.referralType == 6 && viewModel.getIsChestXRayDone() == true
-        val isNaatDone = viewModel.viewOnly && viewModel.referralType == 7 && viewModel.getIsNaatConducted() == true
-        if (!(isXrayDone || isNaatDone)) {
-            binding.btnSubmit.setOnClickListener {
-                submitForm()
-            }
+        // Decided at tap time, not here: the saved row is usually not read yet when this runs.
+        binding.btnSubmit.setOnClickListener {
+            if (viewedTestIsDone() != false) return@setOnClickListener
+            submitForm()
         }
         viewModel.state.observe(viewLifecycleOwner) {
             when (it) {
@@ -245,14 +247,75 @@ class TBSuspectedQuickFragment : Fragment() {
         }
     }
 
+    /** Guards against a second dialog (or a second save) from a quick double tap. */
+    private var confirmingSubmit = false
+
+    /**
+     * Whether this is View Result of a finished X-ray / TrueNat test (nothing to submit). Null until
+     * the saved row is read, treated as "don't offer Submit". False for every editable screen.
+     */
+    private fun viewedTestIsDone(): Boolean? {
+        if (!viewModel.viewOnly) return false
+        if (viewModel.referralType != 6 && viewModel.referralType != 7) return false
+        if (!viewModel.isDiagnosticsLoaded()) return null
+        return when (viewModel.referralType) {
+            6 -> viewModel.getIsChestXRayDone() == true
+            else -> viewModel.getIsNaatConducted() == true
+        }
+    }
+
     private fun submitForm() {
         val result = binding.form.rvInputForm.adapter?.let {
             (it as FormInputAdapter).validateInput(resources, binding.form.rvInputForm)
         } ?: -1
         Timber.d("Validation : $result")
-        if (result == -1) {
-            viewModel.saveForm()
+        if (result != -1 || confirmingSubmit) return
+        confirmingSubmit = true
+        viewLifecycleOwner.lifecycleScope.launch {
+            val submissions = viewModel.previewSubmissions()
+            if (submissions.isEmpty()) {
+                // Nothing irreversible is sent (e.g. only a referral was declined): save directly.
+                confirmingSubmit = false
+                viewModel.saveForm(confirmed = submissions)
+            } else {
+                showConfirmSubmitDialog(submissions)
+            }
         }
+    }
+
+    /**
+     * A manual result cannot be edited once saved, so the user confirms the beneficiary and the one
+     * test being sent.
+     */
+    private fun showConfirmSubmitDialog(submissions: List<TBSuspectedQuickViewModel.ManualSubmission>) {
+        val context = requireContext()
+        val first = submissions.first()
+        val testName = DiagnosticResultLabels.testName(context, first.orderType)
+        val title = if (first.wireResult == null) getString(R.string.confirm_not_conducted_title, testName)
+        else getString(R.string.confirm_result_title, testName)
+        val name = viewModel.benName.value.orEmpty()
+        val lines = submissions.joinToString("\n") { submission ->
+            val value = if (submission.wireResult == null) {
+                getString(R.string.confirm_not_conducted_value, submission.reason.orEmpty())
+            } else {
+                DiagnosticResultLabels.forOrderType(context, submission.orderType, submission.wireResult).orEmpty()
+            }
+            getString(R.string.confirm_result_line, DiagnosticResultLabels.testName(context, submission.orderType), value)
+        }
+        val message = getString(
+            R.string.confirm_result_ben_line, name, viewModel.benId.toString(), viewModel.benAgeGender.value.orEmpty()
+        ) + "\n\n" + lines + "\n\n" + getString(R.string.confirm_result_question, name)
+        MaterialAlertDialogBuilder(context)
+            .setTitle(title)
+            .setMessage(message)
+            .setCancelable(false)
+            .setNegativeButton(R.string.confirm_result_no) { _, _ -> confirmingSubmit = false }
+            .setPositiveButton(R.string.confirm_result_yes) { _, _ ->
+                confirmingSubmit = false
+                // Sends only what the dialog showed; the form may have changed meanwhile.
+                viewModel.saveForm(confirmed = submissions)
+            }
+            .show()
     }
 
     override fun onStart() {
