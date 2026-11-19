@@ -366,12 +366,11 @@ class TBRepo @Inject constructor(
         // Null resultSummary + a reason here closes the order (X-Ray/TrueNat/RIF alike) instead
         // of completing it. Sent to the backend as reasonToClose.
         reasonForRefusal: String? = null,
-        isRetryAfterOrderCreation: Boolean = false
+        isRetryAfterOrderCreation: Boolean = false,
+        expectedOrderId: String? = null
     ):NetworkResponse<String> =
-        manualResultRepo.submitManualResult(benId, orderType, // Null for the "Not Conducted" closure path — see reasonForRefusal below.
-        resultSummary, // Null resultSummary + a reason here closes the order (X-Ray/TrueNat/RIF alike) instead
-        // of completing it. Sent to the backend as reasonToClose.
-        reasonForRefusal, isRetryAfterOrderCreation)
+        manualResultRepo.submitManualResult(benId, orderType, resultSummary, reasonForRefusal,
+            isRetryAfterOrderCreation, expectedOrderId)
 
     suspend fun cascadeOrdersForConfirmedResult(
         benId: Long,

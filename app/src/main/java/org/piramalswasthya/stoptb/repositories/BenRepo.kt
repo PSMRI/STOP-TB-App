@@ -735,6 +735,10 @@ class BenRepo @Inject constructor(
             if (beneficiaryId == null) {
                 benDao.resetSyncingToUnsynced()
                 benDao.requeueTempBeneficiariesForRegistration()
+            } else {
+                // Runs under processNewBenMutex, so no other push holds this row: a SYNCING state
+                // is left over from a failed upload and would make this retry send nothing.
+                benDao.resetSyncingToUnsyncedFor(beneficiaryId)
             }
 
             val benList = beneficiaryId?.let {
@@ -810,7 +814,8 @@ class BenRepo @Inject constructor(
             // whose members are waiting to retry stay with those members.
             val coveredHhIds = (memberGroups.flatMap { it.households }.map { it.householdId.toLong() } +
                     waiting.flatten().mapNotNull { it.householdId }).toSet()
-            val householdOnly = householdDao.getAllUnprocessedHousehold()
+            // A targeted push (one beneficiary) sends only that beneficiary's group.
+            val householdOnly = if (beneficiaryId != null) emptyList() else householdDao.getAllUnprocessedHousehold()
                 .filter { it.householdId !in coveredHhIds }
                 .map { hh -> UploadGroup(emptyList(), emptyList(), listOf(hh.asNetworkModel(user)), emptyList()) }
             val due = memberGroups + householdOnly

@@ -452,8 +452,20 @@ class DiagnosticOrderRepo @Inject constructor(
             diag.xrayOrderStatus.equals("COMPLETED", ignoreCase = true) && diag.chestXRayResult != null -> {
                 diag.chestXRayResult
             }
+            // A current X-ray order that has not completed: its result (none yet) is the answer.
+            // An earlier order's result must not stand in for it, or the beneficiary stays counted
+            // as presumptive on it (as for MTB, mtbOrderHasNoResult).
+            diag.xrayOrderId.asValidOrderId() != null -> diag.chestXRayResult
             else -> diag.chestXRayResult ?: existing?.chestXRayResult
         }
+
+        // Confirmation from the results here: MTB Positive or a positive liquid culture. With no
+        // MTB order, no sputum result and no culture result there is nothing here to decide it,
+        // so a confirmation recorded elsewhere (contact tracing) is kept, not cleared.
+        val cultureResult = diag.liquidCultureResult ?: existing?.liquidCultureResult
+        val confirmedByResults = mappedSputumTestResult == "TB Positive" || isLiquidCulturePositive(cultureResult)
+        val resultsDecideConfirmation = mappedSputumTestResult != null || !cultureResult.isNullOrBlank() ||
+            diag.trueNatOrderId.asValidOrderId() != null
 
         // The server's result wins: once MTB is known and not positive, or absent
         // (mtbOrderHasNoResult), no RIF result applies, even one TB_SUSPECTED held before.
@@ -522,10 +534,10 @@ class DiagnosticOrderRepo @Inject constructor(
             isDRTBConfirmed = mappedIsDRTBConfirmed,
             // Confirmed by an MTB Positive or a positive liquid culture, as on TB_DIAGNOSTICS
             // (formRowOverStored / mergeTrueNatOrder).
-            isTBConfirmed = mappedSputumTestResult == "TB Positive" ||
-                isLiquidCulturePositive(diag.liquidCultureResult ?: existing?.liquidCultureResult),
-            isConfirmed = mappedSputumTestResult == "TB Positive" ||
-                isLiquidCulturePositive(diag.liquidCultureResult ?: existing?.liquidCultureResult),
+            isTBConfirmed = if (resultsDecideConfirmation) confirmedByResults
+                else confirmedByResults || existing?.isTBConfirmed == true,
+            isConfirmed = if (resultsDecideConfirmation) confirmedByResults
+                else confirmedByResults || existing?.isConfirmed == true,
             sputumTestResult = mappedSputumTestResult,
             // TB_SUSPECTED's own copy of these fields stayed null for any beneficiary referred via
             // the quick-entry screen (which only writes them onto TB_DIAGNOSTICS), even though
@@ -558,7 +570,8 @@ class DiagnosticOrderRepo @Inject constructor(
         }
 
         // Logged only here, where the row is really queued for upload: a change to tablet-only
-        // fields alone (returned above with its sync state kept) is not.
+        // fields alone (returned above with its sync state kept) is not. Free-text fields
+        // (results, refusal reasons) are logged by name only: this reaches the sync log store.
         if (existing != null) {
             val diffs = buildList {
                 if (existing.hasSymptoms != provisionalCache.hasSymptoms) add("hasSymptoms: ${existing.hasSymptoms} -> ${provisionalCache.hasSymptoms}")
@@ -568,10 +581,10 @@ class DiagnosticOrderRepo @Inject constructor(
                 if (existing.sputumSubmittedAt != provisionalCache.sputumSubmittedAt) add("sputumSubmittedAt: ${existing.sputumSubmittedAt} -> ${provisionalCache.sputumSubmittedAt}")
                 if (existing.isNaatConducted != provisionalCache.isNaatConducted) add("isNaatConducted: ${existing.isNaatConducted} -> ${provisionalCache.isNaatConducted}")
                 if (existing.naatResult != provisionalCache.naatResult) add("naatResult: changed")
-                if (existing.reasonForRefusalXray != provisionalCache.reasonForRefusalXray) add("reasonForRefusalXray: ${existing.reasonForRefusalXray} -> ${provisionalCache.reasonForRefusalXray}")
-                if (existing.reasonForRefusalSputum != provisionalCache.reasonForRefusalSputum) add("reasonForRefusalSputum: ${existing.reasonForRefusalSputum} -> ${provisionalCache.reasonForRefusalSputum}")
-                if (existing.reasonForRefusalMTB != provisionalCache.reasonForRefusalMTB) add("reasonForRefusalMTB: ${existing.reasonForRefusalMTB} -> ${provisionalCache.reasonForRefusalMTB}")
-                if (existing.reasonForRefusalMDRRIF != provisionalCache.reasonForRefusalMDRRIF) add("reasonForRefusalMDRRIF: ${existing.reasonForRefusalMDRRIF} -> ${provisionalCache.reasonForRefusalMDRRIF}")
+                if (existing.reasonForRefusalXray != provisionalCache.reasonForRefusalXray) add("reasonForRefusalXray: changed")
+                if (existing.reasonForRefusalSputum != provisionalCache.reasonForRefusalSputum) add("reasonForRefusalSputum: changed")
+                if (existing.reasonForRefusalMTB != provisionalCache.reasonForRefusalMTB) add("reasonForRefusalMTB: changed")
+                if (existing.reasonForRefusalMDRRIF != provisionalCache.reasonForRefusalMDRRIF) add("reasonForRefusalMDRRIF: changed")
                 if (existing.mdrRifResult != provisionalCache.mdrRifResult) add("mdrRifResult: changed")
                 if (existing.isDRTBConfirmed != provisionalCache.isDRTBConfirmed) add("isDRTBConfirmed: ${existing.isDRTBConfirmed} -> ${provisionalCache.isDRTBConfirmed}")
                 if (existing.isTBConfirmed != provisionalCache.isTBConfirmed) add("isTBConfirmed: ${existing.isTBConfirmed} -> ${provisionalCache.isTBConfirmed}")
@@ -733,7 +746,7 @@ class DiagnosticOrderRepo @Inject constructor(
         if (merged.triggerTrueNat) {
             WorkerUtils.triggerDiagnosticOrderPushWorkers(context, benId, listOf("SPUTUM_TRUENAT"))
         }
-        val synced = merged.cache.copy(syncState = SyncState.SYNCED)
+        val synced = merged.cache.copy(syncState = syncStateAfterServerMerge(existing))
         // Skip the write when nothing changed: every TB_DIAGNOSTICS write re-runs every live
         // query on the table (list badges, dashboard).
         if (synced != existing) tbDao.saveTbDiagnostics(synced)
@@ -890,7 +903,11 @@ class DiagnosticOrderRepo @Inject constructor(
 
         val mtbClose = splitOtherReason(data.reasonToCloseMTB)
         val rifClose = splitOtherReason(data.reasonToCloseMDRRIF)
-        val naatResult = mtbResult?.displayValue ?: mtbSummary
+        // An older server's flat reply for the same order that carries no summary has not said
+        // anything about the result: keep the stored one (a close, a new order or a results list
+        // still clears it).
+        val keepStoredMtb = legacyFlat && mtbSummary == null && mtbClose == null && !newOrder
+        val naatResult = mtbResult?.displayValue ?: mtbSummary ?: if (keepStoredMtb) base.naatResult else null
         merged = merged.copy(
             naatResult = naatResult,
             isNaatConducted = when {

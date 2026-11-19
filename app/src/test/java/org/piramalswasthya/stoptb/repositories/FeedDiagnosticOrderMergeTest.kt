@@ -519,4 +519,42 @@ class FeedDiagnosticOrderMergeTest {
         assertEquals(true, created.isChestXRayDone)
         assertNull(repo.suspectedFromDiagnostics(created.copy(syncState = SyncState.SYNCED), benId, diag))
     }
+
+    // PR #377 CodeRabbit follow-ups.
+
+    @Test
+    fun aNewPendingXrayOrderDropsThePreviousOrdersResultFromSuspected() { // #9
+        val existing = org.piramalswasthya.stoptb.model.TBSuspectedCache(benId = benId, chestXRayResult = "TB Presumptive")
+        val diag = merge(null, "XRAY_CHEST", result("PENDING", id = "x-new")).cache
+        val suspected = repo.suspectedFromDiagnostics(existing, benId, diag)
+        assertNull((suspected ?: existing).chestXRayResult)
+    }
+
+    @Test
+    fun aConfirmationFromContactTracingSurvivesAnUnrelatedXrayOrder() { // #10
+        val existing = org.piramalswasthya.stoptb.model.TBSuspectedCache(benId = benId, isConfirmed = true, isTBConfirmed = true)
+        val diag = merge(null, "XRAY_CHEST", result("PENDING", id = "x-1")).cache
+        val suspected = repo.suspectedFromDiagnostics(existing, benId, diag) ?: existing
+        assertEquals(true, suspected.isConfirmed)
+        assertEquals(true, suspected.isTBConfirmed)
+    }
+
+    @Test
+    fun aSummaryLessLegacyReplyForTheSameOrderKeepsTheMtbResult() { // #12
+        val stored = TBDiagnosticsCache(benId = benId, trueNatOrderId = "ext-mtb", trueNatOrderStatus = "COMPLETED",
+            naatResult = "TB Positive", isNaatConducted = true, isTBConfirmed = true, isConfirmed = true)
+        val same = merge(stored, "SPUTUM_TRUENAT", OrderResultData(externalOrderId = "ext-mtb", status = "COMPLETED")).cache
+        assertEquals("TB Positive", same.naatResult)
+        val newOrder = merge(stored, "SPUTUM_TRUENAT", OrderResultData(externalOrderId = "ext-new", status = "COMPLETED")).cache
+        assertNull(newOrder.naatResult)
+    }
+
+    @Test
+    fun aServerMergeKeepsUnsentLocalEditsQueued() { // #7
+        assertEquals(SyncState.UNSYNCED,
+            org.piramalswasthya.stoptb.repositories.tb.syncStateAfterServerMerge(TBDiagnosticsCache(benId = benId, syncState = SyncState.UNSYNCED)))
+        assertEquals(SyncState.SYNCED,
+            org.piramalswasthya.stoptb.repositories.tb.syncStateAfterServerMerge(TBDiagnosticsCache(benId = benId, syncState = SyncState.SYNCED)))
+        assertEquals(SyncState.SYNCED, org.piramalswasthya.stoptb.repositories.tb.syncStateAfterServerMerge(null))
+    }
 }

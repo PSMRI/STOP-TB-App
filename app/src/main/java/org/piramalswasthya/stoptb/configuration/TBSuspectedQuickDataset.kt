@@ -1290,11 +1290,16 @@ class TBSuspectedQuickDataset(
         sputumSampleSubmittedAt.isEnabled = !referralMode  // not editable when Submit is hidden (view mode)
         val showCollectionDate = shouldShowIsSputumCollected() && isYes(isSputumCollectedField)
         refreshSputumCollectionDateBounds()
-        sputumCollectionDate.isEnabled = showCollectionDate && !referralMode
-        sputumCollectionDate.required = showCollectionDate && !referralMode
-        if (showCollectionDate && !referralMode) {
+        // Once an MTB result is saved (lockTrueNat) the collection date belongs to that result and
+        // is read-only, so an older saved date does not block a RIF-only entry.
+        val collectionDateEditable = showCollectionDate && !referralMode && !lockTrueNat
+        sputumCollectionDate.isEnabled = collectionDateEditable
+        sputumCollectionDate.required = collectionDateEditable
+        if (collectionDateEditable) {
             ensureSputumCollectionDateDefault()
             applySputumCollectionDateError()
+        } else if (showCollectionDate) {
+            sputumCollectionDate.errorText = null
         }
         if (!showCollectionDate) resetField(sputumCollectionDate)
         reasonForDenialSputum.isEnabled = true

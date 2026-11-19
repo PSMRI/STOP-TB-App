@@ -15,6 +15,8 @@ import org.piramalswasthya.stoptb.database.room.dao.SyncDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
+import org.piramalswasthya.stoptb.helpers.AUTH_REJECTED_STATUS_CODES
+import org.piramalswasthya.stoptb.helpers.AuthRejectedException
 import org.piramalswasthya.stoptb.helpers.TokenExpiryManager
 import org.piramalswasthya.stoptb.model.SyncStatusCache
 import org.piramalswasthya.stoptb.model.LocationEntity
@@ -69,6 +71,9 @@ class UserRepo @Inject constructor(
                         authData.assignedRoleScreenNames
                     )
                 }
+                // Only now: clearing the re-login flag before the user is saved would let a
+                // failed sign-in drop the expected-user check for the next one.
+                tokenExpiryManager.onRefreshSuccess()
                 return@withContext NetworkResponse.Success(user)
             } catch (se: SocketTimeoutException) {
                 return@withContext NetworkResponse.Error(
@@ -119,6 +124,7 @@ class UserRepo @Inject constructor(
                     authData.subCentre,
                     authData.assignedRoleScreenNames
                 )
+                tokenExpiryManager.onRefreshSuccess()
                 return@withContext NetworkResponse.Success(user)
             } catch (se: SocketTimeoutException) {
                 return@withContext NetworkResponse.Error(
@@ -241,6 +247,7 @@ class UserRepo @Inject constructor(
                 return@withContext false
             try {
                 getTokenAmrit(userName, password, expectedUserId = user.userId)
+                tokenExpiryManager.onRefreshSuccess()
                 true
             } catch (e: CancellationException) {
                 throw e
@@ -250,9 +257,14 @@ class UserRepo @Inject constructor(
                 if (e.code() == 401 || e.code() == 403)
                     tokenExpiryManager.onRefreshFailed()
                 false
-            } catch (e: Exception) {
-                Timber.e(e, "Fresh login after token refresh failed")
+            } catch (e: AuthRejectedException) {
+                Timber.w("Fresh login after token refresh was rejected: ${e.message}")
                 tokenExpiryManager.onRefreshFailed()
+                false
+            } catch (e: Exception) {
+                // A malformed or partial response is not a rejection: keep the saved login and
+                // let the next sync try again.
+                Timber.e(e, "Fresh login after token refresh failed")
                 false
             }
         }
@@ -312,17 +324,17 @@ class UserRepo @Inject constructor(
             )
             val statusCode = responseBody.getInt("statusCode")
             // Keep the server's message: it carries the remaining-attempts / account-locked info.
-            if (statusCode == 5002)
-                throw IllegalStateException(
+            if (statusCode in AUTH_REJECTED_STATUS_CODES)
+                throw AuthRejectedException(
                     responseBody.optString("errorMessage").ifBlank { "Login failed" }
                 )
             if (statusCode == 401)
-                throw IllegalStateException("Invalid username / password")
+                throw AuthRejectedException("Invalid username / password")
             val data = responseBody.getJSONObject("data")
             val token = data.getString("key")
             val userId = data.getInt("userID")
             if (expectedUserId != null && userId != expectedUserId)
-                throw IllegalStateException("Authenticated user differs from local user")
+                throw AuthRejectedException("Authenticated user differs from local user")
             val subCentre = data.optJSONObject("facilityData")
                 ?.optJSONArray("facilities")
                 ?.takeIf { it.length() > 0 }
@@ -336,7 +348,6 @@ class UserRepo @Inject constructor(
             TokenInsertTmcInterceptor.setJwt(data.getString("jwtToken"))
             preferenceDao.registerJWTAmritToken(data.getString("jwtToken"))
             preferenceDao.registerRefreshToken(refreshToken)
-            tokenExpiryManager.onRefreshSuccess()
             TokenInsertTmcInterceptor.setToken(token)
             preferenceDao.registerAmritToken(token)
             preferenceDao.lastAmritTokenFetchTimestamp = System.currentTimeMillis()
