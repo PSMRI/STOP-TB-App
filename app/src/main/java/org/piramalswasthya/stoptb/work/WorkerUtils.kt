@@ -324,24 +324,27 @@ object WorkerUtils {
             }).setInputData(pullRunData).addTag("pull_group5_tb").build(),
         )
 
-        val groupMissingData = listOf(
-            (if (campMode) {
-                campSyncRequestBuilder<PullMissingDataFromAmritWorker>()
-            } else {
-                syncRequestBuilder<PullMissingDataFromAmritWorker>()
-            }).setInputData(pullRunData).addTag("pull_missing_data").build()
-        )
+        // release-2.4: Nikshay missing-data disabled, re-enable later (restore the commented lines below)
+        // val groupMissingData = listOf(
+        //     (if (campMode) {
+        //         campSyncRequestBuilder<PullMissingDataFromAmritWorker>()
+        //     } else {
+        //         syncRequestBuilder<PullMissingDataFromAmritWorker>()
+        //     }).setInputData(pullRunData).addTag("pull_missing_data").build()
+        // )
 
         val setSyncCompleteWorker = OneTimeWorkRequestBuilder<UpdatePrefForPullCompleteWorker>()
             .setInputData(pullRunData)
             .build()
 
         val chainTB = afterFoundation.then(groupTB).then(setSyncCompleteWorker)
-        val chainMissingData = afterFoundation.then(groupMissingData)
+        // val chainMissingData = afterFoundation.then(groupMissingData)
 
         SyncDiagnostics.prepareRun(syncRunId, "PULL")
-        WorkContinuation.combine(listOf(chainTB, chainMissingData)).enqueue()
-        val ids = listOf(pullWorkRequest.id, setSyncCompleteWorker.id) + groupTB.map { it.id } + groupMissingData.map { it.id }
+        // WorkContinuation.combine(listOf(chainTB, chainMissingData)).enqueue()
+        chainTB.enqueue()
+        // val ids = listOf(pullWorkRequest.id, setSyncCompleteWorker.id) + groupTB.map { it.id } + groupMissingData.map { it.id }
+        val ids = listOf(pullWorkRequest.id, setSyncCompleteWorker.id) + groupTB.map { it.id }
         SyncDiagnostics.observeRun(context, syncRunId, "PULL", triggerSource, ids, logSessionId)
         return ids
     }

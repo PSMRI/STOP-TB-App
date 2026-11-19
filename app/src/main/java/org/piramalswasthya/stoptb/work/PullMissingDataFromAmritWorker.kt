@@ -18,6 +18,8 @@ import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Konstants
+import org.piramalswasthya.stoptb.helpers.RoleManager
+import org.piramalswasthya.stoptb.model.AppRole
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
@@ -27,7 +29,8 @@ class PullMissingDataFromAmritWorker @AssistedInject constructor(
     @Assisted private val appContext: Context,
     @Assisted params: WorkerParameters,
     private val benRepo: BenRepo,
-    private val preferenceDao: PreferenceDao
+    private val preferenceDao: PreferenceDao,
+    private val roleManager: RoleManager
 ) : CoroutineWorker(appContext, params) {
 
     companion object {
@@ -48,6 +51,13 @@ class PullMissingDataFromAmritWorker @AssistedInject constructor(
         if (preferenceDao.getLoggedInUser() == null) {
             Timber.w("[$NAME] Worker deferred: logged-in user is not available yet")
             return Result.retry()
+        }
+
+        // Only Registrar has the Missing Data module; for other roles the server answers 401,
+        // which the token authenticator treats as an expired session and logs the user out.
+        if (!roleManager.hasAssignedRole(AppRole.REGISTRAR)) {
+            Timber.i("Pull [$triggerSource] missing beneficiary data skipped: no Registrar role assigned")
+            return Result.success()
         }
 
         return try {

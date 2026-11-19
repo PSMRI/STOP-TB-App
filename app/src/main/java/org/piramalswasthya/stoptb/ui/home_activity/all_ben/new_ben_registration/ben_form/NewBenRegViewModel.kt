@@ -717,9 +717,10 @@ class NewBenRegViewModel @Inject constructor(
                         updateLinkedSpouseNameIfBlank(linkedBenId, ben)
                     }
 
-                    if (isDataUpdateFlow) {
-                        benRepo.updateBenMissingDataStatus(ben.beneficiaryId)
-                    }
+                    // release-2.4: Nikshay missing-data disabled, re-enable later
+                    // if (isDataUpdateFlow) {
+                    //     benRepo.updateBenMissingDataStatus(ben.beneficiaryId)
+                    // }
 
                     _state.postValue(State.SAVE_SUCCESS)
 
