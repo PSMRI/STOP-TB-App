@@ -8,8 +8,8 @@ package org.piramalswasthya.stoptb.database.room.dao
  * `scr` = TB_SCREENING, `sus` = TB_SUSPECTED, `dx` = TB_DIAGNOSTICS (sus and dx LEFT JOINed).
  *
  * Rules (product, 2026-11-10):
- * - Presumptive: any TB Screening symptom or "Other Details" answer is Yes (the same 10 answers as
- *   TBScreeningDataset.TbScreeningUtils.isPresumptive), or the chest X-ray is Positive /
+ * - Presumptive: any TB Screening symptom or "Other Details" answer is Yes (the same answers as
+ *   TBScreeningDataset.TbScreeningUtils.isPresumptive, including the six later questions), or the chest X-ray is Positive /
  *   TB Presumptive / Abnormal but not TB Presumptive - and the person is not confirmed and not
  *   on treatment.
  * - Confirmed: either confirmed flag, or NAAT/TrueNat positive (MTB Detected), or liquid culture
@@ -21,7 +21,9 @@ object TbCaseSql {
     const val SYMPTOMATIC = "(scr.coughMoreThan2Weeks = 1 OR scr.bloodInSputum = 1" +
         " OR scr.feverMoreThan2Weeks = 1 OR scr.riseOfFever = 1 OR scr.lossOfAppetite = 1" +
         " OR scr.lossOfWeight = 1 OR scr.nightSweats = 1 OR scr.historyOfTb = 1" +
-        " OR scr.takingAntiTBDrugs = 1 OR scr.familySufferingFromTB = 1)"
+        " OR scr.takingAntiTBDrugs = 1 OR scr.familySufferingFromTB = 1" +
+        " OR scr.chestPain = 1 OR scr.shortnessOfBreath = 1 OR scr.fatigue = 1 OR scr.otherSymptoms = 1" +
+        " OR scr.failureToGainWeightInChildren = 1 OR scr.decreasedActivityOrPlayfulnessInChildren = 1)"
 
     private const val PRESUMPTIVE_XRAY_VALUES = "('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')"
 

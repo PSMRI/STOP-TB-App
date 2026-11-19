@@ -15,6 +15,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
@@ -113,6 +114,8 @@ class TbLocalRepo @Inject constructor(
         tbDao.hasPollableOrder(xray, truenat)
     }
 
+    val allTbSuspected: Flow<List<TBSuspectedCache>> = tbDao.getAllTbSuspected()
+
     suspend fun getDiagnosticsList(): List<TBDiagnosticsCache> = withContext(Dispatchers.IO) {
         tbDao.getDiagnosticsList()
     }
@@ -148,11 +151,70 @@ class TbLocalRepo @Inject constructor(
         }
     }
 
-    /** Returns latest TB_DIAGNOSTICS record by benId — used to get existing id before save */
+    fun observeTBDiagnostics(benId: Long): Flow<TBDiagnosticsCache?> =
+        tbDao.observeTbDiagnosticsByBenId(benId).distinctUntilChanged()
+
     suspend fun getTBDiagnosticsById(benId: Long): TBDiagnosticsCache? {
         return withContext(Dispatchers.IO) {
             tbDao.getTbDiagnosticsByBenId(benId)
         }
+    }
+
+    suspend fun saveTBDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache) {
+        saveTBDiagnosticsLocked(tbDiagnosticsCache, fromForm = false)
+    }
+
+    /**
+     * Saves the general diagnostics form (referralType 0): its own results stay, but while RIF is
+     * not open for entry the form holds no RIF reason, so the stored one is kept.
+     */
+    suspend fun saveTBDiagnosticsFromGeneralForm(form: TBDiagnosticsCache, rifOpenForEntry: Boolean): TBDiagnosticsCache =
+        saveTBDiagnosticsLocked(form, fromForm = false, keepStoredRifReasons = !rifOpenForEntry)
+
+    /** [form] with the stored RIF not-conducted reasons. */
+    internal fun withStoredRifReasons(form: TBDiagnosticsCache, stored: TBDiagnosticsCache): TBDiagnosticsCache =
+        form.copy(
+            reasonNotConductedRif = stored.reasonNotConductedRif,
+            reasonNotConductedRifOther = stored.reasonNotConductedRifOther
+        )
+
+    suspend fun saveTBDiagnosticsFromForm(form: TBDiagnosticsCache): TBDiagnosticsCache =
+        saveTBDiagnosticsLocked(form, fromForm = true)
+
+    internal fun formRowOverStored(form: TBDiagnosticsCache, stored: TBDiagnosticsCache): TBDiagnosticsCache {
+        val confirmed = MtbResult.fromResultText(stored.naatResult) == MtbResult.TB_POSITIVE ||
+            isLiquidCulturePositive(form.liquidCultureResult)
+        return form.copy(
+            id = stored.id,
+            xrayOrderId = stored.xrayOrderId ?: form.xrayOrderId,
+            trueNatOrderId = stored.trueNatOrderId ?: form.trueNatOrderId,
+            rifOrderId = stored.rifOrderId,
+            // Owned by submitManualResult's offline path; a stale copy would stop the replay.
+            xrayManualResultPendingSync = stored.xrayManualResultPendingSync,
+            trueNatManualResultPendingSync = stored.trueNatManualResultPendingSync,
+            rifManualResultPendingSync = stored.rifManualResultPendingSync,
+            xrayOrderStatus = stored.xrayOrderStatus,
+            chestXRayResult = stored.chestXRayResult,
+            isChestXRayDone = stored.isChestXRayDone,
+            errorMsgXray = stored.errorMsgXray,
+            trueNatOrderStatus = stored.trueNatOrderStatus,
+            naatResult = stored.naatResult,
+            isNaatConducted = stored.isNaatConducted,
+            rifOrderStatus = stored.rifOrderStatus,
+            trueNatRifResult = stored.trueNatRifResult,
+            isDrTbConfirmed = stored.isDrTbConfirmed,
+            // Close reasons are written by submitManualResult / the feed; the form may hold nulls.
+            reasonNotConductedChestXray = stored.reasonNotConductedChestXray,
+            reasonNotConductedChestXrayOther = stored.reasonNotConductedChestXrayOther,
+            reasonNotConductedNaat = stored.reasonNotConductedNaat,
+            reasonNotConductedNaatOther = stored.reasonNotConductedNaatOther,
+            reasonNotConductedRif = stored.reasonNotConductedRif,
+            reasonNotConductedRifOther = stored.reasonNotConductedRifOther,
+            errorMsgTrueNat = stored.errorMsgTrueNat,
+            errorMsgRif = stored.errorMsgRif,
+            isTBConfirmed = confirmed,
+            isConfirmed = confirmed
+        )
     }
 
     // Called directly from ViewModels (form save flows) with a snapshot that can be stale by the
@@ -162,19 +224,30 @@ class TbLocalRepo @Inject constructor(
     // fresh under the row's lock and, for each test type whose order id has moved on since this
     // caller's snapshot was taken, defer to the fresh order-lifecycle fields instead of the stale
     // ones — every other field in the caller's snapshot (its actual form edits) still applies.
-    suspend fun saveTBDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache) {
-        withContext(Dispatchers.IO) {
+    private suspend fun saveTBDiagnosticsLocked(
+        tbDiagnosticsCache: TBDiagnosticsCache,
+        fromForm: Boolean,
+        keepStoredRifReasons: Boolean = false
+    ): TBDiagnosticsCache {
+        return withContext(Dispatchers.IO) {
             benDao.getBen(tbDiagnosticsCache.benId)?.let { ben ->
                 ben.gpsLatitude?.let { tbDiagnosticsCache.latitude = it }
                 ben.gpsLongitude?.let { tbDiagnosticsCache.longitude = it }
             }
             var knownTbHouseholdId: Long? = null
-            benIdLocks.withLock(tbDiagnosticsCache.benId) {
+            val saved = benIdLocks.withLock(tbDiagnosticsCache.benId) {
                 val fresh = tbDao.getTbDiagnosticsByBenId(tbDiagnosticsCache.benId)
                 // id is a val (Room primary key) — .copy() to retarget the existing row instead
                 // of reassigning, then apply the deferred-field overrides below onto that copy.
-                val cache = if (fresh != null) tbDiagnosticsCache.copy(id = fresh.id) else tbDiagnosticsCache
-                if (fresh != null) {
+                // A form save keeps the stored order fields (formRowOverStored); other callers
+                // pass a snapshot that may be stale, handled below.
+                val cache = when {
+                    fresh == null -> tbDiagnosticsCache
+                    fromForm -> formRowOverStored(tbDiagnosticsCache, fresh)
+                    keepStoredRifReasons -> withStoredRifReasons(tbDiagnosticsCache, fresh).copy(id = fresh.id)
+                    else -> tbDiagnosticsCache.copy(id = fresh.id)
+                }
+                if (fresh != null && !fromForm) {
                     if (fresh.trueNatOrderId != cache.trueNatOrderId) {
                         cache.naatResult = fresh.naatResult
                         cache.trueNatOrderId = fresh.trueNatOrderId
@@ -214,16 +287,19 @@ class TbLocalRepo @Inject constructor(
                     }
                 }
                 val savedId = tbDao.saveTbDiagnostics(cache)
+                benDao.linkNikshayId(cache.benId, cache.nikshayId)
                 if (cache.isKnownTbCase()) {
                     knownTbHouseholdId = benDao.getBen(cache.benId)?.householdId
                 }
                 SyncDailyStore.record("TB_DIAGNOSTICS", listOf(savedId), "SAVE", "SUCCESS")
+                cache
             }
             // Outside the lock: it only rewrites other members' TB_SCREENING rows.
             knownTbHouseholdId?.takeIf { it > 0L }?.let { applyKnownTbContactRiskFactors(it) }
-            if (tbDiagnosticsCache.isChestXRayDone == true) benDao.updateScreeningStatus(tbDiagnosticsCache.benId,"SCREENED")   // NEW
+            if (saved.isChestXRayDone == true) benDao.updateScreeningStatus(saved.benId,"SCREENED")   // NEW
 
-            if (tbDiagnosticsCache.isNaatConducted == true) benDao.updateScreeningStatus(tbDiagnosticsCache.benId,"SCREENED")   // NEW
+            if (saved.isNaatConducted == true) benDao.updateScreeningStatus(saved.benId,"SCREENED")   // NEW
+            saved
         }
     }
 
@@ -280,6 +356,7 @@ class TbLocalRepo @Inject constructor(
                 ben.gpsLongitude?.let { tbSuspectedCache.longitude = it }
             }
             val savedId = tbDao.saveTbSuspected(tbSuspectedCache)
+            benDao.linkNikshayId(tbSuspectedCache.benId, tbSuspectedCache.nikshayId)
             SyncDailyStore.record("TB_SUSPECTED", listOf(savedId), "SAVE", "SUCCESS")
             tbSuspectedCache.isTBConfirmed == true || tbSuspectedCache.isConfirmed
         }

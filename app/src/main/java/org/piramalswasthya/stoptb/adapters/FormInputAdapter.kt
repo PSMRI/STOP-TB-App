@@ -1846,7 +1846,7 @@ class FormInputAdapter(
             binding.tvStatusValue.setTextColor(onBanner)
             binding.tvStatusValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
             binding.tvStatusValue.setTypeface(binding.tvStatusValue.typeface, Typeface.BOLD)
-            binding.tvStatusDetail.visibility = View.VISIBLE
+            binding.tvStatusDetail.visibility = View.GONE
             binding.tvStatusDetail.text = detail
             binding.tvStatusDetail.setTextColor(onBanner)
             binding.llStatusBanner.contentDescription = "${binding.tvStatusLabel.text}: $label. $detail"
@@ -2087,6 +2087,23 @@ class FormInputAdapter(
                 formRecyclerView?.scrollToFormValidationError(index)
                 return index
             }
+        }
+        return -1
+    }
+
+    fun hasEmptyRequired(): Boolean {
+        if (!isEnabled) return false
+        return currentList.any { it.inputType != TEXT_VIEW && it.required && it.value.isNullOrBlank() }
+    }
+
+    /** Format errors on values the user did enter. Empty-required errors are ignored. */
+    fun firstFormatErrorIndex(emptyError: String): Int {
+        if (!isEnabled) return -1
+        currentList.forEachIndexed { index, it ->
+            if (it.inputType == TEXT_VIEW) return@forEachIndexed
+            val error = it.errorText ?: return@forEachIndexed
+            if (error == emptyError || it.value.isNullOrBlank()) return@forEachIndexed
+            return index
         }
         return -1
     }

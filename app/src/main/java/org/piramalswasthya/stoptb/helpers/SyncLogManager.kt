@@ -19,12 +19,13 @@ class SyncLogManager @Inject constructor(
 ) {
 
     companion object {
-        private const val MAX_BUFFER_SIZE = 500
         private const val EMIT_DELAY_MS = 250L
     }
 
     private val scope = CoroutineScope(Dispatchers.Default)
-    private val buffer = ArrayDeque<SyncLogEntry>(MAX_BUFFER_SIZE)
+    private val buffer = ArrayDeque<SyncLogEntry>(SyncLogLimits.MAX_BUFFER_ENTRIES)
+    // Count UTF-16 storage for message and tag content; entry count also bounds object overhead.
+    private var bufferedBytes = 0
     private var nextId = 0L
     private var emitJob: Job? = null
     private val _logs = MutableStateFlow<List<SyncLogEntry>>(emptyList())
@@ -35,23 +36,30 @@ class SyncLogManager @Inject constructor(
         interactiveSyncLogSession.snapshot(sessionId)
 
     fun addLog(level: LogLevel, tag: String, message: String) {
+        val boundedMessage = message.take(SyncLogLimits.MAX_MESSAGE_CHARS).let {
+            if (message.length > SyncLogLimits.MAX_MESSAGE_CHARS) it + SyncLogLimits.TRUNCATION_SUFFIX else it
+        }
+        val boundedTag = tag.take(SyncLogLimits.MAX_TAG_CHARS)
+        val entryBytes = (boundedMessage.length + boundedTag.length) * 2
         synchronized(buffer) {
-            if (buffer.size >= MAX_BUFFER_SIZE) {
-                buffer.removeFirst()
+            while (buffer.isNotEmpty() && (buffer.size >= SyncLogLimits.MAX_BUFFER_ENTRIES ||
+                    bufferedBytes + entryBytes > SyncLogLimits.MAX_BUFFER_BYTES)) {
+                val removed = buffer.removeFirst()
+                bufferedBytes -= (removed.message.length + removed.tag.length) * 2
             }
-            buffer.addLast(
-                SyncLogEntry(
+            val entry = SyncLogEntry(
                     id = nextId++,
                     timestamp = System.currentTimeMillis(),
                     level = level,
-                    tag = tag,
-                    message = message
+                    tag = boundedTag,
+                    message = boundedMessage
                 )
-            )
-            interactiveSyncLogSession.append(SyncHttpOrigins.current.get()?.sessionId, buffer.last())
+            buffer.addLast(entry)
+            bufferedBytes += entryBytes
+            interactiveSyncLogSession.append(SyncHttpOrigins.current.get()?.sessionId, entry)
             scheduleEmit()
         }
-        fileWriter.writeLog(level, tag, message)
+        fileWriter.writeLog(level, boundedTag, boundedMessage)
     }
 
     private fun scheduleEmit() {
@@ -70,6 +78,7 @@ class SyncLogManager @Inject constructor(
         synchronized(buffer) {
             emitJob?.cancel()
             buffer.clear()
+            bufferedBytes = 0
             interactiveSyncLogSession.clear()
             _logs.value = emptyList()
         }

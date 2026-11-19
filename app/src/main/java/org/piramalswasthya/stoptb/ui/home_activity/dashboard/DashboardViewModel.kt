@@ -29,6 +29,7 @@ data class TbGenderBreakdown(
     val total: Int = 0,
     val male: Int = 0,
     val female: Int = 0,
+    val pregnant: Int = 0,
     val children: Int = 0,
     val others: Int = 0,
     val seniorCitizen: Int = 0
@@ -331,6 +332,7 @@ class DashboardViewModel @Inject constructor(
             totalQuery = { benDao.getDashboardFilteredTbConfirmedCount(assignedVillageIds, startTime, endTime, "", 0, 0) },
             maleQuery = { benDao.getDashboardFilteredTbConfirmedCount(assignedVillageIds, startTime, endTime, "MALE", 0, 0) },
             femaleQuery = { benDao.getDashboardFilteredTbConfirmedCount(assignedVillageIds, startTime, endTime, "FEMALE", 0, 0) },
+            pregnantQuery = { benDao.getDashboardFilteredTbConfirmedCount(assignedVillageIds, startTime, endTime, "FEMALE", 0, 0, 1) },
             childrenQuery = { benDao.getDashboardFilteredTbConfirmedCount(assignedVillageIds, startTime, endTime, "", 1, 0) },
             othersQuery = { benDao.getDashboardFilteredTbConfirmedCount(assignedVillageIds, startTime, endTime, "OTHERS", 0, 0) },
             seniorCitizenQuery = { benDao.getDashboardFilteredTbConfirmedCount(assignedVillageIds, startTime, endTime, "", 0, 1) },
@@ -365,6 +367,7 @@ class DashboardViewModel @Inject constructor(
             totalQuery = { benDao.getDashboardAbhaCount(assignedVillageIds, startTime, endTime, "", 0, 0) },
             maleQuery = { benDao.getDashboardAbhaCount(assignedVillageIds, startTime, endTime, "MALE", 0, 0) },
             femaleQuery = { benDao.getDashboardAbhaCount(assignedVillageIds, startTime, endTime, "FEMALE", 0, 0) },
+            pregnantQuery = { benDao.getDashboardAbhaCount(assignedVillageIds, startTime, endTime, "FEMALE", 0, 0, 1) },
             childrenQuery = { benDao.getDashboardAbhaCount(assignedVillageIds, startTime, endTime, "", 1, 0) },
             othersQuery = { benDao.getDashboardAbhaCount(assignedVillageIds, startTime, endTime, "OTHERS", 0, 0) },
             seniorCitizenQuery = { benDao.getDashboardAbhaCount(assignedVillageIds, startTime, endTime, "", 0, 1) },
@@ -384,6 +387,7 @@ class DashboardViewModel @Inject constructor(
         childrenQuery: () -> Flow<Int>,
         othersQuery: () -> Flow<Int>,
         seniorCitizenQuery: () -> Flow<Int>,
+        pregnantQuery: () -> Flow<Int> = { zeroCountFlow() },
     ) {
         collectJobs += viewModelScope.launch {
             whileVisible {
@@ -393,12 +397,14 @@ class DashboardViewModel @Inject constructor(
                     femaleQuery(),
                     childrenQuery(),
                     othersQuery(),
-                    seniorCitizenQuery()
+                    seniorCitizenQuery(),
+                    pregnantQuery()
                 ) { values ->
                     TbGenderBreakdown(
                         total = values[0],
                         male = values[1],
                         female = values[2],
+                        pregnant = values[6],
                         children = values[3],
                         others = values[4],
                         seniorCitizen = values[5]
@@ -421,6 +427,7 @@ class DashboardViewModel @Inject constructor(
                     total = counts.total,
                     male = counts.male,
                     female = counts.female,
+                    pregnant = counts.pregnant,
                     children = counts.children,
                     others = counts.others,
                     seniorCitizen = counts.seniorCitizen

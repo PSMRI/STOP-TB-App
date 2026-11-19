@@ -23,10 +23,18 @@ class RoleModuleConfigTest {
     fun `registrar home modules and privileges match the product spec`() {
         val p = RoleModuleConfig.privilegeFor(AppRole.REGISTRAR)
         assertThat(p.homeModules).containsExactly(
-            AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.NON_HOUSEHOLD
+            AppModule.HOUSEHOLD,
+            AppModule.BENEFICIARIES,
+            AppModule.NON_HOUSEHOLD,
+            // release-2.4: Nikshay missing-data disabled, re-enable later
+            // AppModule.MISSING_DATA_BENEFICIARIES
         )
         assertThat(p.multiRoleHomeModules).containsExactly(
-            AppModule.HOUSEHOLD, AppModule.BENEFICIARIES, AppModule.NON_HOUSEHOLD
+            AppModule.HOUSEHOLD,
+            AppModule.BENEFICIARIES,
+            AppModule.NON_HOUSEHOLD,
+            // release-2.4: Nikshay missing-data disabled, re-enable later
+            // AppModule.MISSING_DATA_BENEFICIARIES
         )
         assertThat(p.canActOnReferral).isFalse()
         assertThat(p.examineDenominatorRule).isEqualTo(ExamineDenominatorRule.REGISTRAR_TWO)
@@ -164,7 +172,7 @@ class RoleModuleConfigTest {
         val p = RoleModuleConfig.privilegeFor(AppRole.VOLUNTEER)
         assertThat(p.homeModules).containsExactly(AppModule.HOUSEHOLD, AppModule.BENEFICIARIES)
         assertThat(p.allowQuickRefresh).isFalse()
-        assertThat(p.showRegisterSpouseButtons).isTrue()
+        assertThat(p.showRegisterSpouseButtons).isFalse()
         assertThat(p.canActOnReferral).isFalse()
         assertThat(p.showAbhaButton).isTrue()
         assertThat(p.showCallButton).isTrue()

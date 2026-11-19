@@ -22,6 +22,7 @@ import org.piramalswasthya.stoptb.helpers.DigiPinHelper
 import org.piramalswasthya.stoptb.model.VillageDefaults
 import org.piramalswasthya.stoptb.helpers.GpsDiagnostics
 import org.piramalswasthya.stoptb.configuration.BenRegFormDataset
+import org.piramalswasthya.stoptb.configuration.SpouseLinkSelector
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.BenRegCache
@@ -60,6 +61,7 @@ class NewBenRegViewModel @Inject constructor(
     val hhId          = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).hhId
     val relToHeadId   = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).relToHeadId
     val benIdFromArgs = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).benId
+    val isDataUpdateFlow = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).isEditModeUp
     private val genderFromArgs = NewBenRegFragmentArgs.fromSavedStateHandle(savedStateHandle).gender
 
     // StopTB has no HoF / spouse / child concept — kept for nav-graph compat
@@ -113,8 +115,28 @@ class NewBenRegViewModel @Inject constructor(
     val isCampSite: StateFlow<Boolean> = _isCampSite.asStateFlow()
 
     // True once the user chose "update the location details = Yes" for this record
-    private var locationOverridden = false
+    var locationOverridden = false
+        private set
     fun setLocationOverridden(value: Boolean) { locationOverridden = value }
+
+    // Edit session of an existing record. Held here rather than in the Fragment so a recreated
+    // view resumes the session instead of restarting it, which would drop a location captured
+    // before the recreation and take the captured one as the "original".
+    var isEditingExisting = false
+        private set
+    var originalLocationState: LocationState? = null
+        private set
+    var originalCampSite = false
+        private set
+
+    // Starts the edit session once; later calls (e.g. from a recreated view) leave it as is.
+    fun startEditSession() {
+        if (isEditingExisting) return
+        isEditingExisting = true
+        originalLocationState = _locationState.value
+        originalCampSite = _isCampSite.value
+        locationOverridden = false
+    }
 
     private val _isGpsUnavailable = MutableStateFlow(false)
     val isGpsUnavailable: StateFlow<Boolean> = _isGpsUnavailable.asStateFlow()
@@ -338,7 +360,8 @@ class NewBenRegViewModel @Inject constructor(
         }
         // Restore/Inherit Location details
         // A saved beneficiary keeps its own location (it may have been updated separately from the household).
-        val benHasOwnLocation = benHasOwnLocation(ben)
+        // `ben` is only initialised for an existing beneficiary; check first so a new registration doesn't crash.
+        val benHasOwnLocation = benIdFromArgs != 0L && benHasOwnLocation(ben)
         if (benHasOwnLocation) {
             if (ben.isGpsUnavailable) {
                 _isGpsUnavailable.value = true
@@ -381,13 +404,16 @@ class NewBenRegViewModel @Inject constructor(
     }
 
     /**
-     * A saved beneficiary keeps its own location when it has a complete one (lat, lon and digipin)
-     * or is marked GPS-unavailable; otherwise it shows and saves the household's. One rule for
-     * both, so the form never shows the household location and then saves the beneficiary's.
+     * An existing beneficiary keeps its own location when it has a complete one
+     * (lat, lon and digipin) or is marked GPS-unavailable; otherwise, it uses
+     * the household's location. New beneficiaries always use the household's location.
+     * The same rule is applied for both displaying and saving the location.
      */
     private fun benHasOwnLocation(ben: BenRegCache): Boolean =
-        benIdFromArgs != 0L &&
-            (ben.isGpsUnavailable || (ben.gpsLatitude != null && ben.gpsLongitude != null && ben.digipin != null))
+        ben.isGpsUnavailable ||
+                (ben.gpsLatitude != null &&
+                        ben.gpsLongitude != null &&
+                            ben.digipin != null)
 
     // ─── Location callbacks (standalone registrations only) ─────────────
     fun setFetching() { _locationState.value = LocationState.Fetching }
@@ -648,6 +674,7 @@ class NewBenRegViewModel @Inject constructor(
                     val spouseLinkBenId = findExistingSpouseLinkForFamilyMember(ben)
                     if (spouseLinkBenId != null) {
                         ben.isSpouseAdded = true
+                        copyLinkedMemberNameAsSpouse(spouseLinkBenId, ben)
                     }
 
                     benRepo.persistRecord(ben, updateIfExists = benIdFromArgs != 0L)
@@ -691,6 +718,11 @@ class NewBenRegViewModel @Inject constructor(
                         benRepo.updateBeneficiarySpouseAdded(hhId, linkedBenId, SyncState.UNSYNCED)
                         updateLinkedSpouseNameIfBlank(linkedBenId, ben)
                     }
+
+                    // release-2.4: Nikshay missing-data disabled, re-enable later
+                    // if (isDataUpdateFlow) {
+                    //     benRepo.updateBenMissingDataStatus(ben.beneficiaryId)
+                    // }
 
                     _state.postValue(State.SAVE_SUCCESS)
 
@@ -747,47 +779,38 @@ class NewBenRegViewModel @Inject constructor(
         if (isAddSpouseFromArgs == 1 || hhId <= 0L || benIdFromArgs != 0L) return null
         if (relToHeadId != 4 && relToHeadId != 5) return null
 
-        val newFirstName = newBen.firstName.normalizeNameForMatch()
-        val newFullName = newBen.fullName().normalizeNameForMatch()
-        if (newFirstName.isBlank() && newFullName.isBlank()) return null
-
-        val expectedExistingGenderId = if (relToHeadId == 4) 1 else 2
-        val matches = benRepo.getBenListFromHousehold(hhId).filter { existing ->
-            existing.beneficiaryId != newBen.beneficiaryId &&
-                existing.genderId == expectedExistingGenderId &&
-                existing.isMarried &&
-                (relToHeadId == 4 || !existing.isSpouseAdded) &&
-                existing.genDetails?.spouseName.normalizeNameForMatch().let { spouseName ->
-                    spouseName.isNotBlank() &&
-                        (spouseName == newFirstName || spouseName == newFullName)
-                }
+        val members = benRepo.getBenListFromHousehold(hhId).map { existing ->
+            SpouseLinkSelector.Member(
+                beneficiaryId = existing.beneficiaryId,
+                genderId = existing.genderId,
+                isSpouseAdded = existing.isSpouseAdded,
+                isHouseholdHead = existing.familyHeadRelationPosition == 19,
+                spouseName = existing.genDetails?.spouseName
+            )
         }
-
-        matches.singleOrNull()?.beneficiaryId?.let { return it }
-
-        return findHouseholdHeadSpouseFallback()
+        return SpouseLinkSelector.selectPartnerId(
+            newBeneficiaryId = newBen.beneficiaryId,
+            registeringWife = relToHeadId == 4,
+            newSpouseFirstName = newBen.firstName,
+            newSpouseFullName = newBen.fullName(),
+            members = members
+        )
     }
 
-    private fun String?.normalizeNameForMatch(): String =
-        this?.trim()
-            ?.replace(Regex("\\s+"), " ")
-            ?.uppercase()
-            .orEmpty()
-
-    private suspend fun findHouseholdHeadSpouseFallback(): Long? {
-        val expectedGenderId = if (relToHeadId == 4) 1 else 2
-        val householdHead = benRepo.getBenListFromHousehold(hhId).singleOrNull { existing ->
-            existing.familyHeadRelationPosition == 19 &&
-                existing.genderId == expectedGenderId &&
-                existing.isMarried &&
-                !existing.isSpouseAdded
+    private suspend fun copyLinkedMemberNameAsSpouse(linkedBenId: Long, newBen: BenRegCache) {
+        if (!newBen.genDetails?.spouseName.isNullOrBlank()) return
+        val linkedName = benRepo.getBeneficiaryRecord(linkedBenId, hhId)?.fullName() ?: return
+        if (newBen.genDetails == null) {
+            newBen.genDetails = BenRegGen(spouseName = linkedName)
+        } else {
+            newBen.genDetails!!.spouseName = linkedName
         }
-        return householdHead?.beneficiaryId
     }
 
     private suspend fun updateLinkedSpouseNameIfBlank(linkedBenId: Long, newBen: BenRegCache) {
         val newSpouseName = newBen.fullName()?.takeIf { it.isNotBlank() } ?: return
         benRepo.getBeneficiaryRecord(linkedBenId, hhId)?.let { linkedBen ->
+            linkedBen.isSpouseAdded = true
             if (linkedBen.genDetails?.spouseName.isNullOrBlank()) {
                 if (linkedBen.genDetails == null) {
                     linkedBen.genDetails = BenRegGen(spouseName = newSpouseName)

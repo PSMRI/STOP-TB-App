@@ -120,6 +120,11 @@ class DeviceIntegrationRepo @Inject constructor(
     fun isXrayIntegrated(): Boolean {
         return preferenceDao.getXrayIntegrated()
     }
+    /** A camp hub that creates the referred orders itself (from the screening and from an X-ray
+     *  result that refers for TrueNat), so this tablet must not push them too. */
+    fun hubCreatesOrders(): Boolean =
+        preferenceDao.isCampModeEnabled() && preferenceDao.hubCreatesReferralOrders()
+
     fun isTruenatIntegrated(): Boolean {
         return preferenceDao.getTruenatIntegrated()
     }

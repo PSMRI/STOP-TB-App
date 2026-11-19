@@ -78,7 +78,7 @@ class PagedScreensEquivalenceTest {
             val all = db.householdDao.getAllHouseholdWithNumMembers(villageId).first().map { row -> row.asBasicDomainModel() }
             for (query in listOf("", "gopal", "khan", "9123", "700")) {
                 val expected = oldHouseholdFilter(all, query).map { hh -> hh.hhId to hh.numMembers }
-                val paged = db.householdDao.getHouseholdsWithNumMembersPage(villageId, query, ALL_ROWS, 0)
+                val paged = db.householdDao.getHouseholdsWithNumMembersPage(villageId, false, query, ALL_ROWS, 0)
                     .map { row -> row.asBasicDomainModel() }.map { hh -> hh.hhId to hh.numMembers }
                 assertEquals("village=$villageId query='$query'", expected, paged)
             }

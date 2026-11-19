@@ -136,16 +136,10 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 // not a device is integrated or any order still looks pending (an order saved
                 // without an order id is not in pendingOrders). A pair is cleared only once its
                 // fetch succeeds; the worker keeps rescheduling while any remain.
-                var hasSkippedFeedOrders = false
-                if (feedEnabled) {
-                    val skipped = tbRepo.feedSkippedOrdersPastGrace()
-                    skipped.forEach { (benId, type) ->
-                        Timber.d("Polling $type result for benId=$benId skipped by the feed")
-                        if (tbRepo.fetchOrderResult(benId, type) is NetworkResponse.Success) {
-                            tbRepo.ackFeedSkippedOrder(benId, type)
-                        }
-                    }
-                    hasSkippedFeedOrders = preferenceDao.getFeedSkippedOrders().isNotEmpty()
+                // The feed leaves no orders to fetch one by one; entries an older build recorded are dropped.
+                val hasSkippedFeedOrders = false
+                if (feedActive) {
+                    preferenceDao.removeFeedSkippedOrders(preferenceDao.getFeedSkippedOrders().toList())
                 }
 
                 if (!tbRepo.isXrayIntegrated() && !tbRepo.isTruenatIntegrated()) {
@@ -168,33 +162,16 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                         preferenceDao.setLastResultCheckTime(System.currentTimeMillis())
                     }
                 } else {
-                // Without a feed: one status sweep per order type. It applies completed results
-                // itself, and its "awaiting provider result" list tells us which pending orders
-                // the server has nothing new for, so we don't ask order/result about those.
-                val awaitingByType = HashMap<String, Set<Long>>()
-                if (tbRepo.isXrayIntegrated()) {
-                    awaitingByType["XRAY_CHEST"] =
-                        tbRepo.awaitingResultBenIds(tbRepo.fetchBeneficiariesByStatus("XRAY_CHEST"))
-                }
-                if (tbRepo.isTruenatIntegrated()) {
-                    awaitingByType["SPUTUM_TRUENAT"] =
-                        tbRepo.awaitingResultBenIds(tbRepo.fetchBeneficiariesByStatus("SPUTUM_TRUENAT"))
-                    awaitingByType["MDR_RIF"] =
-                        tbRepo.awaitingResultBenIds(tbRepo.fetchBeneficiariesByStatus("MDR_RIF"))
-                }
-                // Only rows with a PENDING order: the filter below keeps nothing else, and loading
-                // the whole table every 60 s cost a full scan + every row's object at scale.
+                // Only rows with a PENDING (or, without the feed, INVALID TrueNat) order: the filter
+                // below keeps nothing else, and loading the whole table every 60 s cost a full scan
+                // + every row's object at scale.
                 val activeList = tbRepo.getDiagnosticsWithPendingOrder()
                 val now = System.currentTimeMillis()
 
-                // Real order/result contract confirmed: PENDING, IN_PROGRESS, COMPLETED, FAILED,
-                // CLOSED, MANUAL_ENTRY. IN_PROGRESS is collapsed into our stored PENDING at the
-                // repository boundary (TBRepo.reducedOrderStatus/createOrder/
-                // fetchBeneficiariesByStatus), so Room never actually holds "IN_PROGRESS" or
-                // "AWAITING_PROVIDER_RESULT" literally — checking PENDING alone is correct.
-                // MANUAL_ENTRY is intentionally excluded here — there is no automated result to
-                // fetch for it; the unconditional fetchBeneficiariesByStatus sweep above already
-                // reconciles it (and FAILED) every time this worker runs.
+                // Statuses: PENDING, IN_PROGRESS, COMPLETED, FAILED, CLOSED, MANUAL_ENTRY, INVALID. IN_PROGRESS is
+                // collapsed into PENDING (TBRepo.reducedOrderStatus); MANUAL_ENTRY has no automated result to wait
+                // for. With the feed active every change arrives through it; without it (no feed, or it failed)
+                // INVALID orders are polled too, as they wait for the machine's retest.
                 data class PendingOrder(val benId: Long, val xray: Boolean, val trueNat: Boolean, val rif: Boolean)
 
                 fun hasRealOrderId(orderId: String?) =
@@ -205,7 +182,8 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                             diag.xrayOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) &&
                             hasRealOrderId(diag.xrayOrderId)
                     val trueNatInProgress = tbRepo.isTruenatIntegrated() &&
-                            diag.trueNatOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) &&
+                            (diag.trueNatOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
+                                (!feedActive && diag.trueNatOrderStatus.equals(OrderStatus.INVALID.name, ignoreCase = true))) &&
                             hasRealOrderId(diag.trueNatOrderId)
                     val rifInProgress = tbRepo.isTruenatIntegrated() &&
                             diag.rifOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) &&
@@ -228,10 +206,9 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                 // coroutineScope's structured concurrency.
                 if (hasInProgress) {
                     // Fallback (no feed): ask order/result only for orders that are due on their
-                    // own backoff schedule and that the status sweep didn't already report as
-                    // still awaiting a result. Was: every pending order, every cycle.
+                    // own backoff schedule. Was: every pending order, every cycle.
                     val pollSemaphore = Semaphore(MAX_CONCURRENT_POLLS)
-                    val fetched = AtomicInteger(); val skippedAwaiting = AtomicInteger(); val notDue = AtomicInteger()
+                    val fetched = AtomicInteger(); val notDue = AtomicInteger()
                     pollSchedule.retainOnly(pendingOrders.flatMap { order ->
                         listOfNotNull(
                             (order.benId to "XRAY_CHEST").takeIf { order.xray },
@@ -248,10 +225,6 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                             )) {
                                 if (!isPending) continue
                                 when {
-                                    order.benId in awaitingByType[orderType].orEmpty() -> {
-                                        pollSchedule.recordUnchanged(order.benId, orderType, now)
-                                        skippedAwaiting.incrementAndGet()
-                                    }
                                     !pollSchedule.isDue(order.benId, orderType, now) -> notDue.incrementAndGet()
                                     else -> launch {
                                         pollSemaphore.withPermit {
@@ -259,7 +232,8 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                                             val result = tbRepo.fetchOrderResult(order.benId, orderType)
                                             val stillPending = result !is NetworkResponse.Success ||
                                                 result.data.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
-                                                result.data.equals("IN_PROGRESS", ignoreCase = true)
+                                                result.data.equals("IN_PROGRESS", ignoreCase = true) ||
+                                                result.data.equals(OrderStatus.INVALID.name, ignoreCase = true)
                                             if (stillPending) pollSchedule.recordUnchanged(order.benId, orderType, now)
                                             else pollSchedule.recordChanged(order.benId, orderType)
                                         }
@@ -269,7 +243,7 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
                         }
                     }
                     Timber.d("Result poll (no feed): ${pendingOrders.size} pending, fetched ${fetched.get()}, " +
-                        "server still awaiting ${skippedAwaiting.get()}, not yet due ${notDue.get()}")
+                        "not yet due ${notDue.get()}")
                     preferenceDao.setLastResultCheckTime(now)
                 }
                 }

@@ -168,5 +168,6 @@
     <string name="discard_changes_message">क्या आप वापस जाना चाहते हैं? बदलाव खो जाएंगे।</string>
     <string name="discard">छोड़ें</string>
     <string name="stay">रुकें</string>
+    <string name="label_missing_data_ben_fragment">अधूरे डेटा वाले लाभार्थियों की सूची</string>
 
 </resources>

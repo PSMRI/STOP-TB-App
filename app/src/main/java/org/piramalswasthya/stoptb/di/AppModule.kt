@@ -8,6 +8,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import org.piramalswasthya.stoptb.BuildConfig
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import org.piramalswasthya.stoptb.database.room.InAppDb
@@ -17,6 +18,7 @@ import org.piramalswasthya.stoptb.database.room.dao.AesDao
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.BeneficiaryIdsAvailDao
 import org.piramalswasthya.stoptb.database.room.dao.CbacDao
+import org.piramalswasthya.stoptb.database.room.dao.DataMissingBenInfoDao
 import org.piramalswasthya.stoptb.database.room.dao.FilariaDao
 import org.piramalswasthya.stoptb.database.room.dao.HouseholdDao
 import org.piramalswasthya.stoptb.database.room.dao.KalaAzarDao
@@ -145,15 +147,10 @@ object AppModule {
     @Provides
     fun provideHttpLoggingInterceptor(): HttpLoggingInterceptor {
         val loggingInterceptor = HttpLoggingInterceptor(LoggingInterceptor()).apply {
-            // BASIC, not BODY. At BODY this interceptor reads every response fully into a
-            // Buffer and then copies it into a String purely to log it - for the bulk
-            // `getAll` endpoints that is a multi-megabyte UTF-16 copy of a body the parser is
-            // about to materialise again. On a camp device that showed up as ~93MB sitting in
-            // the large-object space and a heap pinned near its 186MB ceiling, which stalled
-            // the whole app in back-to-back GCs. BASIC keeps method, URL, status and size.
-            // Flip this to BODY temporarily when a payload actually has to be inspected; it
-            // also writes beneficiary PII (names, DOB, phone numbers) into logcat.
-            level = HttpLoggingInterceptor.Level.BASIC
+            // BODY materialises full payloads, including beneficiary data. Use metadata-only
+            // logging in debug and disable HTTP logging in release.
+            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BASIC
+            else HttpLoggingInterceptor.Level.NONE
         }
         return loggingInterceptor
     }
@@ -267,6 +264,10 @@ object AppModule {
     @Singleton
     @Provides
     fun provideBenDao(database: InAppDb): BenDao = database.benDao
+
+    @Singleton
+    @Provides
+    fun provideDataMissingBenInfoDao(database: InAppDb): DataMissingBenInfoDao = database.dataMissingBenInfoDao
 
     @Singleton
     @Provides

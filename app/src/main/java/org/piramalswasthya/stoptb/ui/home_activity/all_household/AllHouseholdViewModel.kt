@@ -5,6 +5,7 @@ import org.piramalswasthya.stoptb.ui.pagedByQuery
 import org.piramalswasthya.stoptb.ui.QueryPages
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,10 +28,13 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AllHouseholdViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
     private val householdRepo: HouseholdRepo,
     private val recordsRepo: RecordsRepo,
     private val preferenceDao: PreferenceDao
 ) : ViewModel() {
+
+    val doorLockList: Boolean = savedStateHandle.get<Boolean>("doorLockList") ?: false
 
     private val filter = MutableStateFlow("")
 
@@ -44,7 +48,7 @@ class AllHouseholdViewModel @Inject constructor(
     // PR 6: paged; the search and the sort that ran over the whole list in Kotlin are in SQL.
     @OptIn(ExperimentalCoroutinesApi::class)
     val householdList: Flow<QueryPages<HouseHoldBasicDomain>> = filter.debounceTyping()
-        .pagedByQuery(viewModelScope) { query -> recordsRepo.householdsPaged(query.trim().lowercase()) }
+        .pagedByQuery(viewModelScope) { query -> recordsRepo.householdsPaged(query.trim().lowercase(), doorLockList) }
 
     private var _selectedHouseholdId: Long = 0L
     val selectedHouseholdId: Long get() = _selectedHouseholdId
@@ -78,14 +82,15 @@ class AllHouseholdViewModel @Inject constructor(
         _householdBenList.clear()
     }
 
-    fun setSelectedHouseholdId(id: Long) {
+    suspend fun setSelectedHouseholdId(id: Long) {
         _selectedHouseholdId = id
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                _householdBenList.clear()
-                _householdBenList.addAll(householdRepo.getAllBenOfHousehold(id))
-            }
+        val members = withContext(Dispatchers.IO) {
+            householdRepo.getAllBenOfHousehold(id)
         }
+        // A newer selection, or a reset, happened while this lookup was running.
+        if (_selectedHouseholdId != id) return
+        _householdBenList.clear()
+        _householdBenList.addAll(members)
     }
 
     suspend fun getHousehold(id: Long): HouseholdCache? = householdRepo.getRecord(id)

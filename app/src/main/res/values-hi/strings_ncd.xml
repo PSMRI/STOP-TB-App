@@ -284,8 +284,8 @@
     <string name="cat_hrp">एचआरपी</string>
     <string name="cat_maternal">मातृ</string>
     <string-array name="tb_truenat_mtb_result">
-        <item>एमटीबी पाया गया (MTB Positive)</item>
-        <item>एमटीबी नहीं पाया गया (MTB Negative)</item>
+        <item>एमटीबी पाया गया (MTB Detected)</item>
+        <item>एमटीबी नहीं पाया गया (MTB Not Detected)</item>
         <item>अमान्य/त्रुटि (Invalid/Error)</item>
     </string-array>
     <string-array name="tb_truenat_rif_result">

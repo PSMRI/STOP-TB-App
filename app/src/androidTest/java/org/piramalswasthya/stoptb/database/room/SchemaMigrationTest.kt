@@ -42,15 +42,20 @@ class SchemaMigrationTest {
     }
 
     /**
-     * A device on the field build (2.3.1, schema 61) upgrading straight to this build: every
-     * table gets one row at v61, then all migrations run, and every table that still exists
-     * must still hold its row. Values are 1 / '1' everywhere, so foreign keys line up.
+     * A device on a released build (2.3.1 field = 61, 2.4 = 68, 2.5 = 71) upgrading straight to
+     * this build: every table gets one row at that version, then all migrations run, and every
+     * table that still exists must still hold its row. Values are 1 / '1' everywhere, so
+     * foreign keys line up.
      */
     @Test
-    fun rowsWrittenOnTheFieldVersionSurviveTheUpgrade() {
-        val dbName = "schema-migration-data-test"
-        val tables = tablesOf(FIELD_VERSION)
-        helper.createDatabase(dbName, FIELD_VERSION).use { db ->
+    fun rowsWrittenOnEachReleasedVersionSurviveTheUpgrade() {
+        for (version in RELEASED_VERSIONS) rowsSurviveUpgradeFrom(version)
+    }
+
+    private fun rowsSurviveUpgradeFrom(fromVersion: Int) {
+        val dbName = "schema-migration-data-test-$fromVersion"
+        val tables = tablesOf(fromVersion)
+        helper.createDatabase(dbName, fromVersion).use { db ->
             db.execSQL("PRAGMA foreign_keys=OFF")
             for ((table, columns) in tables) {
                 val values = columns.joinToString(",") { (_, affinity) -> sampleValue(affinity) }
@@ -66,10 +71,10 @@ class SchemaMigrationTest {
             for ((table, _) in tables) {
                 if (table !in existing) continue
                 val count = db.query("SELECT COUNT(*) FROM `$table`").use { c -> c.moveToFirst(); c.getInt(0) }
-                assertEquals("rows in $table after migrating $FIELD_VERSION -> ${InAppDb.DB_VERSION}", 1, count)
+                assertEquals("rows in $table after migrating $fromVersion -> ${InAppDb.DB_VERSION}", 1, count)
                 checked++
             }
-            assertTrue("checked $checked of ${tables.size} tables", checked > tables.size / 2)
+            assertTrue("$fromVersion: checked $checked of ${tables.size} tables", checked > tables.size / 2)
         }
     }
 
@@ -96,10 +101,10 @@ class SchemaMigrationTest {
     }
 
     private companion object {
-        /** Schema of the build deployed in the field (release-2.3.1). */
-        const val FIELD_VERSION = 61
+        /** Schemas of released builds: 2.3.1 (in the field), 2.4 and 2.5. */
+        val RELEASED_VERSIONS = listOf(61, 68, 71)
 
         /** Versions whose exported schema JSON exists in app/schemas. */
-        val BASE_VERSIONS = listOf(61, 67)
+        val BASE_VERSIONS = listOf(61, 67, 68, 71)
     }
 }

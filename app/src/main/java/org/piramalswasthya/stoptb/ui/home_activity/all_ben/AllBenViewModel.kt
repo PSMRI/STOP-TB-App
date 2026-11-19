@@ -84,29 +84,18 @@ class AllBenViewModel @Inject constructor(
         _householdBenListForAddMember.clear()
     }
 
-    fun setSelectedHouseholdForAddMember(hhId: Long) {
+    suspend fun setSelectedHouseholdForAddMember(hhId: Long) {
         _selectedHouseholdIdForAddMember = hhId
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                _householdBenListForAddMember.clear()
-                _householdBenListForAddMember.addAll(benRepo.getBenListFromHousehold(hhId))
-            }
+        val members = withContext(Dispatchers.IO) {
+            benRepo.getBenListFromHousehold(hhId)
         }
+        // A newer selection, or a reset, happened while this lookup was running.
+        if (_selectedHouseholdIdForAddMember != hhId) return
+        _householdBenListForAddMember.clear()
+        _householdBenListForAddMember.addAll(members)
     }
 
     private companion object {
-        /** An unfiltered status refresh re-runs at most this often. */
-        const val statusRefreshDebounceMs = 30_000L
-
-        /**
-         * Last time an unfiltered status refresh actually ran. On the companion, not the
-         * instance: a fresh ViewModel is built on every entry to this screen, so an instance
-         * field would only suppress repeat onResume within a single visit and the full sweep
-         * would still run on every navigation back. Same reasoning as
-         * [lastDeviceIntegrationRefreshAt].
-         */
-        private var lastStatusRefreshAt = 0L
-
         /** Device-integration config re-checks at most this often. */
         const val deviceIntegrationRefreshIntervalMs = 5 * 60_000L
 
@@ -123,6 +112,10 @@ class AllBenViewModel @Inject constructor(
     private val kindOrg = MutableStateFlow(0)
     private val expandToBlock = MutableStateFlow(false)
 
+    /** Vulnerable Population list (source 11) filter: "" = All, "TRIBAL", or a risk-factor code. */
+    private val _vulnerabilityCode = MutableStateFlow("")
+    val vulnerabilityCode: StateFlow<String> = _vulnerabilityCode.asStateFlow()
+
     /** True once the current search text can offer/has used the "search other villages" fallback. */
     val canExpandSearchToBlock: Flow<Boolean> = combine(filterOrg, expandToBlock) { text, expanded ->
         text.isNotBlank() && !expanded
@@ -138,9 +131,6 @@ class AllBenViewModel @Inject constructor(
     val searchGeneration: StateFlow<Int> = _searchGeneration.asStateFlow()
 
     init {
-        // No fetchBeneficiaryStatuses() here: the Fragment calls it from onResume, which always
-        // runs right after this ViewModel is created, so doing it in both places ran the whole
-        // status refresh - network calls plus their TB_DIAGNOSTICS writes - twice on every entry.
         // Device-integration state only changes when the camp hub's hardware is reconnected,
         // but each refresh is two sequential vendor/health calls that measured a consistent
         // ~5.1s each - ten seconds of network on every single entry to this screen. The
@@ -156,17 +146,17 @@ class AllBenViewModel @Inject constructor(
     }
 
     @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
-    val benList: Flow<PagingData<BenBasicDomain>> = combine(filterOrg, kindOrg, expandToBlock) { text, kind, expanded ->
-        Triple(text, kind, expanded)
-    }.debounce { (text, _, _) ->
-        if (text.isEmpty()) 0L else 300L
-    }.flatMapLatest { (text, kind, expanded) ->
+    val benList: Flow<PagingData<BenBasicDomain>> = combine(filterOrg, kindOrg, expandToBlock, _vulnerabilityCode) { text, kind, expanded, vulnerability ->
+        BenListQuery(text, kind, expanded, vulnerability)
+    }.debounce { query ->
+        if (query.text.isEmpty()) 0L else 300L
+    }.flatMapLatest { query ->
         _searchGeneration.update { it + 1 }
         Pager(
             // maxSize bounds memory and keeps the loaded-row id list (badge queries) small.
             config = PagingConfig(pageSize = 30, prefetchDistance = 10, maxSize = 300, enablePlaceholders = false)
         ) {
-            recordsRepo.searchBenPagedSource(text, kind, sourceFromArgs, expanded)
+            recordsRepo.searchBenPagedSource(query.text, query.kind, sourceFromArgs, query.expanded, query.vulnerabilityCode)
         }.flow.map { pagingData ->
             pagingData.map { it.asBasicDomainModel() }
         }
@@ -236,6 +226,10 @@ class AllBenViewModel @Inject constructor(
 
     }
 
+    fun filterVulnerability(code: String) {
+        _vulnerabilityCode.value = code
+    }
+
     fun fetchAbha(benId: Long) {
         _abha.value = null
         _benRegId.value = null
@@ -261,7 +255,7 @@ class AllBenViewModel @Inject constructor(
 
     fun downloadCsv(context: Context) {
         viewModelScope.launch {
-            val users = recordsRepo.searchBenOnce(filterOrg.value, kindOrg.value, sourceFromArgs)
+            val users = recordsRepo.searchBenOnce(filterOrg.value, kindOrg.value, sourceFromArgs, vulnerabilityCode = _vulnerabilityCode.value)
             if (users.isNotEmpty()) {
                 createCsvFile(context, users)
             } else {
@@ -302,6 +296,8 @@ class AllBenViewModel @Inject constructor(
     val allTbScreening: Flow<List<TbScreeningSymptoms>> =
         rowBadges.tbScreeningSymptoms
 
+    val allTbSuspected = tbRepo.allTbSuspected
+
     sealed class OrderActionResult {
         object Idle : OrderActionResult()
         object Loading : OrderActionResult()
@@ -337,47 +333,11 @@ class AllBenViewModel @Inject constructor(
 
 
 
-    fun fetchBeneficiaryStatuses(orderType: DiagnosticOrderType? = null) {
-        // A refresh for a specific orderType is always a response to something the user just did
-        // (created/retried an order, fetched a result), so it is never debounced. The unfiltered
-        // refresh is the one that fires on every onResume - returning from a form, dismissing a
-        // dialog, the screen coming back from the background - and each run hits the network and
-        // writes TB_DIAGNOSTICS per beneficiary, which invalidates every list on this screen.
-        if (orderType == null) {
-            // With the changes feed active every order status already arrives with each pull
-            // (the result poll worker and pull worker skip these sweeps too); this unfiltered
-            // refresh only duplicated it, with a per-beneficiary order/result fan-out.
-            // Only while the feed is actually delivering: the flag stays set while pulls fail,
-            // and then this refresh is the only way the cards get fresh order states.
-            if (org.piramalswasthya.stoptb.repositories.isChangesFeedHealthy(
-                    tbRepo.preferenceDao.isChangesFeedActive(), tbRepo.preferenceDao.getStoredCampHubUrl()
-                )) return
-            val now = android.os.SystemClock.elapsedRealtime()
-            if (now - lastStatusRefreshAt < statusRefreshDebounceMs) return
-            lastStatusRefreshAt = now
-        }
-        viewModelScope.launch {
-            if (orderType != null) {
-                tbRepo.fetchBeneficiariesByStatus(orderType.wireValue)
-            } else {
-                when (sourceFromArgs) {
-                    6 -> tbRepo.fetchBeneficiariesByStatus(DiagnosticOrderType.XRAY_CHEST.wireValue)
-                    7 -> {
-                        tbRepo.fetchBeneficiariesByStatus(DiagnosticOrderType.SPUTUM_TRUENAT.wireValue)
-                        tbRepo.fetchBeneficiariesByStatus(DiagnosticOrderType.MDR_RIF.wireValue)
-                    }
-                    else -> {}
-                }
-            }
-        }
-    }
-
     fun markOrderTestCompleted(benId: Long, orderType: DiagnosticOrderType) {
         viewModelScope.launch {
             _orderActionState.value = OrderActionResult.Loading
             when (val response = tbRepo.markTestCompleted(benId, orderType.wireValue)) {
                 is NetworkResponse.Success -> {
-                    fetchBeneficiaryStatuses(orderType)
                     _orderActionState.value = OrderActionResult.Success("Test marked as completed. Status: ${response.data}", orderType)
                 }
                 is NetworkResponse.Error -> {
@@ -393,7 +353,6 @@ class AllBenViewModel @Inject constructor(
             _orderActionState.value = OrderActionResult.Loading
             when (val response = tbRepo.fetchOrderResult(benId, orderType.wireValue)) {
                 is NetworkResponse.Success -> {
-                    fetchBeneficiaryStatuses(orderType)
                     _orderActionState.value = OrderActionResult.Success("Result fetched successfully. Status: ${response.data}", orderType)
                 }
                 is NetworkResponse.Error -> {
@@ -667,3 +626,10 @@ class AllBenViewModel @Inject constructor(
         }
     }
 }
+
+private data class BenListQuery(
+    val text: String,
+    val kind: Int,
+    val expanded: Boolean,
+    val vulnerabilityCode: String
+)

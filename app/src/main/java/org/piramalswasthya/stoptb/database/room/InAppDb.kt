@@ -20,6 +20,7 @@ import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.BeneficiaryIdsAvailDao
 import org.piramalswasthya.stoptb.database.room.dao.CbacDao
 import org.piramalswasthya.stoptb.database.room.dao.ChiefComplaintMasterDao
+import org.piramalswasthya.stoptb.database.room.dao.DataMissingBenInfoDao
 import org.piramalswasthya.stoptb.database.room.dao.DrugMasterDao
 import org.piramalswasthya.stoptb.database.room.dao.FilariaDao
 import org.piramalswasthya.stoptb.database.room.dao.HouseholdDao
@@ -77,6 +78,8 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.SectionResponseEntity
 import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionResponseEntity
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.DynamicFormMetadataDao
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.CounsellingFormResponseDao
+import org.piramalswasthya.stoptb.model.DataMissingBenInfo
+import org.piramalswasthya.stoptb.model.MissingDataInfoStatusConverter
 
 
 @Database(
@@ -119,7 +122,8 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
         OptionConditionEntity::class,
         FormResponseEntity::class,
         SectionResponseEntity::class,
-        QuestionResponseEntity::class
+        QuestionResponseEntity::class,
+        DataMissingBenInfo::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
     version = InAppDb.DB_VERSION, exportSchema = true
@@ -129,8 +133,8 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.Counselling
     SyncStateConverter::class,
     StringListConverter::class,
     GenderConverter::class,
-    ScreeningStatusConverter::class
-
+    ScreeningStatusConverter::class,
+    MissingDataInfoStatusConverter::class
 )
 abstract class InAppDb : RoomDatabase() {
     abstract fun syncVillageCountsDao(): org.piramalswasthya.stoptb.database.room.dao.SyncVillageCountsDao
@@ -138,6 +142,7 @@ abstract class InAppDb : RoomDatabase() {
     abstract val benIdGenDao: BeneficiaryIdsAvailDao
     abstract val householdDao: HouseholdDao
     abstract val benDao: BenDao
+    abstract val dataMissingBenInfoDao: DataMissingBenInfoDao
     abstract val cbacDao: CbacDao
     abstract val chiefComplaintMasterDao: ChiefComplaintMasterDao
     abstract val drugMasterDao: DrugMasterDao
@@ -1731,6 +1736,36 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
+        val MIGRATION_56_57 = object : Migration(56, 57) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE `GENERAL_OPD_PRESCRIPTION` ADD COLUMN `itemFormId` INTEGER")
+                database.execSQL("ALTER TABLE `GENERAL_OPD_PRESCRIPTION` ADD COLUMN `drugForm` TEXT")
+            }
+        }
+
+        val MIGRATION_57_58 = object : Migration(57, 58) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
+                database.execSQL(
+                    "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId, b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod, b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus, b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId, b.isNewAbha, (SELECT COUNT(*) > 0 FROM CBAC c2 WHERE c2.benId = b.beneficiaryId) as cbacFilled, (SELECT c2.syncState FROM CBAC c2 WHERE c2.benId = b.beneficiaryId ORDER BY c2.id DESC LIMIT 1) as cbacSyncState, 0 as cdrFilled, NULL as cdrSyncState, 0 as mdsrFilled, NULL as mdsrSyncState, NULL as pmsmaSyncState, 0 as pmsmaFilled, 0 as hbncFilled, 0 as hbycFilled, 0 as pwrFilled, NULL as pwrSyncState, NULL as doSyncState, NULL as irSyncState, NULL as crSyncState, 0 as ecrFilled, 0 as ectFilled, 0 as isMdsr, (SELECT COUNT(*) > 0 FROM TB_SCREENING s2 WHERE s2.benId = b.beneficiaryId) as tbsnFilled, (SELECT s2.syncState FROM TB_SCREENING s2 WHERE s2.benId = b.beneficiaryId ORDER BY s2.id DESC LIMIT 1) as tbsnSyncState, (SELECT COUNT(*) > 0 FROM TB_SUSPECTED p2 WHERE p2.benId = b.beneficiaryId) as tbspFilled, (SELECT p2.syncState FROM TB_SUSPECTED p2 WHERE p2.benId = b.beneficiaryId ORDER BY p2.id DESC LIMIT 1) as tbspSyncState, 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled, 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled, NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState, 0 as isDelivered, 0 as pwHrp, 0 as irFilled, 0 as crFilled, 0 as doFilled, b.isNonHH, b.isAvailableForCamp, b.reasonForNotAttendingCamp, b.otherReasonForNotAttendingCamp, b.screeningStatus, b.symptomsScreenedDate, b.chestXrayDoneDate, b.trunatTestDoneDate, b.placeOfCurrentLiving, b.otherPlaceOfCurrentLiving, b.institutionName FROM BENEFICIARY b LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId WHERE b.isDraft = 0"
+                )
+            }
+        }
+        val MIGRATION_58_59 = object : Migration(58, 59) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
+                database.execSQL(
+                    "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId, b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod, b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus, b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId, b.isNewAbha, 0 as cbacFilled, NULL as cbacSyncState, 0 as cdrFilled, NULL as cdrSyncState, 0 as mdsrFilled, NULL as mdsrSyncState, NULL as pmsmaSyncState, 0 as pmsmaFilled, 0 as hbncFilled, 0 as hbycFilled, 0 as pwrFilled, NULL as pwrSyncState, NULL as doSyncState, NULL as irSyncState, NULL as crSyncState, 0 as ecrFilled, 0 as ectFilled, 0 as isMdsr, 0 as tbsnFilled, NULL as tbsnSyncState, 0 as tbspFilled, NULL as tbspSyncState, 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled, 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled, NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState, 0 as isDelivered, 0 as pwHrp, 0 as irFilled, 0 as crFilled, 0 as doFilled, b.isNonHH, b.isAvailableForCamp, b.reasonForNotAttendingCamp, b.otherReasonForNotAttendingCamp, b.screeningStatus, b.symptomsScreenedDate, b.chestXrayDoneDate, b.trunatTestDoneDate, b.placeOfCurrentLiving, b.otherPlaceOfCurrentLiving, b.institutionName FROM BENEFICIARY b LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId WHERE b.isDraft = 0"
+                )
+            }
+        }
+
+        val MIGRATION_59_60 = object : Migration(59, 60) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_ben_reg_id` ON `BENEFICIARY` (`benRegId`)")
+            }
+        }
+
         /**
          * Rebuilds BEN_BASIC_CACHE without GROUP BY / ORDER BY so SQLite can flatten it.
          *
@@ -1772,28 +1807,42 @@ abstract class InAppDb : RoomDatabase() {
          * query); the correct list order is worth it.
          */
         /**
-         * v69 (v63 on the release-2.3.1 line): BEN_BASIC_CACHE without its ORDER BY (every COUNT and query on the view sorted
+         * v73: BEN_BASIC_CACHE without its ORDER BY (every COUNT and query on the view sorted
          * all non-draft beneficiaries), plus an updatedDate column so the list queries that
-         * relied on the view's order now order explicitly. View SQL copied from the generated
-         * schema (69.json) so Room's identity check matches.
+         * relied on the view's order now order explicitly. Keeps v69's villageName column and
+         * v70's door-lock filter. View SQL copied from the generated schema (73.json) so Room's
+         * identity check matches.
          */
-        val MIGRATION_68_69 = object : Migration(68, 69) {
+        val MIGRATION_72_73 = object : Migration(72, 73) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
                 database.execSQL(
-                    "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.updatedDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId, b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod, b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus, b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId, b.isNewAbha, 0 as cbacFilled, NULL as cbacSyncState, 0 as cdrFilled, NULL as cdrSyncState, 0 as mdsrFilled, NULL as mdsrSyncState, NULL as pmsmaSyncState, 0 as pmsmaFilled, 0 as hbncFilled, 0 as hbycFilled, 0 as pwrFilled, NULL as pwrSyncState, NULL as doSyncState, NULL as irSyncState, NULL as crSyncState, 0 as ecrFilled, 0 as ectFilled, 0 as isMdsr, 0 as tbsnFilled, NULL as tbsnSyncState, 0 as tbspFilled, NULL as tbspSyncState, 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled, 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled, NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState, 0 as isDelivered, 0 as pwHrp, 0 as irFilled, 0 as crFilled, 0 as doFilled, b.isNonHH, b.isAvailableForCamp, b.reasonForNotAttendingCamp, b.otherReasonForNotAttendingCamp, b.screeningStatus, b.symptomsScreenedDate, b.chestXrayDoneDate, b.trunatTestDoneDate, b.placeOfCurrentLiving, b.otherPlaceOfCurrentLiving, b.institutionName FROM BENEFICIARY b LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId WHERE b.isDraft = 0"
+                    "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.updatedDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId, b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod, b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus, b.loc_village_id as villageId, b.loc_village_name as villageName, b.abha_healthIdNumber as abhaId, b.isNewAbha, 0 as cbacFilled, NULL as cbacSyncState, 0 as cdrFilled, NULL as cdrSyncState, 0 as mdsrFilled, NULL as mdsrSyncState, NULL as pmsmaSyncState, 0 as pmsmaFilled, 0 as hbncFilled, 0 as hbycFilled, 0 as pwrFilled, NULL as pwrSyncState, NULL as doSyncState, NULL as irSyncState, NULL as crSyncState, 0 as ecrFilled, 0 as ectFilled, 0 as isMdsr, 0 as tbsnFilled, NULL as tbsnSyncState, 0 as tbspFilled, NULL as tbspSyncState, 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled, 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled, NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState, 0 as isDelivered, 0 as pwHrp, 0 as irFilled, 0 as crFilled, 0 as doFilled, b.isNonHH, b.isAvailableForCamp, b.reasonForNotAttendingCamp, b.otherReasonForNotAttendingCamp, b.screeningStatus, b.symptomsScreenedDate, b.chestXrayDoneDate, b.trunatTestDoneDate, b.placeOfCurrentLiving, b.otherPlaceOfCurrentLiving, b.institutionName FROM BENEFICIARY b LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId WHERE b.isDraft = 0 AND IFNULL(h.isDoorLocked, 0) = 0"
                 )
             }
         }
 
         /**
-         * v68 (v62 on the release-2.3.1 line): indexes for the push/sync-state lookups, village lists and household lists, and
+         * v72: indexes for the push/sync-state lookups, village lists and household lists, and
          * drops of indexes that duplicated a primary key (ind_ben, ind_vitals_ben) or are covered
          * by a new composite (ind_ben_sync). Idempotent (IF [NOT] EXISTS) so the same SQL can be
          * appended to another release line's migration chain.
          */
-        val MIGRATION_67_68 = object : Migration(67, 68) {
+        val MIGRATION_71_72 = object : Migration(71, 72) {
             override fun migrate(database: SupportSQLiteDatabase) {
+                // Same table as MIGRATION_67_68. A UAT tablet on an earlier build of these
+                // changes (v68/v69 under release-2.4's numbering) skips that step, so create it
+                // here too; IF NOT EXISTS makes it a no-op everywhere else.
+                database.execSQL(
+                    """
+            CREATE TABLE IF NOT EXISTS DATA_MISSING_BEN_INFO (
+                beneficiaryId INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                PRIMARY KEY(beneficiaryId)
+            )
+            """.trimIndent()
+                )
                 database.execSQL("DROP INDEX IF EXISTS `ind_ben`")
                 database.execSQL("DROP INDEX IF EXISTS `ind_ben_sync`")
                 database.execSQL("DROP INDEX IF EXISTS `ind_vitals_ben`")
@@ -1816,37 +1865,6 @@ abstract class InAppDb : RoomDatabase() {
                 database.execSQL(
                     "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId, b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod, b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus, b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId, b.isNewAbha, 0 as cbacFilled, NULL as cbacSyncState, 0 as cdrFilled, NULL as cdrSyncState, 0 as mdsrFilled, NULL as mdsrSyncState, NULL as pmsmaSyncState, 0 as pmsmaFilled, 0 as hbncFilled, 0 as hbycFilled, 0 as pwrFilled, NULL as pwrSyncState, NULL as doSyncState, NULL as irSyncState, NULL as crSyncState, 0 as ecrFilled, 0 as ectFilled, 0 as isMdsr, 0 as tbsnFilled, NULL as tbsnSyncState, 0 as tbspFilled, NULL as tbspSyncState, 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled, 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled, NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState, 0 as isDelivered, 0 as pwHrp, 0 as irFilled, 0 as crFilled, 0 as doFilled, b.isNonHH, b.isAvailableForCamp, b.reasonForNotAttendingCamp, b.otherReasonForNotAttendingCamp, b.screeningStatus, b.symptomsScreenedDate, b.chestXrayDoneDate, b.trunatTestDoneDate, b.placeOfCurrentLiving, b.otherPlaceOfCurrentLiving, b.institutionName FROM BENEFICIARY b LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId WHERE b.isDraft = 0 ORDER BY b.updatedDate DESC"
                 )
-            }
-        }
-
-        val MIGRATION_59_60 = object : Migration(59, 60) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_ben_reg_id` ON `BENEFICIARY` (`benRegId`)")
-            }
-        }
-
-        val MIGRATION_58_59 = object : Migration(58, 59) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
-                database.execSQL(
-                    "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId, b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod, b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus, b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId, b.isNewAbha, 0 as cbacFilled, NULL as cbacSyncState, 0 as cdrFilled, NULL as cdrSyncState, 0 as mdsrFilled, NULL as mdsrSyncState, NULL as pmsmaSyncState, 0 as pmsmaFilled, 0 as hbncFilled, 0 as hbycFilled, 0 as pwrFilled, NULL as pwrSyncState, NULL as doSyncState, NULL as irSyncState, NULL as crSyncState, 0 as ecrFilled, 0 as ectFilled, 0 as isMdsr, 0 as tbsnFilled, NULL as tbsnSyncState, 0 as tbspFilled, NULL as tbspSyncState, 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled, 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled, NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState, 0 as isDelivered, 0 as pwHrp, 0 as irFilled, 0 as crFilled, 0 as doFilled, b.isNonHH, b.isAvailableForCamp, b.reasonForNotAttendingCamp, b.otherReasonForNotAttendingCamp, b.screeningStatus, b.symptomsScreenedDate, b.chestXrayDoneDate, b.trunatTestDoneDate, b.placeOfCurrentLiving, b.otherPlaceOfCurrentLiving, b.institutionName FROM BENEFICIARY b LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId WHERE b.isDraft = 0"
-                )
-            }
-        }
-
-        val MIGRATION_57_58 = object : Migration(57, 58) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
-                database.execSQL(
-                    "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId, b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod, b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus, b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId, b.isNewAbha, (SELECT COUNT(*) > 0 FROM CBAC c2 WHERE c2.benId = b.beneficiaryId) as cbacFilled, (SELECT c2.syncState FROM CBAC c2 WHERE c2.benId = b.beneficiaryId ORDER BY c2.id DESC LIMIT 1) as cbacSyncState, 0 as cdrFilled, NULL as cdrSyncState, 0 as mdsrFilled, NULL as mdsrSyncState, NULL as pmsmaSyncState, 0 as pmsmaFilled, 0 as hbncFilled, 0 as hbycFilled, 0 as pwrFilled, NULL as pwrSyncState, NULL as doSyncState, NULL as irSyncState, NULL as crSyncState, 0 as ecrFilled, 0 as ectFilled, 0 as isMdsr, (SELECT COUNT(*) > 0 FROM TB_SCREENING s2 WHERE s2.benId = b.beneficiaryId) as tbsnFilled, (SELECT s2.syncState FROM TB_SCREENING s2 WHERE s2.benId = b.beneficiaryId ORDER BY s2.id DESC LIMIT 1) as tbsnSyncState, (SELECT COUNT(*) > 0 FROM TB_SUSPECTED p2 WHERE p2.benId = b.beneficiaryId) as tbspFilled, (SELECT p2.syncState FROM TB_SUSPECTED p2 WHERE p2.benId = b.beneficiaryId ORDER BY p2.id DESC LIMIT 1) as tbspSyncState, 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled, 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled, NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState, 0 as isDelivered, 0 as pwHrp, 0 as irFilled, 0 as crFilled, 0 as doFilled, b.isNonHH, b.isAvailableForCamp, b.reasonForNotAttendingCamp, b.otherReasonForNotAttendingCamp, b.screeningStatus, b.symptomsScreenedDate, b.chestXrayDoneDate, b.trunatTestDoneDate, b.placeOfCurrentLiving, b.otherPlaceOfCurrentLiving, b.institutionName FROM BENEFICIARY b LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId WHERE b.isDraft = 0"
-                )
-            }
-        }
-
-        val MIGRATION_56_57 = object : Migration(56, 57) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("ALTER TABLE `GENERAL_OPD_PRESCRIPTION` ADD COLUMN `itemFormId` INTEGER")
-                database.execSQL("ALTER TABLE `GENERAL_OPD_PRESCRIPTION` ADD COLUMN `drugForm` TEXT")
             }
         }
 
@@ -2001,13 +2019,109 @@ abstract class InAppDb : RoomDatabase() {
             }
         }
 
-        private fun recreateBenBasicCacheView(database: SupportSQLiteDatabase) {
+        private val MIGRATION_67_68 = object : Migration(67, 68) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+            CREATE TABLE IF NOT EXISTS DATA_MISSING_BEN_INFO (
+                beneficiaryId INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                PRIMARY KEY(beneficiaryId)
+            )
+            """.trimIndent()
+                )
+            }
+        }
+
+        private val MIGRATION_68_69 = object : Migration(68, 69) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                recreateBenBasicCacheView(database)
+            }
+        }
+
+        private val MIGRATION_69_70 = object : Migration(69, 70) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "HOUSEHOLD", "isDoorLocked")) {
+                    database.execSQL(
+                        "ALTER TABLE HOUSEHOLD ADD COLUMN isDoorLocked INTEGER NOT NULL DEFAULT 0"
+                    )
+                }
+                if (!columnExists(database, "HOUSEHOLD", "doorLockVisitDate")) {
+                    database.execSQL(
+                        "ALTER TABLE HOUSEHOLD ADD COLUMN doorLockVisitDate INTEGER"
+                    )
+                }
+                recreateBenBasicCacheView(database, excludeDoorLocked = true)
+            }
+        }
+
+        private val MIGRATION_70_71 = object : Migration(70, 71) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!columnExists(database, "TB_CONFIRMED_TREATMENT", "treatmentType"))
+                    database.execSQL("ALTER TABLE TB_CONFIRMED_TREATMENT ADD COLUMN treatmentType TEXT")
+                if (!columnExists(database, "TB_CONFIRMED_TREATMENT", "dsTbRegimen"))
+                    database.execSQL("ALTER TABLE TB_CONFIRMED_TREATMENT ADD COLUMN dsTbRegimen TEXT")
+                if (!columnExists(database, "TB_CONFIRMED_TREATMENT", "pmdtRegimen"))
+                    database.execSQL("ALTER TABLE TB_CONFIRMED_TREATMENT ADD COLUMN pmdtRegimen TEXT")
+            }
+        }
+
+        private fun recreateBenBasicCacheView(
+            database: SupportSQLiteDatabase,
+            excludeDoorLocked: Boolean = false
+        ) {
             database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
+            if (excludeDoorLocked) {
+                // Final view after the release-2.4 -> 2.5 merge. Must equal the @DatabaseView in
+                // model/Ben.kt exactly (2.4's literal-column view + villageName + door-lock filter),
+                // or Room fails validation on open. Only MIGRATION_68_69 passes true; do not edit
+                // this SQL - a later view change needs its own new migration.
+                database.execSQL(
+                    "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId" +
+                            ", b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod" +
+                            ", b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus" +
+                            ", b.loc_village_id as villageId, b.loc_village_name as villageName, b.abha_healthIdNumber as abhaId" +
+                            ", b.isNewAbha" +
+                            ", 0 as cbacFilled, NULL as cbacSyncState" +
+                            ", 0 as cdrFilled, NULL as cdrSyncState" +
+                            ", 0 as mdsrFilled, NULL as mdsrSyncState" +
+                            ", NULL as pmsmaSyncState, 0 as pmsmaFilled" +
+                            ", 0 as hbncFilled" +
+                            ", 0 as hbycFilled" +
+                            ", 0 as pwrFilled, NULL as pwrSyncState" +
+                            ", NULL as doSyncState, NULL as irSyncState, NULL as crSyncState" +
+                            ", 0 as ecrFilled, 0 as ectFilled" +
+                            ", 0 as isMdsr" +
+                            ", 0 as tbsnFilled, NULL as tbsnSyncState" +
+                            ", 0 as tbspFilled, NULL as tbspSyncState" +
+                            ", 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled" +
+                            ", 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled" +
+                            ", NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState" +
+                            ", 0 as isDelivered, 0 as pwHrp" +
+                            ", 0 as irFilled, 0 as crFilled, 0 as doFilled" +
+                            ", b.isNonHH" +
+                            ", b.isAvailableForCamp" +
+                            ", b.reasonForNotAttendingCamp" +
+                            ", b.otherReasonForNotAttendingCamp" +
+                            ", b.screeningStatus" +
+                            ", b.symptomsScreenedDate" +
+                            ", b.chestXrayDoneDate" +
+                            ", b.trunatTestDoneDate" +
+                            ", b.placeOfCurrentLiving" +
+                            ", b.otherPlaceOfCurrentLiving" +
+                            ", b.institutionName" +
+                            " FROM BENEFICIARY b " +
+                            "LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId " +
+                            "WHERE b.isDraft = 0 AND IFNULL(h.isDoorLocked, 0) = 0 ORDER BY b.updatedDate DESC"
+                )
+                return
+            }
             database.execSQL(
                 "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId" +
                         ", b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod" +
                         ", b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus" +
-                        ", b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId" +
+                        ", b.loc_village_id as villageId, b.loc_village_name as villageName, b.abha_healthIdNumber as abhaId" +
                         ", b.isNewAbha" +
                         ", IFNULL(cbac.benId IS NOT NULL, 0) as cbacFilled, cbac.syncState as cbacSyncState" +
                         ", 0 as cdrFilled, NULL as cdrSyncState" +
@@ -2042,7 +2156,11 @@ abstract class InAppDb : RoomDatabase() {
                         "LEFT OUTER JOIN CBAC cbac ON b.beneficiaryId = cbac.benId " +
                         "LEFT OUTER JOIN TB_SCREENING tbsn ON b.beneficiaryId = tbsn.benId " +
                         "LEFT OUTER JOIN TB_SUSPECTED tbsp ON b.beneficiaryId = tbsp.benId " +
-                        "WHERE b.isDraft = 0 GROUP BY b.beneficiaryId ORDER BY b.updatedDate DESC"
+                        (if (excludeDoorLocked) {
+                            "WHERE b.isDraft = 0 AND IFNULL(h.isDoorLocked, 0) = 0 GROUP BY b.beneficiaryId ORDER BY b.updatedDate DESC"
+                        } else {
+                            "WHERE b.isDraft = 0 GROUP BY b.beneficiaryId ORDER BY b.updatedDate DESC"
+                        })
             )
         }
 
@@ -2207,7 +2325,7 @@ abstract class InAppDb : RoomDatabase() {
 
 
         // Bump together with a new MIGRATION_x_y added to MIGRATIONS below.
-        const val DB_VERSION = 69
+        const val DB_VERSION = 73
 
         // Oldest schema version that can be migrated in place.
         const val OLDEST_MIGRATABLE_VERSION = 2
@@ -2281,7 +2399,11 @@ abstract class InAppDb : RoomDatabase() {
             MIGRATION_65_66,
             MIGRATION_66_67,
             MIGRATION_67_68,
-            MIGRATION_68_69
+            MIGRATION_68_69,
+            MIGRATION_69_70,
+            MIGRATION_70_71,
+            MIGRATION_71_72,
+            MIGRATION_72_73
         )
 
         fun getInstance(appContext: Context): InAppDb {

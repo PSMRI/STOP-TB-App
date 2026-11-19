@@ -13,6 +13,7 @@ import org.piramalswasthya.stoptb.model.BenBasicCache
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.paging.NoCountPagingSource
+import org.piramalswasthya.stoptb.database.room.dao.DataMissingBenInfoDao
 import org.piramalswasthya.stoptb.database.room.dao.HouseholdDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.BenBasicDomain
@@ -25,6 +26,7 @@ class RecordsRepo @Inject constructor(
     @ApplicationContext private val context: Context,
     private val householdDao: HouseholdDao,
     private val benDao: BenDao,
+    private val missingBenInfoDao: DataMissingBenInfoDao,
     private val  preferenceDao: PreferenceDao,
     private val database: InAppDb
 ) {
@@ -46,10 +48,13 @@ class RecordsRepo @Inject constructor(
     val hhList get() = householdDao.getAllHouseholdWithNumMembers(selectedVillage)
         .map { list -> list.map { it.asBasicDomainModel() } }
     val hhListCount get() = householdDao.getAllHouseholdsCount(selectedVillage)
+    val doorLockList get() = householdDao.getDoorLockHouseholds(selectedVillage)
+        .map { list -> list.map { it.asBasicDomainModel() } }
+    val doorLockListCount get() = householdDao.getDoorLockHouseholdsCount(selectedVillage)
 
-    // PR 6: All Household paged, searched and sorted in SQL.
-    fun householdsPaged(query: String) =
-        Pager(tbListPagingConfig) { noCountSource("HOUSEHOLD", "BENEFICIARY") { limit, offset -> householdDao.getHouseholdsWithNumMembersPage(selectedVillage, query, limit, offset) } }
+    // PR 6: All Household paged, searched and sorted in SQL. doorLocked: the door-locked list.
+    fun householdsPaged(query: String, doorLocked: Boolean = false) =
+        Pager(tbListPagingConfig) { noCountSource("HOUSEHOLD", "BENEFICIARY") { limit, offset -> householdDao.getHouseholdsWithNumMembersPage(selectedVillage, doorLocked, query, limit, offset) } }
             .flow.map { page -> page.map { row -> row.asBasicDomainModel() } }
 
     val hhListforAsha get() = householdDao.getAllHouseholdForAshaFamilyMembers(selectedVillage)
@@ -73,14 +78,22 @@ class RecordsRepo @Inject constructor(
     val anthropometryFilledBenIds: Flow<List<Long>> get() =
         benDao.getAnthropometryFilledBenIds()
 
-    fun searchBen(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false): Flow<List<BenBasicDomain>> =
-        benDao.searchBen(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query)
+    // vulnerabilityCode only applies to source 11 (Vulnerable Population list): "" = All, "TRIBAL", or a risk-factor code.
+    fun searchBen(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false, vulnerabilityCode: String = ""): Flow<List<BenBasicDomain>> =
+        benDao.searchBen(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query, vulnerabilityCode)
             .map { list -> list.map { it.asBasicDomainModel() } }
 
     /** Sources whose filter touches no TB table: 0 All, 1 ABHA, 2 RCH, 3 age 30+, 4 eligible couple. */
     private val sourcesWithoutTbPredicates = setOf(0, 1, 2, 3, 4)
 
-    fun searchBenPagedSource(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false): PagingSource<Int, BenBasicCache> {
+    // vulnerabilityCode only applies to source 11 (Vulnerable Population list): "" = All, "TRIBAL", or a risk-factor code.
+    fun searchBenPagedSource(
+        query: String,
+        filterType: Int,
+        source: Int,
+        expandToBlock: Boolean = false,
+        vulnerabilityCode: String = ""
+    ): PagingSource<Int, BenBasicCache> {
         val villageIds = if (expandToBlock) allVillageIds else listOf(selectedVillage)
         // Sources 0-4 have no TB predicate, so they use the statement that never names a TB table
         // and therefore is not invalidated by the sync writing to one. See
@@ -89,16 +102,17 @@ class RecordsRepo @Inject constructor(
             noCountSource(BEN_VIEW) { limit, offset -> benDao.searchBenPageWithoutTbTables(villageIds, source, filterType, query, limit, offset) }
         } else {
             noCountSource(BEN_VIEW, "BENEFICIARY", "BEN_VITALS", "TB_SUSPECTED", "TB_DIAGNOSTICS", "TB_SCREENING") { limit, offset ->
-                benDao.searchBenPage(villageIds, source, filterType, query, limit, offset)
+                benDao.searchBenPage(villageIds, source, filterType, query, vulnerabilityCode, limit, offset)
             }
         }
     }
 
-    suspend fun searchBenOnce(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false): List<BenBasicDomain> =
-        benDao.searchBenOnce(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query)
+    suspend fun searchBenOnce(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false, vulnerabilityCode: String = ""): List<BenBasicDomain> =
+        benDao.searchBenOnce(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query, vulnerabilityCode)
             .map { it.asBasicDomainModel() }
 
     val allBenListCount get() = benDao.getAllBenCount(selectedVillage)
+    val allMissingDataBenListCount get() = missingBenInfoDao.getDataCount(selectedVillage)
     val nonHHListCount get() = benDao.getNonHHCount(selectedVillage)
     val nonHHList get() = benDao.getNonHHBeneficiaries(selectedVillage)
         .map { list -> list.map { it.asBasicDomainModel() } }

@@ -2,6 +2,7 @@ package org.piramalswasthya.stoptb.configuration
 import android.content.res.Resources
 import dagger.hilt.android.scopes.ActivityRetainedScoped
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.adapters.BenListAdapter
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 //import org.piramalswasthya.stoptb.helpers.isCounsellingOfficerRole
 //import org.piramalswasthya.stoptb.helpers.isNurseRole
@@ -14,6 +15,7 @@ import org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.Ncd
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.AppModule
 import org.piramalswasthya.stoptb.model.AppRole
+import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.volunteer.fragment.VolunteerHomeFragmentDirections
 import javax.inject.Inject
 @ActivityRetainedScoped
@@ -30,6 +32,31 @@ class IconDataset @Inject constructor(
      * users see a narrower, role-exclusive set per active tab ([getMultiRoleIconDataset]) —
      * these are deliberately different card sets, not two views of the same data.
      */
+    private fun canRegisterHousehold(): Boolean =
+        roleManager.privilegesForActiveRole().householdPermission == Permission.FULL
+
+    private fun doorLockIcon(resources: Resources) = Icon(
+        R.drawable.ic_door_lock,
+        resources.getString(R.string.icon_title_door_lock),
+        resources.getString(R.string.home_card_door_lock_subtitle),
+        recordsRepo.doorLockListCount,
+        VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllHouseholdFragment(
+            doorLockList = true
+        )
+    )
+
+    /** Vulnerable Population / TPT-Eligible Groups list (STOP-771) — AllBenFragment source 11. */
+    private fun vulnerablePopulationIcon(resources: Resources) = Icon(
+        icon = R.drawable.ic_tpt_module,
+        title = resources.getString(R.string.icon_title_vulnerable_population),
+        subtitle = resources.getString(R.string.home_card_vulnerable_population_subtitle),
+        count = null,
+        navAction = VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment(
+            source = BenListAdapter.VULNERABLE_POPULATION_SOURCE,
+            showContactTracingForms = true
+        )
+    )
+
     fun getVolunteerIconDataset(resources: Resources): List<Icon> {
         val isMultiRole = roleManager.assignedRoles.size > 1
         return if (isMultiRole) {
@@ -57,6 +84,7 @@ class IconDataset @Inject constructor(
                     VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllHouseholdFragment()
                 )
             )
+            if (canRegisterHousehold()) iconList.add(doorLockIcon(resources))
         }
         if (AppModule.BENEFICIARIES in homeModules) {
             iconList.add(
@@ -66,6 +94,17 @@ class IconDataset @Inject constructor(
                     resources.getString(R.string.home_card_all_ben_subtitle),
                     recordsRepo.allBenListCount,
                     VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment()
+                )
+            )
+        }
+        if (AppModule.MISSING_DATA_BENEFICIARIES in homeModules) {
+            iconList.add(
+                Icon(
+                    R.drawable.ic_all_ben,
+                    resources.getString(R.string.icon_title_missing_data_ben),
+                    resources.getString(R.string.home_card_missing_data_ben_subtitle),
+                    recordsRepo.allMissingDataBenListCount,
+                    VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToMissingDataBenFragment()
                 )
             )
         }
@@ -175,6 +214,8 @@ class IconDataset @Inject constructor(
                     )
                 )
             )
+            // Counsellor-only, same as TPT / Contact Follow Up (STOP-771).
+            iconList.add(vulnerablePopulationIcon(resources))
         }
 
         return iconList.apply {
@@ -202,6 +243,7 @@ class IconDataset @Inject constructor(
                     VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllHouseholdFragment()
                 )
             )
+            if (canRegisterHousehold()) iconList.add(doorLockIcon(resources))
         }
         if (AppModule.BENEFICIARIES in modules) {
             iconList.add(
@@ -211,6 +253,17 @@ class IconDataset @Inject constructor(
                     resources.getString(R.string.home_card_all_ben_subtitle),
                     recordsRepo.allBenListCount,
                     VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToAllBenFragment()
+                )
+            )
+        }
+        if (AppModule.MISSING_DATA_BENEFICIARIES in modules) {
+            iconList.add(
+                Icon(
+                    R.drawable.ic_all_ben,
+                    resources.getString(R.string.icon_title_missing_data_ben),
+                    resources.getString(R.string.home_card_missing_data_ben_subtitle),
+                    recordsRepo.allMissingDataBenListCount,
+                    VolunteerHomeFragmentDirections.actionVolunteerHomeFragmentToMissingDataBenFragment()
                 )
             )
         }
@@ -299,6 +352,8 @@ class IconDataset @Inject constructor(
                     )
                 )
             )
+            // Counsellor-only, same as TPT / Contact Follow Up (STOP-771).
+            iconList.add(vulnerablePopulationIcon(resources))
         }
 
         return iconList.apply {

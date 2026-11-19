@@ -32,6 +32,7 @@ import org.piramalswasthya.stoptb.helpers.Languages.ENGLISH
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.ui.login_activity.LoginActivity
 import org.piramalswasthya.stoptb.utils.NoCopyPasteHelper
+import org.piramalswasthya.stoptb.utils.navigateSafe
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import javax.inject.Inject
 import androidx.core.view.ViewCompat
@@ -180,7 +181,7 @@ class SignInFragment : Fragment() {
                 suppressCampModeListener = true
                 binding.cbCampMode.isChecked = false
                 suppressCampModeListener = false
-                findNavController().navigate(R.id.action_signInFragment_to_campModeConnectFragment)
+                findNavController().navigateSafe(R.id.action_signInFragment_to_campModeConnectFragment)
                 return@setOnCheckedChangeListener
             }
 
@@ -194,7 +195,7 @@ class SignInFragment : Fragment() {
         }
 
         binding.btnCampRetry.setOnClickListener {
-            findNavController().navigate(R.id.action_signInFragment_to_campModeConnectFragment)
+            findNavController().navigateSafe(R.id.action_signInFragment_to_campModeConnectFragment)
         }
 
         viewModel.campHubStatus.observe(viewLifecycleOwner) { status ->
@@ -289,7 +290,7 @@ class SignInFragment : Fragment() {
                         // unreachable during the call, which is the only failure that should fall
                         // back to a local login. A 401 or a server error leaves it set, so bad
                         // credentials still surface instead of silently signing the user in.
-                        if (!viewModel.isCampHubConnected()) {
+                        if (!prefDao.isReauthenticationRequired() && !viewModel.isCampHubConnected()) {
                             loginLocally(
                                 binding.etUsername.text.toString(),
                                 binding.etPassword.text.toString()
@@ -596,7 +597,7 @@ class SignInFragment : Fragment() {
             return
         }
 
-        if (viewModel.isCampHubConnected()) {
+        if (prefDao.isReauthenticationRequired() || viewModel.isCampHubConnected()) {
             campAuthInFlight = true
             viewModel.authUser(username, password)
             return

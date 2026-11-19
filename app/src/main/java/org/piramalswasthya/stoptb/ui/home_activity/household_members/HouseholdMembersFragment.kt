@@ -22,15 +22,18 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.BenListAdapter
+import org.piramalswasthya.stoptb.configuration.HouseholdSpouseRelations
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.AlertNewBenBinding
 import org.piramalswasthya.stoptb.databinding.FragmentHouseholdMembersBinding
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.helpers.RoleManager
+import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
+import org.piramalswasthya.stoptb.utils.navigateSafe
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -55,6 +58,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
     private var addBenAlert: AlertDialog? = null
     private var addBenAlertBinding: AlertNewBenBinding? = null
     private var selectedRelationIndex = -1
+    private var householdMembers: List<BenBasicDomain> = emptyList()
     private var pendingExamineBenId: Long? = null
     // Latest showExamineBottomSheet call; an older call whose ID lookup finishes late is dropped.
     private var examineRequestId = 0
@@ -95,7 +99,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
                     if (isMemberLimitReached) {
                         showMemberLimitReachedMessage()
                     } else {
-                        findNavController().navigate(
+                        findNavController().navigateSafe(
                             HouseholdMembersFragmentDirections.actionHouseholdMembersFragmentToNewBenRegFragment(
                                 hhId = hhId,
                                 relToHeadId = 4,        // "Wife" index in nbr_relationship_to_head_src
@@ -111,7 +115,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
                     if (isMemberLimitReached) {
                         showMemberLimitReachedMessage()
                     } else {
-                        findNavController().navigate(
+                        findNavController().navigateSafe(
                             HouseholdMembersFragmentDirections.actionHouseholdMembersFragmentToNewBenRegFragment(
                                 hhId = hhId,
                                 relToHeadId = 5,        // "Husband" index in nbr_relationship_to_head_src
@@ -154,6 +158,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.benList.collect { list ->
                     binding.flLoading.visibility = View.GONE
+                    householdMembers = list
                     // Hide the beneficiary whose "View Member" was tapped; counts still use the full household
                     val displayList = list.filter { it.benId != args.excludeBenId }
                     binding.flEmpty.visibility = if (displayList.isEmpty()) View.VISIBLE else View.GONE
@@ -252,7 +257,12 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
         val canAddMember = privilege.beneficiaryPermission == Permission.FULL
         binding.fabAddMember.visibility = if (canAddMember) View.VISIBLE else View.GONE
         binding.fabAddMember.setOnClickListener {
-            if (isMemberLimitReached) showMemberLimitReachedMessage() else addBenAlert?.show()
+            if (isMemberLimitReached) {
+                showMemberLimitReachedMessage()
+            } else {
+                addBenAlertBinding?.let { resetAddBenDialog(it) }
+                addBenAlert?.show()
+            }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -371,7 +381,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
     }
 
     private fun openMemberForm(hhId: Long, benId: Long, relToHeadId: Int) {
-        findNavController().navigate(
+        findNavController().navigateSafe(
             HouseholdMembersFragmentDirections.actionHouseholdMembersFragmentToNewBenRegFragment(
                 hhId = hhId,
                 relToHeadId = relToHeadId,
@@ -394,21 +404,29 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
             alertBinding.actvRth.text = null
             alertBinding.btnOk.isEnabled = false
             selectedRelationIndex = -1
-            val sourceItems = resources.getStringArray(R.array.nbr_relationship_to_head_src)
-            val items = when (selectedGender) {
-                Gender.FEMALE -> resources.getStringArray(R.array.nbr_relationship_to_head_female)
-                else -> resources.getStringArray(R.array.nbr_relationship_to_head_male)
-            }.map { item -> item to sourceItems.indexOf(item) }
-            val visibleItems = items.map { it.first }
+            val relationLabels = resources.getStringArray(R.array.nbr_relationship_to_head)
+            val visibleItems = HouseholdSpouseRelations.withoutRegisteredSpouse(
+                relations = when (selectedGender) {
+                    Gender.FEMALE -> resources.getStringArray(R.array.nbr_relationship_to_head_female).toList()
+                    else -> resources.getStringArray(R.array.nbr_relationship_to_head_male).toList()
+                },
+                wifeLabel = relationLabels.getOrNull(4),
+                husbandLabel = relationLabels.getOrNull(5),
+                wifeRegistered = householdMembers.any {
+                    HouseholdSpouseRelations.isWife(it.relToHeadId)
+                },
+                husbandRegistered = householdMembers.any {
+                    HouseholdSpouseRelations.isHusband(it.relToHeadId)
+                }
+            )
             alertBinding.actvRth.setAdapter(
                 ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, visibleItems)
             )
         }
 
-        alertBinding.actvRth.setOnItemClickListener { _, _, position, _ ->
-            val selectedGender = genderFromRadioId(alertBinding, alertBinding.rgGender.checkedRadioButtonId)
-            selectedRelationIndex = getRelationIndex(selectedGender, position)
-            alertBinding.btnOk.isEnabled = true
+        alertBinding.actvRth.setOnItemClickListener { parent, _, position, _ ->
+            selectedRelationIndex = relationIndexForLabel(parent.getItemAtPosition(position)?.toString())
+            alertBinding.btnOk.isEnabled = selectedRelationIndex >= 0
         }
 
         addBenAlert = MaterialAlertDialogBuilder(requireContext())
@@ -425,7 +443,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
                 return@setOnClickListener
             }
 
-            findNavController().navigate(
+            findNavController().navigateSafe(
                 HouseholdMembersFragmentDirections.actionHouseholdMembersFragmentToNewBenRegFragment(
                     hhId = viewModel.hhId,
                     relToHeadId = selectedRelationIndex,
@@ -436,6 +454,7 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
         }
 
         alertBinding.btnCancel.setOnClickListener {
+            resetAddBenDialog(alertBinding)
             addBenAlert?.dismiss()
         }
     }
@@ -448,15 +467,9 @@ class HouseholdMembersFragment : Fragment(), ExamineBottomSheetFragment.ExamineC
         selectedRelationIndex = -1
     }
 
-    private fun getRelationIndex(selectedGender: Gender?, position: Int): Int {
-        val sourceItems = resources.getStringArray(R.array.nbr_relationship_to_head_src)
-        val selectedItems = when (selectedGender) {
-            Gender.FEMALE -> resources.getStringArray(R.array.nbr_relationship_to_head_female)
-            Gender.MALE, Gender.TRANSGENDER, Gender.PREFER_NOT_TO_SAY ->
-                resources.getStringArray(R.array.nbr_relationship_to_head_male)
-            null -> return -1
-        }
-        return sourceItems.indexOf(selectedItems.getOrNull(position))
+    private fun relationIndexForLabel(label: String?): Int {
+        if (label.isNullOrBlank()) return -1
+        return resources.getStringArray(R.array.nbr_relationship_to_head_src).indexOf(label)
     }
 
     private fun genderFromRadioId(alertBinding: AlertNewBenBinding, checkedId: Int): Gender? =

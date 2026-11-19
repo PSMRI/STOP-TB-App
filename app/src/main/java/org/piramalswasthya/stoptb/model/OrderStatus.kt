@@ -14,7 +14,10 @@ enum class OrderStatus {
     COMPLETED,
     FAILED,
     CLOSED,
-    MANUAL_ENTRY
+    MANUAL_ENTRY,
+    /** MTB / MTB_PLUS only: an invalid machine run ("Error-2"); the machine retests the same order.
+     *  Manual entry and closing are still allowed. */
+    INVALID
 }
 
 /**

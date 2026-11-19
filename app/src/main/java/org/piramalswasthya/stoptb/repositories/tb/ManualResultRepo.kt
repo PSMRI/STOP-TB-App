@@ -91,16 +91,22 @@ class ManualResultRepo @Inject constructor(
     @ApplicationContext private val context: Context,
     private val tbLocalRepo: TbLocalRepo,
     private val diagnosticOrderRepo: DiagnosticOrderRepo,
-    private val benIdLocks: BenIdLocks
+    private val benIdLocks: BenIdLocks,
+    private val deviceIntegrationRepo: DeviceIntegrationRepo
 ) {
 
+    /**
+     * order/manualResult for one test (see [DiagnosticManualResultRequest]). [orderType] is the local
+     * test; MDR_RIF is sent as orderType MTB with mdrRifResult / reasonToCloseRif. [resultSummary] is
+     * in the server's wording; null with a [reasonForRefusal] closes the test ("Not Conducted").
+     *
+     * The server decides the order status, so the accepted response is written through
+     * [mergeOrderResult] rather than assuming COMPLETED.
+     */
     suspend fun submitManualResult(
         benId: Long,
         orderType: String,
-        // Null for the "Not Conducted" closure path — see reasonForRefusal below.
         resultSummary: String? = null,
-        // Null resultSummary + a reason here closes the order (X-Ray/TrueNat/RIF alike) instead
-        // of completing it. Sent to the backend as reasonToClose.
         reasonForRefusal: String? = null,
         isRetryAfterOrderCreation: Boolean = false
     ):NetworkResponse<String> {
@@ -108,21 +114,15 @@ class ManualResultRepo @Inject constructor(
             val ben = benDao.getBen(benId)
                 ?: return@withContext NetworkResponse.Error(context.getString(R.string.error_beneficiary_not_found))
             val targetBenId = ben.beneficiaryId
-
-            val apiOrderType = if (orderType.equals("SPUTUM_TRUENAT", ignoreCase = true)) "MTB" else orderType
-
-            val localResult = when (resultSummary) {
-                "TB Positive" -> "MTB detected"
-                "TB Negative" -> "MTB not detected"
-                "DR TB" -> "Rif Resistance Detected"
-                "Non DR TB" -> "Rif Resistance Not Detected"
-                else -> resultSummary
-            }
+            val isXray = orderType.equals("XRAY_CHEST", ignoreCase = true)
+            val isRif = orderType.equals("MDR_RIF", ignoreCase = true)
+            val apiOrderType = if (isXray) "XRAY_CHEST" else "MTB"
+            val wireResult = toServerResultWording(orderType, resultSummary)
 
             // Offline-first: never let a connectivity issue discard user-entered data — skip the
             // network attempt entirely when the hub is known-disconnected.
             if (preferenceDao.isCampModeEnabled() && !preferenceDao.isCampHubConnected()) {
-                saveManualResultPendingSync(benId, orderType, resultSummary, reasonForRefusal, localResult)
+                saveManualResultPendingSync(benId, orderType, wireResult, reasonForRefusal)
                 return@withContext NetworkResponse.Success(PENDING_SYNC)
             }
 
@@ -130,8 +130,11 @@ class ManualResultRepo @Inject constructor(
                 val request = DiagnosticManualResultRequest(
                     beneficiaryId = targetBenId,
                     orderType = apiOrderType,
-                    resultSummary = resultSummary,
-                    reasonToClose = reasonForRefusal
+                    resultSummary = if (isRif) null else wireResult,
+                    mdrRifResult = if (isRif) wireResult else null,
+                    reasonToCloseXray = if (isXray && wireResult == null) reasonForRefusal else null,
+                    reasonToCloseMTB = if (!isXray && !isRif && wireResult == null) reasonForRefusal else null,
+                    reasonToCloseRif = if (isRif && wireResult == null) reasonForRefusal else null
                 )
                 val response = tmcNetworkApiService.submitManualResult(request)
                 val statusCode = response.code()
@@ -141,31 +144,18 @@ class ManualResultRepo @Inject constructor(
                     if (responseBody.statusCode == 200) {
                         // The legacy envelope can signal an error via body statusCode even on
                         // HTTP 200 (e.g. "order already COMPLETED"), so check both.
-                        val fetchedOrderId = responseBody.data.externalOrderId.asValidOrderId()
-                        benIdLocks.withLock(benId) {
-                            val cache = buildManualResultCache(
-                                benId, orderType, resultSummary, reasonForRefusal, localResult,
-                                fetchedOrderId = fetchedOrderId, pendingSync = false
-                            )
-                            tbDao.saveTbDiagnostics(cache)
-                        }
+                        saveAcceptedManualResult(benId, orderType, wireResult, reasonForRefusal, responseBody.data)
                         return@withContext NetworkResponse.Success(context.getString(R.string.diagnostic_manual_result_success))
                     } else {
                         val errMsg = responseBody.errorMessage ?: context.getString(R.string.error_manual_result_rejected)
-                        if (!isRetryAfterOrderCreation &&
+                        // RIF has no order of its own to create: it is a test on the MTB order.
+                        if (!isRif && !isRetryAfterOrderCreation &&
                             errMsg.contains("DiagnosticOrder not found for beneficiaryId=")
                         ) {
                             if (WorkerUtils.isDiagnosticOrderPushActive(context, benId)) {
-                                // Not a connectivity problem: this device's own order push is
-                                // still in flight, so the same submit succeeds once it lands.
-                                // Queued rather than reported, and replayed by
-                                // DiagnosticResultPollWorker. That worker only runs in camp mode,
-                                // which is the whole deployment - every tablet talks to the camp
-                                // hub and sign-in is not possible without one - so there is no
-                                // mode in which this queue goes unserviced.
-                                return@withContext queueForLaterReplay(
-                                    benId, orderType, resultSummary, reasonForRefusal, localResult
-                                )
+                                // This device's order push is still in flight; queued and replayed by
+                                // DiagnosticResultPollWorker once it lands.
+                                return@withContext queueForLaterReplay(benId, orderType, wireResult, reasonForRefusal)
                             }
                             val orderResult = diagnosticOrderRepo.createOrder(benId, orderType)
                             if (orderResult is NetworkResponse.Success) {
@@ -176,9 +166,6 @@ class ManualResultRepo @Inject constructor(
                                 )
                             }
                             val orderErrMsg = (orderResult as? NetworkResponse.Error)?.message
-                            // Compared against the same localized resources diagnosticOrderRepo.createOrder() itself
-                            // returns below — a raw English literal here would stop matching as
-                            // soon as the device locale changes diagnosticOrderRepo.createOrder()'s actual message.
                             val isDefinitiveOrderFailure = orderErrMsg == context.getString(R.string.error_no_user_logged_in) ||
                                 orderErrMsg == context.getString(R.string.error_beneficiary_not_found) ||
                                 orderErrMsg == context.getString(R.string.error_beneficiary_id_invalid)
@@ -187,28 +174,79 @@ class ManualResultRepo @Inject constructor(
                                     context.getString(R.string.diagnostic_order_creation_failed, orderErrMsg)
                                 )
                             }
-                            return@withContext queueForLaterReplay(
-                                benId, orderType, resultSummary, reasonForRefusal, localResult
-                            )
+                            return@withContext queueForLaterReplay(benId, orderType, wireResult, reasonForRefusal)
                         }
-                        // A definitive rejection (e.g. already COMPLETED) won't succeed on retry —
-                        // surface it as a real error instead of queuing for offline-first retry.
+                        // A definitive rejection (e.g. already COMPLETED, or RIF on a negative MTB)
+                        // won't succeed on retry — surface it as a real error.
                         return@withContext NetworkResponse.Error(errMsg)
                     }
                 } else {
                     // Couldn't confirm anything either way — treat like an unreachable hub.
-                    return@withContext queueForLaterReplay(
-                        benId, orderType, resultSummary, reasonForRefusal, localResult
-                    )
+                    return@withContext queueForLaterReplay(benId, orderType, wireResult, reasonForRefusal)
                 }
             } catch (e: CancellationException) {
-                throw e // a stopped worker must not queue the entry and go on to the next one
+                throw e
             } catch (e: Exception) {
                 Timber.e(e, "submitManualResult failed")
-                return@withContext queueForLaterReplay(
-                    benId, orderType, resultSummary, reasonForRefusal, localResult
-                )
+                return@withContext queueForLaterReplay(benId, orderType, wireResult, reasonForRefusal)
             }
+        }
+    }
+
+    /** The server's wording for a result the form picked (it may hold an older local synonym). */
+    private fun toServerResultWording(orderType: String, resultSummary: String?): String? {
+        if (resultSummary.isNullOrBlank()) return null
+        return when {
+            orderType.equals("XRAY_CHEST", ignoreCase = true) -> ChestXrayResult.fromResultText(resultSummary)?.displayValue
+            orderType.equals("MDR_RIF", ignoreCase = true) -> RifResult.fromResultText(resultSummary)?.displayValue
+            else -> MtbResult.fromResultText(resultSummary)?.displayValue
+        } ?: resultSummary
+    }
+
+    /**
+     * Writes an accepted manual result: a `results` list response goes through [mergeOrderResult];
+     * an older server returns no result, so the entered values are written.
+     */
+    private suspend fun saveAcceptedManualResult(
+        benId: Long,
+        orderType: String,
+        wireResult: String?,
+        reasonForRefusal: String?,
+        data: OrderResultData
+    ) {
+        preferenceDao.setManualEnteredResult(benId, orderType, wireResult)
+        val fetchedOrderId = data.externalOrderId.asValidOrderId()
+        benIdLocks.withLock(benId) {
+            val cleared = tbDao.getTbDiagnosticsByBenId(benId)?.let { diag ->
+                when {
+                    orderType.equals("XRAY_CHEST", ignoreCase = true) -> diag.copy(xrayManualResultPendingSync = false)
+                    orderType.equals("MDR_RIF", ignoreCase = true) -> diag.copy(rifManualResultPendingSync = false)
+                    else -> diag.copy(trueNatManualResultPendingSync = false)
+                }
+            }
+            val cache = if (data.results != null && !data.status.isNullOrBlank()) {
+                val mergeType = if (orderType.equals("XRAY_CHEST", ignoreCase = true)) "XRAY_CHEST" else "SPUTUM_TRUENAT"
+                // The manual MTB -> TrueNat referral of an X-ray is raised by the form itself
+                // (cascadeOrdersForConfirmedResult), so the merge's trigger is not used here.
+                diagnosticOrderRepo.mergeOrderResult(cleared, benId, mergeType, data, data.status, deviceIntegrationRepo.isTruenatIntegrated(), hubCreatesOrders = true).cache
+                    .let { merged -> keepEnteredReason(merged, orderType, reasonForRefusal) }
+            } else {
+                buildManualResultCache(cleared, benId, orderType, wireResult, reasonForRefusal, fetchedOrderId, pendingSync = false)
+            }
+            tbDao.saveTbDiagnostics(cache.copy(syncState = SyncState.UNSYNCED))
+        }
+    }
+
+    /** The form's own reason fields stay as entered ("Other" + free text) when the server echoes it. */
+    private fun keepEnteredReason(merged: TBDiagnosticsCache, orderType: String, reasonForRefusal: String?): TBDiagnosticsCache {
+        if (reasonForRefusal == null) return merged
+        val (reason, other) = diagnosticOrderRepo.splitOtherReason(reasonForRefusal) ?: return merged
+        return when {
+            orderType.equals("XRAY_CHEST", ignoreCase = true) ->
+                merged.copy(reasonNotConductedChestXray = reason, reasonNotConductedChestXrayOther = other)
+            orderType.equals("MDR_RIF", ignoreCase = true) ->
+                merged.copy(reasonNotConductedRif = reason, reasonNotConductedRifOther = other)
+            else -> merged.copy(reasonNotConductedNaat = reason, reasonNotConductedNaatOther = other)
         }
     }
 
@@ -242,13 +280,9 @@ class ManualResultRepo @Inject constructor(
                     else -> emptyList()
                 }
             }
-            orderType.equals("MDR_RIF", ignoreCase = true) ->
-                if (RifResult.fromResultText(resultSummary) == RifResult.INVALID_ERROR) listOf("MDR_RIF") else emptyList()
-            else -> when (MtbResult.fromResultText(resultSummary)) {
-                MtbResult.TB_POSITIVE -> listOf("MDR_RIF")
-                MtbResult.INVALID_ERROR -> listOf("SPUTUM_TRUENAT")
-                else -> emptyList()
-            }
+            // RIF is a test on the MTB order, never an order of its own. An invalid MTB closes
+            // the order on the server; the nurse raises a new one (Create New Order).
+            else -> emptyList()
         }
     }
 
@@ -266,170 +300,130 @@ class ManualResultRepo @Inject constructor(
     private suspend fun queueForLaterReplay(
         benId: Long,
         orderType: String,
-        resultSummary: String?,
-        reasonForRefusal: String?,
-        localResult: String?
+        wireResult: String?,
+        reasonForRefusal: String?
     ): NetworkResponse<String> {
-        saveManualResultPendingSync(benId, orderType, resultSummary, reasonForRefusal, localResult)
+        saveManualResultPendingSync(benId, orderType, wireResult, reasonForRefusal)
         return NetworkResponse.Success(PENDING_SYNC)
     }
 
-    /** Writes the same fields the confirmed-by-backend path would, marked with this test
-     *  type's pending-sync flag so DiagnosticResultPollWorker's retry sweep knows to replay
-     *  the order/manualResult call later. */
+    /** Writes the entered values, marked with this test's pending-sync flag so
+     *  DiagnosticResultPollWorker's retry sweep replays the order/manualResult call later. */
     private suspend fun saveManualResultPendingSync(
-        benId: Long, orderType: String, resultSummary: String?, reasonForRefusal: String?, localResult: String?
+        benId: Long, orderType: String, wireResult: String?, reasonForRefusal: String?
     ) {
+        preferenceDao.setManualEnteredResult(benId, orderType, wireResult)
         benIdLocks.withLock(benId) {
             val cache = buildManualResultCache(
-                benId, orderType, resultSummary, reasonForRefusal, localResult,
+                tbDao.getTbDiagnosticsByBenId(benId), benId, orderType, wireResult, reasonForRefusal,
                 fetchedOrderId = null, pendingSync = true
             )
             tbDao.saveTbDiagnostics(cache)
         }
     }
 
-    private suspend fun buildManualResultCache(
+    /**
+     * The row with a manual entry written into it, for a result the server has not answered with
+     * its own view of the order (queued offline, or an older server). The status mirrors the server:
+     *  - X-ray result -> COMPLETED; MTB Negative -> COMPLETED; Invalid/Error -> CLOSED
+     *  - MTB Positive -> order stays as it was (PENDING / MANUAL_ENTRY, waiting for RIF)
+     *  - RIF result -> the whole TrueNat order COMPLETED (RIF Invalid/Error -> CLOSED)
+     *  - any "Not Conducted" reason -> CLOSED (for RIF, the MTB result is kept)
+     */
+    private fun buildManualResultCache(
+        existing: TBDiagnosticsCache?,
         benId: Long,
         orderType: String,
-        resultSummary: String?,
+        wireResult: String?,
         reasonForRefusal: String?,
-        localResult: String?,
         fetchedOrderId: String?,
         pendingSync: Boolean
     ): TBDiagnosticsCache {
-        val isXrayNotConducted = orderType.equals("XRAY_CHEST", ignoreCase = true) &&
-                resultSummary == null && reasonForRefusal != null
-        val isRifNotConducted = orderType.equals("MDR_RIF", ignoreCase = true) &&
-                resultSummary == null && reasonForRefusal != null
-        val isMtbNotConducted = !orderType.equals("XRAY_CHEST", ignoreCase = true) &&
-                !orderType.equals("MDR_RIF", ignoreCase = true) &&
-                resultSummary == null && reasonForRefusal != null
-
-        val existing = tbDao.getTbDiagnosticsByBenId(benId)
-        return (existing ?: TBDiagnosticsCache(benId = benId)).let {
-            if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
-                // A CLOSED response from order/manualResult (Not Conducted) is treated as
-                // success — see isXrayNotConducted above.
-                if (isXrayNotConducted) {
-                    val (reason, other) = keptOrSplitReason(it.reasonNotConductedChestXray, it.reasonNotConductedChestXrayOther, reasonForRefusal)
-                    it.copy(
-                        reasonNotConductedChestXray = reason,
-                        reasonNotConductedChestXrayOther = other,
-                        xrayOrderId = fetchedOrderId ?: it.xrayOrderId,
-                        xrayOrderStatus = OrderStatus.CLOSED.name,
-                        isChestXRayDone = false,
-                        chestXRayResult = null,
-                        xrayManualResultPendingSync = pendingSync,
-                        syncState = SyncState.UNSYNCED
-                    )
-                } else {
-                    it.copy(
-                        xrayOrderId = fetchedOrderId ?: it.xrayOrderId,
-                        xrayOrderStatus = OrderStatus.COMPLETED.name,
-                        isChestXRayDone = true,
-                        chestXRayResult = localResult,
-                        xrayManualResultPendingSync = pendingSync,
-                        syncState = SyncState.UNSYNCED
-                    )
+        val base = existing ?: TBDiagnosticsCache(benId = benId)
+        val notConducted = wireResult == null && reasonForRefusal != null
+        val reason = diagnosticOrderRepo.splitOtherReason(reasonForRefusal)
+        return when {
+            orderType.equals("XRAY_CHEST", ignoreCase = true) -> if (notConducted) base.copy(
+                xrayOrderId = fetchedOrderId ?: base.xrayOrderId,
+                xrayOrderStatus = OrderStatus.CLOSED.name,
+                isChestXRayDone = false,
+                chestXRayResult = null,
+                reasonNotConductedChestXray = reason?.first ?: base.reasonNotConductedChestXray,
+                reasonNotConductedChestXrayOther = reason?.second,
+                xrayManualResultPendingSync = pendingSync,
+                syncState = SyncState.UNSYNCED
+            ) else base.copy(
+                xrayOrderId = fetchedOrderId ?: base.xrayOrderId,
+                xrayOrderStatus = OrderStatus.COMPLETED.name,
+                isChestXRayDone = true,
+                chestXRayResult = wireResult,
+                xrayManualResultPendingSync = pendingSync,
+                syncState = SyncState.UNSYNCED
+            )
+            orderType.equals("MDR_RIF", ignoreCase = true) -> if (notConducted) base.copy(
+                trueNatOrderStatus = OrderStatus.CLOSED.name,
+                rifOrderId = base.trueNatOrderId ?: base.rifOrderId,
+                rifOrderStatus = OrderStatus.CLOSED.name,
+                trueNatRifResult = null,
+                isDrTbConfirmed = false,
+                reasonNotConductedRif = reason?.first ?: base.reasonNotConductedRif,
+                reasonNotConductedRifOther = reason?.second,
+                rifManualResultPendingSync = pendingSync,
+                syncState = SyncState.UNSYNCED
+            ) else {
+                val rif = RifResult.fromResultText(wireResult)
+                // A hand-entered RIF Invalid/Error closes the order on the server (MTB result kept).
+                val rifStatus = if (rif == RifResult.INVALID_ERROR) OrderStatus.CLOSED.name else OrderStatus.COMPLETED.name
+                base.copy(
+                    trueNatOrderStatus = rifStatus,
+                    rifOrderId = base.trueNatOrderId ?: base.rifOrderId,
+                    rifOrderStatus = rifStatus,
+                    trueNatRifResult = wireResult,
+                    isDrTbConfirmed = rif == RifResult.DR_TB,
+                    reasonNotConductedRif = null,
+                    reasonNotConductedRifOther = null,
+                    rifManualResultPendingSync = pendingSync,
+                    syncState = SyncState.UNSYNCED
+                )
+            }
+            notConducted -> base.copy(
+                trueNatOrderId = fetchedOrderId ?: base.trueNatOrderId,
+                trueNatOrderStatus = OrderStatus.CLOSED.name,
+                isNaatConducted = false,
+                naatResult = null,
+                reasonNotConductedNaat = reason?.first ?: base.reasonNotConductedNaat,
+                reasonNotConductedNaatOther = reason?.second,
+                trueNatManualResultPendingSync = pendingSync,
+                syncState = SyncState.UNSYNCED
+            )
+            else -> {
+                val mtb = MtbResult.fromResultText(wireResult)
+                val orderStatus = when (mtb) {
+                    MtbResult.TB_POSITIVE -> base.trueNatOrderStatus?.takeIf {
+                        it == OrderStatus.MANUAL_ENTRY.name || it == OrderStatus.PENDING.name
+                    } ?: OrderStatus.PENDING.name
+                    MtbResult.INVALID_ERROR -> OrderStatus.CLOSED.name
+                    else -> OrderStatus.COMPLETED.name
                 }
-            } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
-                // RIF's own "Not Conducted" closure — a CLOSED response from order/manualResult
-                // is treated as success, mirroring Chest X-Ray's isXrayNotConducted handling
-                // above.
-                if (isRifNotConducted) {
-                    val (reason, other) = keptOrSplitReason(it.reasonNotConductedRif, it.reasonNotConductedRifOther, reasonForRefusal)
-                    it.copy(
-                        reasonNotConductedRif = reason,
-                        reasonNotConductedRifOther = other,
-                        rifOrderId = fetchedOrderId ?: it.rifOrderId,
-                        rifOrderStatus = OrderStatus.CLOSED.name,
-                        trueNatRifResult = null,
-                        rifManualResultPendingSync = pendingSync,
-                        syncState = SyncState.UNSYNCED
-                    )
-                } else {
-                    val standardizedRif = RifResult.fromResultText(resultSummary)
-                    it.copy(
-                        rifOrderId = fetchedOrderId ?: it.rifOrderId,
-                        rifOrderStatus = OrderStatus.COMPLETED.name,
-                        // Invalid/Error triggers a reorder, after which this text must not
-                        // outlive it locally - but only once the backend has accepted the entry.
-                        // While it is queued the text is the only thing the replay can send.
-                        // Indeterminate is terminal, keep it.
-                        trueNatRifResult = manualResultTextToStore(
-                            localResult, standardizedRif == RifResult.INVALID_ERROR, pendingSync
-                        ),
-                        // RIF DR TB / Non DR TB manual entry — extend the same
-                        // isConfirmed/isTBConfirmed flags the automated path sets;
-                        // isDrTbConfirmed distinguishes the DR-TB-specific outcome.
-                        isDrTbConfirmed = if (standardizedRif == RifResult.DR_TB) true else it.isDrTbConfirmed,
-                        isConfirmed = if (standardizedRif == RifResult.DR_TB || standardizedRif == RifResult.NON_DR_TB)
-                            true else it.isConfirmed,
-                        isTBConfirmed = if (standardizedRif == RifResult.DR_TB || standardizedRif == RifResult.NON_DR_TB)
-                            true else it.isTBConfirmed,
-                        rifManualResultPendingSync = pendingSync,
-                        syncState = SyncState.UNSYNCED
-                    )
-                }
-            } else {
-                // TrueNat/MTB's own "Not Conducted" closure — same convention as above.
-                if (isMtbNotConducted) {
-                    val (reason, other) = keptOrSplitReason(it.reasonNotConductedNaat, it.reasonNotConductedNaatOther, reasonForRefusal)
-                    it.copy(
-                        reasonNotConductedNaat = reason,
-                        reasonNotConductedNaatOther = other,
-                        trueNatOrderId = fetchedOrderId ?: it.trueNatOrderId,
-                        trueNatOrderStatus = OrderStatus.CLOSED.name,
-                        isNaatConducted = false,
-                        naatResult = null,
-                        trueNatManualResultPendingSync = pendingSync,
-                        syncState = SyncState.UNSYNCED
-                    )
-                } else {
-                    val standardizedMtb = MtbResult.fromResultText(resultSummary)
-                    it.copy(
-                        trueNatOrderId = fetchedOrderId ?: it.trueNatOrderId,
-                        trueNatOrderStatus = OrderStatus.COMPLETED.name,
-                        isReferredForSputum = true,
-                        isNaatConducted = true,
-                        // See the RIF branch above: kept while the entry is still queued for
-                        // replay, dropped once the backend accepts and the reorder is raised.
-                        naatResult = manualResultTextToStore(
-                            localResult, standardizedMtb == MtbResult.INVALID_ERROR, pendingSync
-                        ),
-                        isTBConfirmed = when (standardizedMtb) {
-                            MtbResult.TB_POSITIVE -> true
-                            MtbResult.TB_NEGATIVE -> false
-                            else -> it.isTBConfirmed
-                        },
-                        isConfirmed = when (standardizedMtb) {
-                            MtbResult.TB_POSITIVE -> true
-                            MtbResult.TB_NEGATIVE -> false
-                            else -> it.isConfirmed
-                        },
-                        trueNatManualResultPendingSync = pendingSync,
-                        syncState = SyncState.UNSYNCED
-                    )
-                }
+                val orderId = fetchedOrderId ?: base.trueNatOrderId
+                base.copy(
+                    trueNatOrderId = orderId,
+                    trueNatOrderStatus = orderStatus,
+                    isReferredForSputum = true,
+                    isNaatConducted = true,
+                    naatResult = wireResult,
+                    isTBConfirmed = if (mtb != null) mtb == MtbResult.TB_POSITIVE else base.isTBConfirmed,
+                    isConfirmed = if (mtb != null) mtb == MtbResult.TB_POSITIVE else base.isConfirmed,
+                    // MTB Positive opens the RIF test on this same order.
+                    rifOrderId = if (mtb == MtbResult.TB_POSITIVE) orderId else null,
+                    rifOrderStatus = if (mtb == MtbResult.TB_POSITIVE) orderStatus else null,
+                    trueNatRifResult = null,
+                    isDrTbConfirmed = false,
+                    trueNatManualResultPendingSync = pendingSync,
+                    syncState = SyncState.UNSYNCED
+                )
             }
         }
-    }
-
-    /**
-     * The not-conducted reason to store with a queued closure: the row's own (the form saves it
-     * right after this) when it has one, else [sent] split back into the form's two fields, so
-     * the replay still has it if the app stops before the form's save.
-     */
-    private fun keptOrSplitReason(current: String?, currentOther: String?, sent: String?): Pair<String?, String?> {
-        if (!current.isNullOrBlank() || sent.isNullOrBlank()) return current to currentOther
-        val otherPrefix = "Other: "
-        return if (sent.startsWith(otherPrefix)) "Other" to sent.removePrefix(otherPrefix) else sent to null
-    }
-
-    private fun formatNotConductedReason(reason: String?, other: String?): String? {
-        if (reason.isNullOrBlank()) return null
-        return if (reason.equals("Other", ignoreCase = true) && !other.isNullOrBlank()) "Other: $other" else reason
     }
 
     /**

@@ -23,8 +23,8 @@ import org.piramalswasthya.stoptb.model.LocationEntity
 import org.piramalswasthya.stoptb.model.LocationRecord
 
 /**
- * PR 5: each dashboard section's single breakdown query must give exactly the six numbers the
- * six separate COUNT queries gave (total, male, female, children, others, senior), for several
+ * PR 5: each dashboard section's single breakdown query must give exactly the numbers the
+ * separate COUNT queries gave (total, male, female, children, others, senior, pregnant), for several
  * filter combinations, on data that exercises every section's conditions.
  */
 @RunWith(AndroidJUnit4::class)
@@ -38,32 +38,43 @@ class DashboardBreakdownEquivalenceTest {
         val name: String,
         val hasSenior: Boolean,
         val old: (gender: String, isChild: Int, isSenior: Int) -> Flow<Int>,
-        val new: () -> Flow<DashboardBreakdownCounts>
+        val new: () -> Flow<DashboardBreakdownCounts>,
+        /** The section's pregnant-women COUNT, where the dashboard shows one. */
+        val oldPregnant: (() -> Flow<Int>)? = null
     )
 
     private fun sections(ids: List<Int>, village: String, start: Long, end: Long) = listOf(
         Section("TbScreening", true, { g, c, s -> tbDao.getDashboardTbScreeningCount(ids, village, start, end, g, c, s) },
-            { tbDao.getDashboardTbScreeningBreakdown(ids, village, start, end) }),
+            { tbDao.getDashboardTbScreeningBreakdown(ids, village, start, end) },
+            { tbDao.getDashboardTbScreeningCount(ids, village, start, end, "FEMALE", 0, 0, 1) }),
         Section("PresumptiveTb", false, { g, c, _ -> tbDao.getDashboardPresumptiveTbCount(ids, village, start, end, g, c) },
-            { tbDao.getDashboardPresumptiveTbBreakdown(ids, village, start, end) }),
+            { tbDao.getDashboardPresumptiveTbBreakdown(ids, village, start, end) },
+            { tbDao.getDashboardPresumptiveTbCount(ids, village, start, end, "FEMALE", 0, 1) }),
         Section("PastHistoryTb", true, { g, c, s -> tbDao.getDashboardPastHistoryTbCount(ids, village, start, end, g, c, s) },
-            { tbDao.getDashboardPastHistoryTbBreakdown(ids, village, start, end) }),
+            { tbDao.getDashboardPastHistoryTbBreakdown(ids, village, start, end) },
+            { tbDao.getDashboardPastHistoryTbCount(ids, village, start, end, "FEMALE", 0, 0, 1) }),
         Section("AntiTbDrugs", true, { g, c, s -> tbDao.getDashboardAntiTbDrugsCount(ids, village, start, end, g, c, s) },
-            { tbDao.getDashboardAntiTbDrugsBreakdown(ids, village, start, end) }),
+            { tbDao.getDashboardAntiTbDrugsBreakdown(ids, village, start, end) },
+            { tbDao.getDashboardAntiTbDrugsCount(ids, village, start, end, "FEMALE", 0, 0, 1) }),
         Section("TbSuspected", true, { g, c, s -> tbDao.getDashboardTbSuspectedCount(ids, village, start, end, g, c, s) },
             { tbDao.getDashboardTbSuspectedBreakdown(ids, village, start, end) }),
         Section("Nikshay", true, { g, c, s -> tbDao.getDashboardNikshayCount(ids, village, start, end, g, c, s) },
-            { tbDao.getDashboardNikshayBreakdown(ids, village, start, end) }),
+            { tbDao.getDashboardNikshayBreakdown(ids, village, start, end) },
+            { tbDao.getDashboardNikshayCount(ids, village, start, end, "FEMALE", 0, 0, 1) }),
         Section("DigitalChestXRay", true, { g, c, s -> tbDao.getDashboardDigitalChestXRayCount(ids, village, start, end, g, c, s) },
             { tbDao.getDashboardDigitalChestXRayBreakdown(ids, village, start, end) }),
         Section("SputumCollection", true, { g, c, s -> tbDao.getDashboardSputumCollectionCount(ids, village, start, end, g, c, s) },
-            { tbDao.getDashboardSputumCollectionBreakdown(ids, village, start, end) }),
+            { tbDao.getDashboardSputumCollectionBreakdown(ids, village, start, end) },
+            { tbDao.getDashboardSputumCollectionCount(ids, village, start, end, "FEMALE", 0, 0, 1) }),
         Section("TrueNat", true, { g, c, s -> tbDao.getDashboardTrueNatCount(ids, village, start, end, g, c, s) },
-            { tbDao.getDashboardTrueNatBreakdown(ids, village, start, end) }),
+            { tbDao.getDashboardTrueNatBreakdown(ids, village, start, end) },
+            { tbDao.getDashboardTrueNatCount(ids, village, start, end, "FEMALE", 0, 0, 1) }),
         Section("LiquidCulture", true, { g, c, s -> tbDao.getDashboardLiquidCultureCount(ids, village, start, end, g, c, s) },
-            { tbDao.getDashboardLiquidCultureBreakdown(ids, village, start, end) }),
+            { tbDao.getDashboardLiquidCultureBreakdown(ids, village, start, end) },
+            { tbDao.getDashboardLiquidCultureCount(ids, village, start, end, "FEMALE", 0, 0, 1) }),
         Section("HwcReferral", true, { g, c, s -> tbDao.getDashboardHwcReferralCount(ids, village, start, end, g, c, s) },
-            { tbDao.getDashboardHwcReferralBreakdown(ids, village, start, end) }),
+            { tbDao.getDashboardHwcReferralBreakdown(ids, village, start, end) },
+            { tbDao.getDashboardHwcReferralCount(ids, village, start, end, "FEMALE", 0, 0, 1) }),
         Section("Unscreened", false, { g, c, _ -> tbDao.getDashboardUnscreenedCount(ids, village, start, end, g, c) },
             { tbDao.getDashboardUnscreenedBreakdown(ids, village, start, end) }),
     )
@@ -80,7 +91,7 @@ class DashboardBreakdownEquivalenceTest {
     fun closeDb() = db.close()
 
     @Test
-    fun everySectionMatchesItsSixCountQueries() = runBlocking {
+    fun everySectionMatchesItsCountQueries() = runBlocking {
         val filters = listOf(
             listOf(101, 102, 103) to ("" to (0L to 0L)),
             listOf(101, 102, 103) to ("" to (BASE + 50_000L to BASE + 250_000L)),
@@ -88,6 +99,7 @@ class DashboardBreakdownEquivalenceTest {
             listOf(103, 103) to ("" to (0L to 0L)),
         )
         var nonZeroSections = 0
+        var pregnantSections = 0
         for ((ids, rest) in filters) {
             val (village, range) = rest
             for (section in sections(ids, village, range.first, range.second)) {
@@ -97,12 +109,15 @@ class DashboardBreakdownEquivalenceTest {
                     female = section.old("FEMALE", 0, 0).first(),
                     children = section.old("", 1, 0).first(),
                     others = section.old("OTHERS", 0, 0).first(),
-                    seniorCitizen = if (section.hasSenior) section.old("", 0, 1).first() else 0
+                    seniorCitizen = if (section.hasSenior) section.old("", 0, 1).first() else 0,
+                    pregnant = section.oldPregnant?.invoke()?.first() ?: 0
                 )
                 assertEquals("${section.name} ids=$ids village='$village' range=$range", expected, section.new().first())
                 if (expected.total > 0) nonZeroSections++
+                if (expected.pregnant > 0) pregnantSections++
             }
         }
+        assertTrue("seed data should give pregnant counts, got $pregnantSections", pregnantSections >= 5)
         assertTrue("seed data should give most sections non-zero counts, got $nonZeroSections", nonZeroSections >= 25)
     }
 
@@ -189,6 +204,10 @@ class DashboardBreakdownEquivalenceTest {
                    ${b(2)}, ${r(2)}, ${b(3)}, ${r(3)}, ${if (index % 3 == 0) "'COMPLETED'" else "'PENDING'"},
                    ${if (index % 2 == 0) "'COMPLETED'" else "NULL"})"""
             )
+            // Pregnant (reproductive status 1) on some women; the beneficiary's Nikshay ID as the
+            // app copies it from TB_SUSPECTED.
+            if (index % 5 == 1 && index % 2 == 0) sql.execSQL("UPDATE BENEFICIARY SET gen_reproductiveStatusId = 1 WHERE beneficiaryId = $benId")
+            if (index % 6 == 0) sql.execSQL("UPDATE BENEFICIARY SET nikshayId = 'NK$index' WHERE beneficiaryId = $benId")
             if (index % 11 == 0) sql.execSQL(
                 """INSERT INTO TB_CONFIRMED_TREATMENT (benId, treatmentStartDate, reasonForDeath, syncState, createdAt, updatedAt)
                    VALUES ($benId, $visit, '', 2, $visit, $visit)"""

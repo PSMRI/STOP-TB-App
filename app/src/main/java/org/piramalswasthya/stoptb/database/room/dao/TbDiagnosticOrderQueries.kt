@@ -64,7 +64,8 @@ interface TbDiagnosticOrderQueries {
     suspend fun getBenIdsWithRifOrderId(benIds: List<Long>): List<Long>
 
     /**
-     * Rows with at least one PENDING order. The result poll only acts on these, so it no longer
+     * Rows with at least one PENDING order, or an INVALID TrueNat run (polled without the feed
+     * while the machine retests). The result poll only acts on these, so it no longer
      * loads every TB_DIAGNOSTICS row each cycle. NOCASE matches the callers'
      * equals(ignoreCase = true) for the ASCII status values.
      */
@@ -72,6 +73,7 @@ interface TbDiagnosticOrderQueries {
         """SELECT * FROM TB_DIAGNOSTICS
         WHERE xrayOrderStatus = 'PENDING' COLLATE NOCASE
            OR trueNatOrderStatus = 'PENDING' COLLATE NOCASE
+           OR trueNatOrderStatus = 'INVALID' COLLATE NOCASE
            OR rifOrderStatus = 'PENDING' COLLATE NOCASE"""
     )
     suspend fun getDiagnosticsWithPendingOrder(): List<TBDiagnosticsCache>

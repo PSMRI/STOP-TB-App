@@ -55,6 +55,7 @@
 
     <string name="counselling_data_load_error">We\'re unable to fetch data.\nPlease try again later.</string>
     <string name="counselling_select_all">Select All</string>
+    <string name="counselling_sections_completed">%1$d of %2$d sections completed</string>
 
     <!-- Home cards for the four independent Counsellor modules (module separation) -->
     <string name="icon_title_counselling_module">Counselling</string>
@@ -65,5 +66,12 @@
     <string name="home_card_tb_followup_module_subtitle">Monthly treatment follow-up</string>
     <string name="icon_title_tpt_module">TPT</string>
     <string name="home_card_tpt_module_subtitle">TB Preventive Treatment follow-up</string>
+
+    <!-- Vulnerable Population / TPT-Eligible Groups list (STOP-771) -->
+    <string name="icon_title_vulnerable_population">Vulnerable Population</string>
+    <string name="home_card_vulnerable_population_subtitle">TPT-eligible groups</string>
+    <string name="vulnerability_conditions">Vulnerability conditions</string>
+    <string name="vulnerability_conditions_selected">Vulnerability conditions: %1$s</string>
+    <string name="vulnerability_tribal">Tribal (NPVTG / PVTG)</string>
 
 </resources>

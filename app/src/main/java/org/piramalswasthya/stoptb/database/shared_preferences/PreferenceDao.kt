@@ -23,6 +23,7 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
     private companion object {
         private const val LAST_RESULT_CHECK_TIME = "last_result_check_time"
         private const val LEGACY_LAST_CHECKED_PRUNED = "legacy_last_checked_time_pruned"
+        const val REAUTHENTICATION_REQUIRED = "reauthentication_required"
         const val CHANGES_FEED_TOKEN = "changes_feed_token"
         const val COUNSELLING_SCHEMA_STORE_FORMAT_KEY = "counselling_schema_store_format"
         const val CHANGES_FEED_SCOPE = "changes_feed_scope"
@@ -138,6 +139,24 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         }
     }
 
+    fun isReauthenticationRequired(): Boolean =
+        pref.getBoolean(REAUTHENTICATION_REQUIRED, false)
+
+    fun setReauthenticationRequired(required: Boolean) {
+        pref.edit().putBoolean(REAUTHENTICATION_REQUIRED, required).commit()
+    }
+
+    /** End the expired session without deleting the current user's unsynced records or cursors. */
+    fun clearAuthenticationForReauthentication() {
+        pref.edit()
+            .remove(context.getString(R.string.PREF_primary_API_KEY))
+            .remove(context.getString(R.string.PREF_primary_JWT_API_KEY))
+            .remove(context.getString(R.string.PREF_primary_REFRESH_TOKEN))
+            .remove(context.getString(R.string.PREF_rem_me_pwd))
+            .putBoolean(REAUTHENTICATION_REQUIRED, true)
+            .commit()
+    }
+
     fun deleteLoginCred() {
         val editor = pref.edit()
         val prefUserKey = context.getString(R.string.PREF_rem_me_uname)
@@ -190,6 +209,9 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         // Village changed — reset sync page counter so pull starts from page 0 for new village
         if (oldVillageId != null && oldVillageId != newVillageId) {
             editor.putInt(context.getString(R.string.PREF_first_pull_amrit_last_synced_page), 0)
+            // The missing-data resume page belongs to the old village too; a pull interrupted
+            // there must not make the new village's pull skip its first pages.
+            editor.putInt(context.getString(R.string.PREF_first_pull_missing_data_last_synced_page), 0)
             editor.putLong(context.getString(R.string.PREF_full_load_pull_progress), Konstants.defaultTimeStamp)
         }
         editor.apply()
@@ -347,6 +369,18 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
 
     fun getFirstSyncLastSyncedPage(): Int {
         val prefKey = context.getString(R.string.PREF_first_pull_amrit_last_synced_page)
+        return pref.getInt(prefKey, 0)
+    }
+
+    fun setFirstSyncMissingDataLastSyncedPage(page: Int) {
+        val editor = pref.edit()
+        val prefKey = context.getString(R.string.PREF_first_pull_missing_data_last_synced_page)
+        editor.putInt(prefKey, page)
+        editor.apply()
+    }
+
+    fun getFirstSyncMissingDataLastSyncedPage(): Int {
+        val prefKey = context.getString(R.string.PREF_first_pull_missing_data_last_synced_page)
         return pref.getInt(prefKey, 0)
     }
 
@@ -568,6 +602,18 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         val editor = pref.edit()
         pref.all.keys.filter { key -> key.startsWith("last_checked_time_") }.forEach { key -> editor.remove(key) }
         editor.putBoolean(LEGACY_LAST_CHECKED_PRUNED, true).apply()
+    }
+
+    /**
+     * The result the user entered by hand for a test (XRAY_CHEST / SPUTUM_TRUENAT / MDR_RIF), in the
+     * server's wording; a different server result later shows "Updated by device". Null if none.
+     */
+    fun getManualEnteredResult(benId: Long, orderType: String): String? =
+        pref.getString("manual_entered_result_${benId}_${orderType}", null)
+
+    fun setManualEnteredResult(benId: Long, orderType: String, result: String?) {
+        val key = "manual_entered_result_${benId}_${orderType}"
+        pref.edit().apply { if (result == null) remove(key) else putString(key, result) }.apply()
     }
 
     fun getRifNotConductedReason(benId: Long): String? {

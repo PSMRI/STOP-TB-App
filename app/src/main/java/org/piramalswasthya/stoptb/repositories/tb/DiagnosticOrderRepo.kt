@@ -46,6 +46,7 @@ import org.piramalswasthya.stoptb.model.MtbResult
 import org.piramalswasthya.stoptb.model.OpdDrugMasters
 import org.piramalswasthya.stoptb.model.OpdMedicineDraft
 import org.piramalswasthya.stoptb.model.OrderResultData
+import org.piramalswasthya.stoptb.model.PerTestResults
 import org.piramalswasthya.stoptb.model.OrderStatus
 import org.piramalswasthya.stoptb.model.RifResult
 import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
@@ -95,69 +96,6 @@ class DiagnosticOrderRepo @Inject constructor(
     private val deviceIntegrationRepo: DeviceIntegrationRepo,
     private val benIdLocks: BenIdLocks
 ) {
-    companion object {
-        // How TBSuspectedQuickViewModel joins an "Other" choice and its text into reasonToClose.
-        private const val OTHER_REASON = "Other"
-        private const val OTHER_REASON_PREFIX = "Other: "
-
-        // English values of R.array.tb_reason_not_conducted_naat (the stored form). A TrueNat
-        // closure reason outside this list came from the sputum-denial question.
-        private val NAAT_NOT_CONDUCTED_REASONS = setOf(
-            "Machine unavailable", "Cartridge unavailable", "Sample rejected", "Patient refused",
-            "Connectivity issue", "Technical issue", "Patient absent", "Excessive waiting time", OTHER_REASON
-        )
-
-        /**
-         * How many "completed" beneficiaries one sweep of [fetchBeneficiariesByStatus] fans out
-         * at a time. Sized to keep OkHttp's 5 per-host slots saturated with a little slack for
-         * the Room reads each one does first, without holding thousands of coroutines alive.
-         */
-        const val completedFetchChunkSize = 16
-
-        /**
-         * Chunk size for `IN (:ids)` reads. SQLite's default host-parameter ceiling is 999, so
-         * this stays clear of it while still collapsing a whole bucket into a handful of reads.
-         */
-        const val sqliteInClauseChunkSize = 900
-
-        /**
-         * How many missing order ids one sweep of [fetchBeneficiariesByStatus] backfills.
-         *
-         * Each backfill is a network round trip plus a TB_DIAGNOSTICS write, and every one of
-         * those writes invalidates the Paging source and the diagnostics flow of whichever
-         * screen triggered the sweep. Unbounded, a single open of the X-ray list fired 552
-         * result fetches and the list never settled - it was re-created five times in 28 s.
-         * The backlog drains across sweeps instead.
-         */
-        const val orderIdBackfillPerSweep = 50
-
-        /**
-         * Per orderType, the chunk index the previous backfill pass stopped at, so the next
-         * sweep resumes there rather than re-scanning the same already-filled prefix.
-         */
-        val backfillChunkCursor = java.util.concurrent.ConcurrentHashMap<String, Int>()
-
-        /**
-         * Per orderType, a content signature of the awaiting bucket for which a complete pass
-         * found nothing left to backfill. While the bucket is unchanged the scan is skipped.
-         *
-         * Keyed on content, not size: one beneficiary entering the bucket as another leaves
-         * keeps the size identical, and a size-keyed marker would hide the newcomer's missing
-         * order id for as long as the count happened to hold steady.
-         */
-        val backfillConvergedForBucket =
-        java.util.concurrent.ConcurrentHashMap<String, Int>()
-
-        /**
-         * Clears the backfill cursor and converged markers. Both live here, so without this
-         * they would survive a logout and be applied to the next user's village.
-         */
-        fun resetOrderIdBackfillState() {
-        backfillChunkCursor.clear()
-        backfillConvergedForBucket.clear()
-        }
-    }
-
     internal val orderCreatedTimestamps = java.util.concurrent.ConcurrentHashMap<String, Long>()
     internal val ORDER_STATUS_GRACE_PERIOD_MS = 90_000L
     // Orders whose feed row was skipped inside the grace period are kept in PreferenceDao
@@ -182,6 +120,8 @@ class DiagnosticOrderRepo @Inject constructor(
                     status.equals("EXPIRED", ignoreCase = true) ||
                     status.equals("REFUSED", ignoreCase = true) -> OrderStatus.CLOSED.name
             status.equals(OrderStatus.MANUAL_ENTRY.name, ignoreCase = true) -> OrderStatus.MANUAL_ENTRY.name
+            // An invalid MTB / RIF machine run; the machine retests the same order.
+            status.equals(OrderStatus.INVALID.name, ignoreCase = true) -> OrderStatus.INVALID.name
             else -> OrderStatus.PENDING.name // PENDING, IN_PROGRESS, or anything unrecognized
         }
     }
@@ -192,6 +132,11 @@ class DiagnosticOrderRepo @Inject constructor(
         reasonForRefusal: String? = null
     ): NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
+            // RIF is a test on the MTB order; the server has no MDR_RIF order to create.
+            if (testType.equals("MDR_RIF", ignoreCase = true)) {
+                Timber.e("createOrder called for MDR_RIF benId=$benId; RIF is part of the MTB order, nothing pushed")
+                return@withContext NetworkResponse.Error(context.getString(R.string.error_rif_part_of_mtb_order))
+            }
             val user = preferenceDao.getLoggedInUser()
                 ?: return@withContext NetworkResponse.Error(context.getString(R.string.error_no_user_logged_in))
             val ben = benDao.getBen(benId)
@@ -223,7 +168,8 @@ class DiagnosticOrderRepo @Inject constructor(
                     providerServiceMapID = user.serviceMapId,
                     orderType = apiOrderType,
                     orderEvent = "STOP_TB_REFERRAL",
-                    reasonToClose = reasonForRefusal,
+                    reasonToCloseXray = reasonForRefusal?.takeIf { apiOrderType == "XRAY_CHEST" },
+                    reasonToCloseMTB = reasonForRefusal?.takeIf { apiOrderType == "MTB" },
                     patient = patientReq
                 )
                 val response = tmcNetworkApiService.pushDiagnosticOrder(request)
@@ -236,34 +182,32 @@ class DiagnosticOrderRepo @Inject constructor(
                             val orderId = responseData.providerOrderId.asValidOrderId()
                                 ?: responseData.externalOrderId.asValidOrderId()
                             val status = responseData.status
-                            
+                            // A declined referral is pushed with its reason and the server closes
+                            // the order: it is stored CLOSED and not done, not as a pending test
+                            // (the form save takes these fields from this row).
+                            val refused = !reasonForRefusal.isNullOrBlank()
+                            val storedStatus = when {
+                                status.equals(OrderStatus.FAILED.name, ignoreCase = true) -> OrderStatus.FAILED.name
+                                refused || status.equals(OrderStatus.CLOSED.name, ignoreCase = true) -> OrderStatus.CLOSED.name
+                                else -> OrderStatus.PENDING.name
+                            }
+
                             val cache = benIdLocks.withLock(benId) {
                             val existing = tbDao.getTbDiagnosticsByBenId(benId)
                             val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
                                 if (testType.equals("XRAY_CHEST", ignoreCase = true)) {
                                     it.copy(
                                         xrayOrderId = orderId,
-                                        xrayOrderStatus = if (status.equals(OrderStatus.FAILED.name, ignoreCase = true))
-                                            OrderStatus.FAILED.name else OrderStatus.PENDING.name,
-                                        isChestXRayDone = true,
-                                        isReferredForDigitalChestXray = true,
+                                        xrayOrderStatus = storedStatus,
+                                        isChestXRayDone = !refused,
+                                        isReferredForDigitalChestXray = !refused,
                                         chestXRayResult = null,
                                         reasonNotConductedChestXray = null,
                                         reasonNotConductedChestXrayOther = null,
+                                        // A pending result of the old order must not be replayed onto this one.
+                                        xrayManualResultPendingSync = false,
                                         syncState = SyncState.UNSYNCED,
                                         errorMsgXray = responseBody.data.errorMessage
-                                    )
-                                } else if (testType.equals("MDR_RIF", ignoreCase = true)) {
-                                    it.copy(
-                                        rifOrderId = orderId,
-                                        rifOrderStatus = if (status.equals(OrderStatus.FAILED.name, ignoreCase = true))
-                                            OrderStatus.FAILED.name else OrderStatus.PENDING.name,
-                                        trueNatRifResult = null,
-                                        isDrTbConfirmed = null,
-                                        reasonNotConductedRif = null,
-                                        reasonNotConductedRifOther = null,
-                                        syncState = SyncState.UNSYNCED,
-                                        errorMsgRif = responseBody.data.errorMessage
                                     )
                                 } else {
                                     // A fresh MTB order invalidates any RIF order/result tied to
@@ -271,17 +215,27 @@ class DiagnosticOrderRepo @Inject constructor(
                                     // of an MTB-positive result) — reset it here too.
                                     it.copy(
                                         trueNatOrderId = orderId,
-                                        trueNatOrderStatus = if (status.equals(OrderStatus.FAILED.name, ignoreCase = true))
-                                            OrderStatus.FAILED.name else OrderStatus.PENDING.name,
+                                        trueNatOrderStatus = storedStatus,
                                         naatResult = null,
                                         trueNatRifResult = null,
-                                        isReferredForSputum = true,
-                                        isNaatConducted = true,
+                                        isReferredForSputum = !refused,
+                                        isNaatConducted = !refused,
                                         reasonNotConductedNaat = null,
                                         reasonNotConductedNaatOther = null,
                                         rifOrderId = null,
                                         rifOrderStatus = null,
+                                        // The previous order's "RIF not conducted" would otherwise
+                                        // show on the new order and keep its RIF entry shut.
+                                        reasonNotConductedRif = null,
+                                        reasonNotConductedRifOther = null,
+                                        // A pending result of the old order must not be replayed onto this one.
+                                        trueNatManualResultPendingSync = false,
+                                        rifManualResultPendingSync = false,
                                         isDrTbConfirmed = null,
+                                        // A new order is a new test: not TB confirmed until its
+                                        // MTB result arrives, unless liquid culture is positive.
+                                        isTBConfirmed = isLiquidCulturePositive(it.liquidCultureResult),
+                                        isConfirmed = isLiquidCulturePositive(it.liquidCultureResult),
                                         sputumSubmittedAt = it.sputumSubmittedAt ?: "TB Screening Camp",
                                         syncState = SyncState.UNSYNCED,
                                         errorMsgTrueNat = responseBody.data.errorMessage
@@ -290,12 +244,15 @@ class DiagnosticOrderRepo @Inject constructor(
                             }
                             tbDao.saveTbDiagnostics(cache)
                             orderCreatedTimestamps["${benId}_${testType}"] = System.currentTimeMillis()
+                            // A new order starts clean: a hand-entered result of the old one is
+                            // no reference for "Updated by device".
+                            preferenceDao.setManualEnteredResult(benId, testType, null)
+                            if (!testType.equals("XRAY_CHEST", ignoreCase = true)) {
+                                preferenceDao.setManualEnteredResult(benId, "MDR_RIF", null)
+                            }
                             cache
                             }
-                            syncTBSuspectedFromDiagnostics(
-                                benId, cache,
-                                reasonForRefusalMDRRIF = if (testType.equals("MDR_RIF", ignoreCase = true)) reasonForRefusal else null
-                            )
+                            syncTBSuspectedFromDiagnostics(benId, cache)
                             try {
                                 tbPushRepo.pushUnSyncedRecordsTBSuspected()
                             } catch (e: Exception) {
@@ -459,6 +416,10 @@ class DiagnosticOrderRepo @Inject constructor(
         }
 
         val naatResLocal = diag.naatResult
+        // The current MTB order has no MTB result (waiting, INVALID, CLOSED or FAILED). A new order is a
+        // new test: earlier MTB / RIF results no longer apply and the beneficiary is not TB confirmed
+        // until its result arrives (a positive liquid culture still confirms). No MTB order: keep stored.
+        val mtbOrderHasNoResult = naatResLocal.isNullOrBlank() && diag.trueNatOrderId.asValidOrderId() != null
         val mappedSputumTestResult = when {
             !naatResLocal.isNullOrBlank() -> {
                 val clean = naatResLocal.trim().lowercase()
@@ -468,6 +429,7 @@ class DiagnosticOrderRepo @Inject constructor(
                     else -> null
                 }
             }
+            mtbOrderHasNoResult -> null
             else -> existing?.sputumTestResult
         }
 
@@ -493,7 +455,14 @@ class DiagnosticOrderRepo @Inject constructor(
             else -> diag.chestXRayResult ?: existing?.chestXRayResult
         }
 
+        // The server's result wins: once MTB is known and not positive, or absent
+        // (mtbOrderHasNoResult), no RIF result applies, even one TB_SUSPECTED held before.
+        val mtbKnownNotPositive = mtbOrderHasNoResult ||
+            MtbResult.fromResultText(diag.naatResult).let { it != null && it != MtbResult.TB_POSITIVE }
+        val currentOrderCarriesRif = diag.trueNatOrderId.asValidOrderId() != null &&
+            diag.rifOrderId == diag.trueNatOrderId
         val mappedMdrRifResult = when {
+            mtbKnownNotPositive -> null
             diag.rifOrderStatus.equals("COMPLETED", ignoreCase = true) && diag.trueNatRifResult != null -> {
                 when {
                     diag.trueNatRifResult.equals("Rif Resistance Detected", ignoreCase = true) ||
@@ -504,12 +473,17 @@ class DiagnosticOrderRepo @Inject constructor(
                     else -> diag.trueNatRifResult
                 }
             }
+            // Combined order: the current MTB order carries its own RIF test, so an earlier order's RIF
+            // result must not stand in for it. Legacy separate MDR_RIF orders keep the fallback.
+            currentOrderCarriesRif -> diag.trueNatRifResult
             else -> diag.trueNatRifResult ?: existing?.mdrRifResult
         }
 
-        val mappedIsDRTBConfirmed = when (mappedMdrRifResult) {
-            "DR TB" -> true
-            "Non DR TB", "Indeterminate" -> false
+        val mappedIsDRTBConfirmed = when {
+            mappedMdrRifResult == "DR TB" -> true
+            mappedMdrRifResult == "Non DR TB" || mappedMdrRifResult == "Indeterminate" -> false
+            mtbKnownNotPositive -> false
+            currentOrderCarriesRif -> false
             else -> existing?.isDRTBConfirmed
         }
 
@@ -524,15 +498,34 @@ class DiagnosticOrderRepo @Inject constructor(
             isSputumCollected = mappedIsSputumCollected,
             sputumSubmittedAt = mappedSputumSubmittedAt,
             isNaatConducted = diag.isNaatConducted ?: existing?.isNaatConducted,
-            naatResult = diag.naatResult ?: existing?.naatResult,
-            reasonForRefusalXray = diag.reasonNotConductedChestXray ?: existing?.reasonForRefusalXray,
+            naatResult = if (mtbOrderHasNoResult) null else diag.naatResult ?: existing?.naatResult,
+            // A previous X-ray order's "not conducted" reason stays only while the current X-ray
+            // order is CLOSED (as for MTB and RIF).
+            reasonForRefusalXray = diag.reasonNotConductedChestXray
+                ?: if (diag.xrayOrderId.asValidOrderId() != null &&
+                    !diag.xrayOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
+                ) null else existing?.reasonForRefusalXray,
             reasonForRefusalSputum = diag.reasonForDenialSputum ?: existing?.reasonForRefusalSputum,
-            reasonForRefusalMTB = diag.reasonNotConductedNaat ?: existing?.reasonForRefusalMTB,
-            reasonForRefusalMDRRIF = reasonForRefusalMDRRIF ?: existing?.reasonForRefusalMDRRIF,
+            // A previous order's "MTB not conducted" reason stays only while the current MTB order is CLOSED.
+            reasonForRefusalMTB = diag.reasonNotConductedNaat
+                ?: if (diag.trueNatOrderId.asValidOrderId() != null &&
+                    !diag.trueNatOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
+                ) null else existing?.reasonForRefusalMTB,
+            // The stored reason stays only while the current MTB order's RIF test is closed; a new MTB
+            // order or a RIF still to come must not inherit the previous order's reason.
+            reasonForRefusalMDRRIF = reasonForRefusalMDRRIF
+                ?: formatNotConductedReason(diag.reasonNotConductedRif, diag.reasonNotConductedRifOther)
+                ?: if (!diag.trueNatOrderId.isNullOrBlank() &&
+                    !diag.rifOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
+                ) null else existing?.reasonForRefusalMDRRIF,
             mdrRifResult = mappedMdrRifResult,
             isDRTBConfirmed = mappedIsDRTBConfirmed,
-            isTBConfirmed = mappedSputumTestResult == "TB Positive",
-            isConfirmed = mappedSputumTestResult == "TB Positive",
+            // Confirmed by an MTB Positive or a positive liquid culture, as on TB_DIAGNOSTICS
+            // (formRowOverStored / mergeTrueNatOrder).
+            isTBConfirmed = mappedSputumTestResult == "TB Positive" ||
+                isLiquidCulturePositive(diag.liquidCultureResult ?: existing?.liquidCultureResult),
+            isConfirmed = mappedSputumTestResult == "TB Positive" ||
+                isLiquidCulturePositive(diag.liquidCultureResult ?: existing?.liquidCultureResult),
             sputumTestResult = mappedSputumTestResult,
             // TB_SUSPECTED's own copy of these fields stayed null for any beneficiary referred via
             // the quick-entry screen (which only writes them onto TB_DIAGNOSTICS), even though
@@ -629,67 +622,6 @@ class DiagnosticOrderRepo @Inject constructor(
         }
     }
 
-    // Returns true when a failed order has no error message and requires reconciliation.
-    suspend fun isAwaitingReconciliation(benId: Long, orderType: String, errorMsg: String?): Boolean {
-        if (!errorMsg.isNullOrBlank()) return false
-        reconcileOrderResult(benId, orderType)
-        return true
-    }
-
-    // Rechecks the order result and updates the diagnostic record.
-    private suspend fun reconcileOrderResult(benId: Long, orderType: String) {
-        try {
-            if (tbDao.getTbDiagnosticsByBenId(benId) == null) return
-            val response = tmcNetworkApiService.fetchOrderResult(
-                benId = benId,
-                orderType = orderType
-            )
-            if (response.code() != 200) return
-
-            val responseData = response.body()?.takeIf { it.statusCode == 200 }?.data
-                ?: return
-
-            // Network call outside the lock; read-modify-write inside it on a fresh row, like every
-            // other TB_DIAGNOSTICS update here - a row read before the call could revert a write
-            // that landed during it (a result, a new order, a feed apply) and re-push the old state.
-            benIdLocks.withLock(benId) {
-            val existing = tbDao.getTbDiagnosticsByBenId(benId) ?: return@withLock
-            val cache = when {
-                orderType.equals("XRAY_CHEST", ignoreCase = true) ->
-                    existing.copy(
-                        errorMsgXray = responseData.errorMessage,
-                        syncState = SyncState.UNSYNCED
-                    )
-
-                orderType.equals("MDR_RIF", ignoreCase = true) ->
-                    existing.copy(
-                        errorMsgRif = responseData.errorMessage,
-                        syncState = SyncState.UNSYNCED
-                    )
-
-                // Callers pass the server's order type, which is MTB for TrueNat.
-                orderType.equals("SPUTUM_TRUENAT", ignoreCase = true) ||
-                        orderType.equals("MTB", ignoreCase = true) ->
-                    existing.copy(
-                        errorMsgTrueNat = responseData.errorMessage,
-                        syncState = SyncState.UNSYNCED
-                    )
-
-                else -> return@withLock
-            }
-
-            // Only write (and re-mark for push) when the error message actually changed. While
-            // the server's errorMessage stays null this ran on every status sweep, rewriting the
-            // row and re-queueing the same push each time.
-            if (cache.copy(syncState = existing.syncState) != existing) {
-                tbDao.saveTbDiagnostics(cache)
-            }
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "giveUpReconciliation failed")
-        }
-    }
-
     suspend fun markTestCompleted(benId: Long, orderType: String): NetworkResponse<String> {
         return withContext(Dispatchers.IO) {
             val ben = benDao.getBen(benId)
@@ -742,8 +674,9 @@ class DiagnosticOrderRepo @Inject constructor(
                             }
                             preferenceDao.setDiagPollStartTime(benId, orderType, System.currentTimeMillis())
                             
-                            if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
-                                // Immediately fetch order result from server for X-Ray
+                            // Without the changes feed, fetch the X-ray result now; with it, the result
+                            // arrives through the feed (no per-order calls).
+                            if (orderType.equals("XRAY_CHEST", ignoreCase = true) && !preferenceDao.isChangesFeedActive()) {
                                 fetchOrderResult(benId, orderType)
                             }
 
@@ -763,46 +696,24 @@ class DiagnosticOrderRepo @Inject constructor(
     }
 
     /**
-     * Applies one order's result to TB_DIAGNOSTICS: the result mapping per test type, the MTB
-     * positive -> RIF cascade, and the TB Suspected sync. Used by [fetchOrderResult] after its
-     * network call and by the changes feed with the order rows it delivers. Returns the server
-     * status. [rifOrderKnown] skips the RIF cascade when the caller already holds an MDR_RIF order
-     * for this beneficiary (the feed applies it from the same batch).
+     * Applies one order's result to TB_DIAGNOSTICS (through [mergeOrderResult]), syncs TB Suspected
+     * from it and returns the server status. Used by [fetchOrderResult].
      */
     internal suspend fun applyOrderResult(
         ben: BenRegCache,
         orderType: String,
         responseData: OrderResultData,
         orderIdAtStart: String?,
-        pushSuspectedAfter: Boolean,
-        rifOrderKnown: Boolean = false
+        pushSuspectedAfter: Boolean
     ): String {
         val benId = ben.beneficiaryId
         val isXrayType = orderType.equals("XRAY_CHEST", ignoreCase = true)
         val isRifType = orderType.equals("MDR_RIF", ignoreCase = true)
         val rawStatus = responseData.status
         val status = if (rawStatus.isNullOrBlank()) "IN_PROGRESS" else rawStatus
-       Timber.d("STOP-TB polling debug: fetchOrderResult benId=$benId status=$status rawStatus=$rawStatus")
 
-        val isCompleted = status.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
-
-        // MTB-positive -> RIF cascade must run to completion BEFORE this
-        // function takes its own per-benId lock below — createOrder()/
-        // fetchBeneficiariesByStatus() for the RIF cascade lock the SAME
-        // benId internally (kotlinx.coroutines Mutex is not reentrant), so
-        // holding our own lock across this call would deadlock. rifFieldOverride
-        // stays null unless this cascade actually determined a fresh RIF
-        // status/id to persist; null means "leave whatever is currently in the
-        // row untouched" in the locked commit below (never re-apply a stale
-        // pre-cascade snapshot over it).
-        val rifFieldOverride = mtbRifCascade(ben, orderType, responseData, isCompleted, rifOrderKnown)
-
-        // Final commit: re-reads the row fresh, INSIDE the per-benId lock,
-        // right before writing — this is what actually fixes the lost-update
-        // race (Gaps 1/2), since any concurrent write for a different test
-        // type on the same beneficiary (or the RIF cascade above, which
-        // already committed its own fields) is guaranteed to be visible here
-        // rather than clobbered by a stale pre-cascade snapshot.
+        // Re-reads the row inside the per-benId lock right before writing, so a concurrent write
+        // for another test type on the same beneficiary is not overwritten by a stale snapshot.
         val syncedCache = benIdLocks.withLock(benId) {
         val existing = tbDao.getTbDiagnosticsByBenId(benId)
         val currentOrderId = if (isXrayType) existing?.xrayOrderId else if (isRifType) existing?.rifOrderId else existing?.trueNatOrderId
@@ -816,7 +727,7 @@ class DiagnosticOrderRepo @Inject constructor(
             // poll cycle will fetch against the current order instead.
             return@withLock existing ?: TBDiagnosticsCache(benId = benId)
         }
-        val merged = mergeOrderResult(existing, benId, orderType, responseData, status, rifFieldOverride, deviceIntegrationRepo.isTruenatIntegrated())
+        val merged = mergeOrderResult(existing, benId, orderType, responseData, status, deviceIntegrationRepo.isTruenatIntegrated(), deviceIntegrationRepo.hubCreatesOrders())
         // Enqueued before the row is saved: WorkManager keeps the work across a restart, so the
         // referral survives the process dying right after the completed X-ray is stored.
         if (merged.triggerTrueNat) {
@@ -824,8 +735,7 @@ class DiagnosticOrderRepo @Inject constructor(
         }
         val synced = merged.cache.copy(syncState = SyncState.SYNCED)
         // Skip the write when nothing changed: every TB_DIAGNOSTICS write re-runs every live
-        // query on the table (list badges, dashboard), and the fallback poll re-applies the same
-        // unchanged result for every pending order each cycle. The feed path already does this.
+        // query on the table (list badges, dashboard).
         if (synced != existing) tbDao.saveTbDiagnostics(synced)
         synced
         }
@@ -845,103 +755,16 @@ class DiagnosticOrderRepo @Inject constructor(
         return status
     }
 
-    // MTB-positive -> RIF cascade: must run to completion BEFORE the caller
-    // takes its own per-benId lock — createOrder()/fetchBeneficiariesByStatus()
-    // for the RIF cascade lock the SAME benId internally (kotlinx.coroutines
-    // Mutex is not reentrant), so holding the lock across this call would
-    // deadlock. Returns null unless this cascade actually determined a fresh RIF
-    // status/id to persist; null means "leave whatever is currently in the row
-    // untouched" in the locked commit (never re-apply a stale pre-cascade
-    // snapshot over it).
-    private suspend fun mtbRifCascade(
-        ben: BenRegCache,
-        orderType: String,
-        responseData: OrderResultData,
-        isCompleted: Boolean,
-        rifOrderKnown: Boolean
-    ): Pair<String, String?>? {
-        val benId = ben.beneficiaryId
-        var rifFieldOverride: Pair<String, String?>? = null
-        if (!orderType.equals("XRAY_CHEST", ignoreCase = true) &&
-            !orderType.equals("MDR_RIF", ignoreCase = true)) {
-            val mtbResultForCascade = if (isCompleted) MtbResult.fromResultText(responseData.resultSummary ?: "") else null
-            val isMtbDetectedForCascade = isCompleted && mtbResultForCascade == MtbResult.TB_POSITIVE
-            if (isMtbDetectedForCascade) {
-                val precheck = tbDao.getTbDiagnosticsByBenId(benId)
-                val hasExistingRifOrder = !precheck?.rifOrderId.isNullOrBlank() ||
-                        precheck?.rifOrderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
-                        precheck?.rifOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
-                        precheck?.rifOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
-                if (!hasExistingRifOrder && !rifOrderKnown) {
-                    // MTB Positive always creates a RIF order — unchanged
-                    // cascade shape, just recast onto the new status
-                    // vocabulary below.
-                    val statusResponse = fetchBeneficiariesByStatus("MDR_RIF")
-                    var serverHasOrder = false
-                    if (statusResponse is NetworkResponse.Success) {
-                        val statusData = statusResponse.data
-                        val awaitingProviderResult = statusData?.awaitingProviderResult ?: emptyList()
-                        val completedList = statusData?.completed ?: emptyList()
-                        val regId = if (ben.benRegId > 0) ben.benRegId else ben.beneficiaryId
-                        if (awaitingProviderResult.contains(regId)) {
-                            serverHasOrder = true
-                            rifFieldOverride = OrderStatus.PENDING.name to "EXISTING-RIF-${regId}"
-                            WorkerUtils.triggerRifDiagnosticResultPollWorker(context)
-                        } else if (completedList.contains(regId)) {
-                            serverHasOrder = true
-                            rifFieldOverride = OrderStatus.COMPLETED.name to "EXISTING-RIF-${regId}"
-                        }
-                    }
-                    if (!serverHasOrder) {
-                        val maxRifRetries = 1
-                        var rifAttempt = 0
-                        var rifSuccess = false
-                        while (rifAttempt <= maxRifRetries && !rifSuccess) {
-                            try {
-                                val newOrderId = createOrder(benId, "MDR_RIF")
-                                if (newOrderId is NetworkResponse.Success) {
-                                    rifFieldOverride = OrderStatus.PENDING.name to newOrderId.data
-                                    rifSuccess = true
-                                    WorkerUtils.triggerRifDiagnosticResultPollWorker(context)
-                                } else {
-                                    rifAttempt++
-                                    if (rifAttempt <= maxRifRetries) {
-                                        kotlinx.coroutines.delay(5000L)
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                Timber.e(e, "Auto createOrder for MDR_RIF failed, attempt=${rifAttempt}")
-                                rifAttempt++
-                                if (rifAttempt <= maxRifRetries) {
-                                    kotlinx.coroutines.delay(5000L)
-                                }
-                            }
-                        }
-                        if (!rifSuccess) {
-                            rifFieldOverride = OrderStatus.FAILED.name to null
-                        }
-                    }
-                }
-            }
-        }
-
-        return rifFieldOverride
-    }
-
-    /** Whether a feed result for [orderType] would start the MTB -> RIF cascade. */
-    @androidx.annotation.VisibleForTesting
-    internal fun needsRifCascade(orderType: String, responseData: OrderResultData, rifOrderKnown: Boolean): Boolean {
-        if (rifOrderKnown) return false
-        if (orderType.equals("XRAY_CHEST", ignoreCase = true) || orderType.equals("MDR_RIF", ignoreCase = true)) return false
-        val status = responseData.status
-        if (!status.equals(OrderStatus.COMPLETED.name, ignoreCase = true)) return false
-        return MtbResult.fromResultText(responseData.resultSummary ?: "") == MtbResult.TB_POSITIVE
-    }
-
     /**
-     * The diagnostics row after applying one order result to [existing] (null = no row yet).
-     * Pure: no database or network. [triggerTrueNat] asks the caller to start the X-ray ->
-     * TrueNat referral push once the row is saved.
+     * The diagnostics row after applying one order (from the changes feed, order/result or the
+     * order/manualResult response) to [existing] (null = no row yet). Pure: no database or network.
+     *
+     * The server's result always wins: when it sent the `results` list, every result field of the
+     * test is rewritten and a missing entry clears the stored value (so a vendor TB Negative hides
+     * RIF again). Exception: a manual result still pending sync keeps its fields until the replay.
+     *
+     * [triggerTrueNat] asks the caller to push the X-ray -> TrueNat referral once the row is saved.
+     * Never when [hubCreatesOrders]: a camp hub creates that order itself from the X-ray result.
      */
     @androidx.annotation.VisibleForTesting
     internal fun mergeOrderResult(
@@ -950,206 +773,236 @@ class DiagnosticOrderRepo @Inject constructor(
         orderType: String,
         responseData: OrderResultData,
         status: String,
-        rifFieldOverride: Pair<String, String?>?,
-        truenatIntegrated: Boolean
+        truenatIntegrated: Boolean,
+        hubCreatesOrders: Boolean = false
     ): MergedOrderResult {
+        val base = existing ?: TBDiagnosticsCache(benId = benId)
         val fetchedOrderId = responseData.externalOrderId.asValidOrderId()
-        val isCompleted = status.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
-        var triggerTrueNat = false
-        val cache = (existing ?: TBDiagnosticsCache(benId = benId)).let {
-            if (orderType.equals("XRAY_CHEST", ignoreCase = true)) {
-                // Chest X-Ray order lifecycle redesign: standardized 4-way
-                // result mapping (replaces the old exact-string
-                // isChestXrayPositive/isChestXrayAbnormalNonTB checks) and
-                // the reduced 5-value status vocabulary.
-                val chestResult = responseData.resultSummary ?: ""
-                val standardizedResult = if (isCompleted) ChestXrayResult.fromResultText(chestResult) else null
+        val perTest = responseData.perTest(fallbackType = orderType)
+        return when {
+            orderType.equals("XRAY_CHEST", ignoreCase = true) ->
+                mergeXrayOrder(base, fetchedOrderId, responseData, perTest, status, truenatIntegrated, hubCreatesOrders)
+            orderType.equals("MDR_RIF", ignoreCase = true) ->
+                MergedOrderResult(mergeLegacyRifOrder(base, fetchedOrderId, responseData, perTest, status), false)
+            else -> MergedOrderResult(mergeTrueNatOrder(base, fetchedOrderId, responseData, perTest, status), false)
+        }
+    }
 
-                when {
-                    isCompleted && standardizedResult?.triggersTrueNatReferral == true -> {
-                        // TB Presumptive/Abnormal — trigger SPUTUM_TRUENAT via the
-                        // per-benId push-worker chain, not inline (an inline call
-                        // here used to race the Screening Form's own TrueNat push).
-                        // Leave trueNatOrderStatus/isReferredForSputum/isNaatConducted
-                        // untouched — writing PENDING here would make the worker's
-                        // own "does an order exist" check skip the push.
-                        val hasTruenat = !it.trueNatOrderId.isNullOrBlank() ||
-                                it.trueNatOrderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
-                                it.trueNatOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
-                                it.trueNatOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
-                        if (!hasTruenat && truenatIntegrated) triggerTrueNat = true
-                        it.copy(
-                            xrayOrderId = fetchedOrderId ?: it.xrayOrderId,
-                            xrayOrderStatus = OrderStatus.COMPLETED.name,
-                            isReferredForDigitalChestXray = true,
-                            isChestXRayDone = true,
-                            chestXRayResult = standardizedResult?.displayValue ?: chestResult,
-                            syncState = SyncState.UNSYNCED
-                        )
-                    }
-                    isCompleted && standardizedResult == ChestXrayResult.AI_INVALID -> {
-                        // Automated AI-Invalid: the backend creates the repeat
-                        // order itself and doesn't return its id in this
-                        // response. Don't call createOrder and don't mark this
-                        // Closed — leave the row as-is so the poll worker keeps
-                        // sweeping this beneficiary until a later poll surfaces
-                        // the backend-created replacement order's new
-                        // xrayOrderId/PENDING status.
-                        it
-                    }
-                    isCompleted -> {
-                        // Normal (or an unrecognized-but-completed summary) —
-                        // terminal, no cascade. Canonicalize for the same reason
-                        // as the referral branch above.
-                        it.copy(
-                            xrayOrderId = fetchedOrderId ?: it.xrayOrderId,
-                            xrayOrderStatus = OrderStatus.COMPLETED.name,
-                            isReferredForDigitalChestXray = true,
-                            isChestXRayDone = true,
-                            chestXRayResult = standardizedResult?.displayValue ?: chestResult,
-                            syncState = SyncState.UNSYNCED
-                        )
-                    }
-                    else -> {
-                        // Not completed yet — reuse the same real-contract
-                        // mapping as reducedOrderStatus() (order/result's
-                        // confirmed status values: PENDING, IN_PROGRESS,
-                        // COMPLETED, FAILED, CLOSED, MANUAL_ENTRY).
-                        val mappedStatus = reducedOrderStatus(status)
-                        it.copy(
-                            xrayOrderId = fetchedOrderId ?: it.xrayOrderId,
-                            xrayOrderStatus = mappedStatus,
-                            isReferredForDigitalChestXray = true,
-                            errorMsgXray = if (mappedStatus == OrderStatus.FAILED.name)
-                                responseData.errorMessage ?: it.errorMsgXray else it.errorMsgXray,
-                            syncState = SyncState.UNSYNCED
-                        )
-                    }
-                }
-            } else if (orderType.equals("MDR_RIF", ignoreCase = true)) {
-                // RIF order lifecycle redesign — standardized 4-way result
-                // mapping (DR TB / Non DR TB / Indeterminate / Invalid-Error)
-                // replacing the old free-text "Indeterminate" check, PLUS an
-                // intentionally INVERTED behavior from before: Indeterminate
-                // is now terminal (Completed) instead of auto-repeating the
-                // order — the auto-reorder-on-Indeterminate block that used to
-                // live here has been removed entirely. Invalid/Error is the
-                // new repeat-trigger instead (previously had no handling).
-                val serverRifResultSummary = responseData.resultSummary
-                val rifResult = serverRifResultSummary ?: ""
-                val standardizedRifResult = if (isCompleted) RifResult.fromResultText(rifResult) else null
+    private fun mergeXrayOrder(
+        base: TBDiagnosticsCache,
+        fetchedOrderId: String?,
+        data: OrderResultData,
+        perTest: PerTestResults,
+        status: String,
+        truenatIntegrated: Boolean,
+        hubCreatesOrders: Boolean
+    ): MergedOrderResult {
+        val mappedStatus = reducedOrderStatus(status)
+        val isCompleted = mappedStatus == OrderStatus.COMPLETED.name
+        val summary = perTest.xray?.resultSummary?.takeIf { it.isNotBlank() }
+        val standardized = ChestXrayResult.fromResultText(summary)
+        // Automated AI-Invalid: the server raises the repeat order itself; keep the row as it is
+        // until that order arrives.
+        if (isCompleted && standardized == ChestXrayResult.AI_INVALID) return MergedOrderResult(base, false)
 
-                when {
-                    isCompleted && standardizedRifResult == RifResult.INVALID_ERROR -> {
-                        // Automated Invalid/Error: the backend creates the
-                        // repeat order itself and doesn't return its id in
-                        // this response. Don't call createOrder and don't mark
-                        // this Closed — leave the row as-is so the poll worker
-                        // keeps sweeping this beneficiary until a later poll
-                        // surfaces the backend-created replacement order's new
-                        // rifOrderId/PENDING status. Mirrors Chest X-Ray's
-                        // automated AI-Invalid handling exactly.
-                        it
-                    }
-                    isCompleted -> {
-                        // DR TB / Non DR TB / Indeterminate — all terminal now.
-                        it.copy(
-                            rifOrderId = fetchedOrderId ?: it.rifOrderId,
-                            rifOrderStatus = OrderStatus.COMPLETED.name,
-                            trueNatRifResult = rifResult,
-                            isDrTbConfirmed = if (standardizedRifResult == RifResult.DR_TB) true else it.isDrTbConfirmed,
-                            isConfirmed = if (standardizedRifResult == RifResult.DR_TB || standardizedRifResult == RifResult.NON_DR_TB)
-                                true else it.isConfirmed,
-                            isTBConfirmed = if (standardizedRifResult == RifResult.DR_TB || standardizedRifResult == RifResult.NON_DR_TB)
-                                true else it.isTBConfirmed,
-                            syncState = SyncState.UNSYNCED
-                        )
-                    }
-                    else -> {
-                        val mappedStatus = reducedOrderStatus(status)
-                        it.copy(
-                            rifOrderId = fetchedOrderId ?: it.rifOrderId,
-                            rifOrderStatus = mappedStatus,
-                            errorMsgRif = if (mappedStatus == OrderStatus.FAILED.name)
-                                responseData.errorMessage ?: it.errorMsgRif else it.errorMsgRif,
-                            syncState = SyncState.UNSYNCED
-                        )
-                    }
-                }
-            } else {
-                val serverMtbResultSummary = responseData.resultSummary
-                val mtbResult = serverMtbResultSummary ?: ""
-                val standardizedMtbResult = if (isCompleted) MtbResult.fromResultText(mtbResult) else null
-
-                if (isCompleted && standardizedMtbResult == MtbResult.INVALID_ERROR) {
-                    // Automated Invalid/Error: same treatment as RIF's above
-                    // (and Chest X-Ray's automated AI-Invalid) — the backend
-                    // creates the repeat order itself, so don't call
-                    // createOrder and don't mark this Closed/Completed; leave
-                    // the row as-is for the poll worker to keep sweeping.
-                    it
-                } else {
-                val isMtbDetected = isCompleted && standardizedMtbResult == MtbResult.TB_POSITIVE
-                val computedTrueNatStatus = reducedOrderStatus(status)
-                val computedTrueNatOrderId = fetchedOrderId ?: it.trueNatOrderId
-
-                it.copy(
-                    trueNatOrderStatus = computedTrueNatStatus,
-                    trueNatOrderId = computedTrueNatOrderId ?: it.trueNatOrderId,
-                    isReferredForSputum = true,
-                    isNaatConducted = if (isCompleted) true else it.isNaatConducted,
-                    naatResult = if (isCompleted) (serverMtbResultSummary ?: mtbResult) else it.naatResult,
-                    isTBConfirmed = if (isCompleted) isMtbDetected else it.isTBConfirmed,
-                    isConfirmed = if (isCompleted) isMtbDetected else it.isConfirmed,
-                    // rifFieldOverride (computed above, before this lock was
-                    // taken) is non-null only when the MTB->RIF cascade
-                    // actually determined a fresh RIF status/id; otherwise
-                    // preserve whatever this freshly-read row currently holds
-                    // (e.g. a RIF result the poll worker already committed
-                    // concurrently) rather than a stale pre-cascade value.
-                    rifOrderStatus = rifFieldOverride?.first ?: it.rifOrderStatus,
-                    rifOrderId = rifFieldOverride?.second ?: it.rifOrderId,
-                    errorMsgTrueNat = if (computedTrueNatStatus == OrderStatus.FAILED.name)
-                        responseData.errorMessage ?: it.errorMsgTrueNat else it.errorMsgTrueNat,
-                    syncState = SyncState.UNSYNCED
+        val closeReason = splitOtherReason(data.reasonToCloseXray)
+        // A different order (e.g. a retest the server raised) carries none of the old one's reason.
+        val newOrder = fetchedOrderId != null && fetchedOrderId != base.xrayOrderId
+        var merged = base.copy(
+            xrayOrderId = fetchedOrderId ?: base.xrayOrderId,
+            reasonNotConductedChestXray = if (newOrder) null else base.reasonNotConductedChestXray,
+            reasonNotConductedChestXrayOther = if (newOrder) null else base.reasonNotConductedChestXrayOther,
+            xrayOrderStatus = mappedStatus,
+            isReferredForDigitalChestXray = true,
+            errorMsgXray = if (mappedStatus == OrderStatus.FAILED.name) data.errorMessage ?: base.errorMsgXray else base.errorMsgXray,
+            syncState = SyncState.UNSYNCED
+        )
+        if (base.xrayManualResultPendingSync != true) {
+            merged = when {
+                summary != null -> merged.copy(
+                    isChestXRayDone = true,
+                    chestXRayResult = standardized?.displayValue ?: summary,
+                    reasonNotConductedChestXray = null,
+                    reasonNotConductedChestXrayOther = null
                 )
-                }
+                closeReason != null -> merged.copy(
+                    isChestXRayDone = false,
+                    chestXRayResult = null,
+                    reasonNotConductedChestXray = closeReason.first,
+                    reasonNotConductedChestXrayOther = closeReason.second
+                )
+                // The server holds no X-ray result: one that was stored before is gone.
+                perTest.hasResultsList -> merged.copy(chestXRayResult = null, isChestXRayDone = if (isCompleted) base.isChestXRayDone else null)
+                else -> merged
             }
         }
-        val closed = reducedOrderStatus(status) == OrderStatus.CLOSED.name
-        return MergedOrderResult(if (closed) withCloseReason(cache, orderType, responseData.reasonToClose) else cache, triggerTrueNat)
+        val hasTrueNat = !base.trueNatOrderId.isNullOrBlank() ||
+                base.trueNatOrderStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
+                base.trueNatOrderStatus.equals(OrderStatus.PENDING.name, ignoreCase = true) ||
+                base.trueNatOrderStatus.equals(OrderStatus.MANUAL_ENTRY.name, ignoreCase = true) ||
+                base.trueNatOrderStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
+        val triggerTrueNat = isCompleted && standardized?.triggersTrueNatReferral == true &&
+                !hasTrueNat && truenatIntegrated && !hubCreatesOrders
+        return MergedOrderResult(merged, triggerTrueNat)
     }
 
     /**
-     * Copies the reason an order was closed without a result onto the row, so every tablet shows
-     * why the test was not done. Before, only the tablet that entered "Not Conducted" had it; the
-     * order closure reached the others with the status alone (UAT field test 2026-11-11, finding 5).
-     *
-     * [reasonToClose] is what that tablet sent: the selected English value, or "Other: <text>".
-     * TrueNat is closed for two reasons that share one server field - test not conducted
-     * (reasonNotConductedNaat) or sputum not collected (reasonForDenialSputum, pipe-separated) -
-     * so the value decides: all of it from the not-conducted list means not conducted, anything
-     * else means the sputum was not collected. A row that already holds the reason (the tablet
-     * that entered it) is left as it is.
+     * The TrueNat order: MTB result plus, on the same order, the RIF result. The RIF fields
+     * (rifOrderId / rifOrderStatus / trueNatRifResult) are derived from this one order:
+     *  - a MDR_RIF result entry -> its result, status COMPLETED
+     *  - closed with reasonToCloseMDRRIF -> CLOSED with the reason
+     *  - MTB Positive and no RIF result yet -> the order's own status (waiting for RIF)
+     *  - otherwise no RIF at all.
      */
-    internal fun withCloseReason(cache: TBDiagnosticsCache, orderType: String, reasonToClose: String?): TBDiagnosticsCache {
-        val reason = reasonToClose?.trim()?.takeIf { it.isNotEmpty() } ?: return cache
-        val (value, other) = if (reason.startsWith(OTHER_REASON_PREFIX)) {
-            OTHER_REASON to reason.removePrefix(OTHER_REASON_PREFIX).trim().ifEmpty { null }
-        } else reason to null
+    private fun mergeTrueNatOrder(
+        base: TBDiagnosticsCache,
+        fetchedOrderId: String?,
+        data: OrderResultData,
+        perTest: PerTestResults,
+        status: String
+    ): TBDiagnosticsCache {
+        val mappedStatus = reducedOrderStatus(status)
+        val orderId = fetchedOrderId ?: base.trueNatOrderId
+        // A different order (e.g. a retest the server raised) carries none of the old one's reasons.
+        val newOrder = fetchedOrderId != null && fetchedOrderId != base.trueNatOrderId
+        var merged = base.copy(
+            trueNatOrderId = orderId,
+            trueNatOrderStatus = mappedStatus,
+            isReferredForSputum = true,
+            reasonNotConductedNaat = if (newOrder) null else base.reasonNotConductedNaat,
+            reasonNotConductedNaatOther = if (newOrder) null else base.reasonNotConductedNaatOther,
+            reasonNotConductedRif = if (newOrder) null else base.reasonNotConductedRif,
+            reasonNotConductedRifOther = if (newOrder) null else base.reasonNotConductedRifOther,
+            errorMsgTrueNat = if (mappedStatus == OrderStatus.FAILED.name) data.errorMessage ?: base.errorMsgTrueNat else base.errorMsgTrueNat,
+            syncState = SyncState.UNSYNCED
+        )
+        // A manual MTB or RIF result still on its way to the server keeps every result field as
+        // the user entered it; the replay's response brings the server's answer.
+        if (base.trueNatManualResultPendingSync == true || base.rifManualResultPendingSync == true) return merged
+
+        val legacyFlat = !perTest.hasResultsList
+        // An invalid run ("Error-2") is not a result: the machine retests the same order (INVALID).
+        // Kept out of naatResult / trueNatRifResult so the card offers Enter Result instead.
+        val mtbSummary = perTest.mtb?.resultSummary?.takeIf { it.isNotBlank() && !isMachineRunError(it) }
+        val mtbResult = MtbResult.fromResultText(mtbSummary)
+        // Older server, order not finished yet: the flat summary is not a result; keep what is stored.
+        if (legacyFlat && mappedStatus != OrderStatus.COMPLETED.name && mappedStatus != OrderStatus.CLOSED.name) return merged
+
+        val mtbClose = splitOtherReason(data.reasonToCloseMTB)
+        val rifClose = splitOtherReason(data.reasonToCloseMDRRIF)
+        val naatResult = mtbResult?.displayValue ?: mtbSummary
+        merged = merged.copy(
+            naatResult = naatResult,
+            isNaatConducted = when {
+                naatResult != null -> true
+                mtbClose != null -> false
+                else -> base.isNaatConducted
+            },
+            reasonNotConductedNaat = mtbClose?.first ?: if (naatResult != null) null else merged.reasonNotConductedNaat,
+            reasonNotConductedNaatOther = mtbClose?.second ?: if (naatResult != null) null else merged.reasonNotConductedNaatOther,
+            // The results list is the server's whole answer: with no MTB result in it, an earlier MTB
+            // Positive no longer confirms TB (only a positive liquid culture does). A flat response keeps it.
+            isTBConfirmed = when {
+                mtbResult != null -> mtbResult == MtbResult.TB_POSITIVE || isLiquidCulturePositive(base.liquidCultureResult)
+                perTest.hasResultsList -> isLiquidCulturePositive(base.liquidCultureResult)
+                else -> base.isTBConfirmed
+            },
+            isConfirmed = when {
+                mtbResult != null -> mtbResult == MtbResult.TB_POSITIVE || isLiquidCulturePositive(base.liquidCultureResult)
+                perTest.hasResultsList -> isLiquidCulturePositive(base.liquidCultureResult)
+                else -> base.isConfirmed
+            }
+        )
+
+        // On an older server the RIF result arrives on its own MDR_RIF order (mergeLegacyRifOrder).
+        if (legacyFlat) return merged
+
+        val rifSummary = perTest.rif?.resultSummary?.takeIf { it.isNotBlank() && !isMachineRunError(it) }
+        val rifResult = RifResult.fromResultText(rifSummary)
+        val mtbPositive = mtbResult == MtbResult.TB_POSITIVE
+        // The RIF row's own status: a hand-entered RIF "Invalid/Error" is CLOSED (and closes the
+        // order) on the server, not COMPLETED. Absent or unknown -> COMPLETED, as a result is in.
+        val rifRowStatus = perTest.rif?.providerStatus?.let { reducedOrderStatus(it) }
+            ?.takeIf { it == OrderStatus.CLOSED.name || it == OrderStatus.FAILED.name }
+            ?: OrderStatus.COMPLETED.name
         return when {
-            orderType.equals("XRAY_CHEST", ignoreCase = true) ->
-                if (cache.reasonNotConductedChestXray == value && cache.reasonNotConductedChestXrayOther == other) cache
-                else cache.copy(isChestXRayDone = false, reasonNotConductedChestXray = value, reasonNotConductedChestXrayOther = other)
-            orderType.equals("MDR_RIF", ignoreCase = true) ->
-                if (cache.reasonNotConductedRif == value && cache.reasonNotConductedRifOther == other) cache
-                else cache.copy(reasonNotConductedRif = value, reasonNotConductedRifOther = other)
-            cache.reasonForDenialSputum == reason -> cache
-            reason.split('|').all { part -> part.trim() in NAAT_NOT_CONDUCTED_REASONS } || value == OTHER_REASON ->
-                if (cache.reasonNotConductedNaat == value && cache.reasonNotConductedNaatOther == other) cache
-                else cache.copy(isNaatConducted = false, reasonNotConductedNaat = value, reasonNotConductedNaatOther = other)
-            else -> cache.copy(isSputumCollected = false, reasonForDenialSputum = reason)
+            rifSummary != null -> merged.copy(
+                rifOrderId = orderId,
+                rifOrderStatus = rifRowStatus,
+                trueNatRifResult = rifResult?.displayValue ?: rifSummary,
+                isDrTbConfirmed = rifResult == RifResult.DR_TB,
+                reasonNotConductedRif = null,
+                reasonNotConductedRifOther = null
+            )
+            rifClose != null -> merged.copy(
+                rifOrderId = orderId,
+                rifOrderStatus = OrderStatus.CLOSED.name,
+                trueNatRifResult = null,
+                isDrTbConfirmed = false,
+                reasonNotConductedRif = rifClose.first,
+                reasonNotConductedRifOther = rifClose.second
+            )
+            mtbPositive -> merged.copy(
+                rifOrderId = orderId,
+                rifOrderStatus = mappedStatus,
+                trueNatRifResult = null,
+                isDrTbConfirmed = false,
+                reasonNotConductedRif = null,
+                reasonNotConductedRifOther = null
+            )
+            else -> merged.copy(
+                rifOrderId = null,
+                rifOrderStatus = null,
+                trueNatRifResult = null,
+                isDrTbConfirmed = false,
+                reasonNotConductedRif = null,
+                reasonNotConductedRifOther = null,
+                errorMsgRif = null
+            )
         }
+    }
+
+    /**
+     * An MDR_RIF order from an older server (RIF as a separate order). Applied onto the RIF fields
+     * only while the current TrueNat order is MTB Positive with no RIF result of its own, so an old
+     * order never overrides a newer MTB order's RIF.
+     */
+    private fun mergeLegacyRifOrder(
+        base: TBDiagnosticsCache,
+        fetchedOrderId: String?,
+        data: OrderResultData,
+        perTest: PerTestResults,
+        status: String
+    ): TBDiagnosticsCache {
+        if (base.rifManualResultPendingSync == true) return base
+        val mtbPositive = MtbResult.fromResultText(base.naatResult) == MtbResult.TB_POSITIVE
+        // rifOrderId == trueNatOrderId: the current MTB order carries its own RIF test (set by
+        // mergeTrueNatOrder), whether or not that RIF result is in yet. An old MDR_RIF order in
+        // the same feed batch must not fill the new order's waiting RIF with its old result.
+        val currentOrderCarriesRif = base.rifOrderId != null && base.rifOrderId == base.trueNatOrderId
+        if (!mtbPositive || currentOrderCarriesRif) return base
+        val mappedStatus = reducedOrderStatus(status)
+        val summary = perTest.rif?.resultSummary?.takeIf { it.isNotBlank() }
+        val rifResult = RifResult.fromResultText(summary)
+        return base.copy(
+            rifOrderId = fetchedOrderId ?: base.rifOrderId,
+            rifOrderStatus = mappedStatus,
+            trueNatRifResult = if (mappedStatus == OrderStatus.COMPLETED.name) rifResult?.displayValue ?: summary else base.trueNatRifResult,
+            isDrTbConfirmed = if (rifResult != null) rifResult == RifResult.DR_TB else base.isDrTbConfirmed,
+            errorMsgRif = if (mappedStatus == OrderStatus.FAILED.name) data.errorMessage ?: base.errorMsgRif else base.errorMsgRif,
+            syncState = SyncState.UNSYNCED
+        )
+    }
+
+    /** The vendor's code for an invalid TrueNat run (MTB or RIF); the machine retests the order. */
+    private fun isMachineRunError(summary: String): Boolean = summary.trim().equals("Error-2", ignoreCase = true)
+
+    /** "Other: text" (how the form sends a free-text reason) -> ("Other", "text"); else (reason, null). */
+    internal fun splitOtherReason(reason: String?): Pair<String, String?>? {
+        val value = reason?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        return if (value.startsWith("Other:", ignoreCase = true)) {
+            "Other" to value.substringAfter(':').trim().ifEmpty { null }
+        } else value to null
     }
 
     /**
@@ -1211,634 +1064,6 @@ class DiagnosticOrderRepo @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "fetchOrderResult failed")
-                NetworkResponse.Error(e.message ?: "Unknown error")
-            }
-        }
-    }
-
-    /**
-     * The beneficiaries in the awaiting buckets that still have no local order id, capped at
-     * [orderIdBackfillPerSweep].
-     *
-     * Resolving the *whole* bucket to find the next 50 is what made every referral-list open
-     * slow. On a 19,110-entry bucket that is ~21 chunks x 2 large IN-clause reads = ~42 cursor
-     * fills, queued on the same ~3 SQLite read connections as the Paging refresh the user is
-     * waiting on: a no-op "SELECT 1" was measured waiting 2,872 ms behind it while the refresh
-     * took 3,588 ms of a 4,068 ms screen open.
-     *
-     * Three things bound it now:
-     *  - it stops as soon as the cap is reached, so the common case is one or two reads;
-     *  - it resumes from where the previous sweep stopped ([backfillChunkCursor]) instead of
-     *    re-scanning an already-backfilled prefix, so successive sweeps make progress;
-     *  - once a full pass finds nothing, it short-circuits entirely until the bucket changes
-     *    size ([backfillConvergedForBucketSize]), so a drained backlog costs no reads at all.
-     *
-     * The cursor and the converged marker are in-memory on purpose: losing them on process
-     * death only costs one extra full pass.
-     */
-    private suspend fun collectBenIdsNeedingOrderId(
-        awaitingRegIds: List<Long>,
-        orderType: String,
-        isXray: Boolean,
-        isRif: Boolean
-    ): List<Long> {
-        if (awaitingRegIds.isEmpty()) {
-            backfillConvergedForBucket.remove(orderType)
-            return emptyList()
-        }
-        // Content signature, computed in memory - no DB reads - so a bucket whose membership
-        // changed is always rescanned even when its size did not.
-        val bucketSignature = awaitingRegIds.sorted().hashCode()
-        if (backfillConvergedForBucket[orderType] == bucketSignature) {
-            return emptyList()
-        }
-
-        val chunks = awaitingRegIds.chunked(sqliteInClauseChunkSize)
-        val startChunk = (backfillChunkCursor[orderType] ?: 0).let { if (it in chunks.indices) it else 0 }
-        val needsBackfill = mutableListOf<Long>()
-        var chunksExamined = 0
-        var index = startChunk
-
-        while (chunksExamined < chunks.size && needsBackfill.size < orderIdBackfillPerSweep) {
-            val regIdChunk = chunks[index]
-
-            val mappings = benDao.getBenIdsByRegIds(regIdChunk)
-            val benIds = mappings.mapTo(mutableListOf()) { mapping -> mapping.beneficiaryId }
-            // Same fallback the per-record form had: an id that matches no benRegId may already
-            // BE a local beneficiaryId.
-            val matchedRegIds = mappings.mapTo(mutableSetOf()) { mapping -> mapping.benRegId }
-            val unmatched = regIdChunk.filterNot { regId -> regId in matchedRegIds }
-            if (unmatched.isNotEmpty()) {
-                benIds += benDao.getExistingBenIds(unmatched)
-            }
-
-            val distinctBenIds = benIds.distinct()
-            if (distinctBenIds.isNotEmpty()) {
-                val withOrderId = when {
-                    isXray -> tbDao.getBenIdsWithXrayOrderId(distinctBenIds)
-                    isRif -> tbDao.getBenIdsWithRifOrderId(distinctBenIds)
-                    else -> tbDao.getBenIdsWithTrueNatOrderId(distinctBenIds)
-                }.toSet()
-                needsBackfill += distinctBenIds.filterNot { benId -> benId in withOrderId }
-            }
-
-            index = (index + 1) % chunks.size
-            chunksExamined++
-        }
-
-        backfillChunkCursor[orderType] = index
-        val completedFullPass = chunksExamined == chunks.size
-        if (completedFullPass && needsBackfill.isEmpty()) {
-            backfillConvergedForBucket[orderType] = bucketSignature
-            Timber.d("Order id backfill [$orderType]: full pass over ${awaitingRegIds.size} entries found nothing; skipping until the bucket changes")
-        } else {
-            backfillConvergedForBucket.remove(orderType)
-        }
-
-        val batch = needsBackfill.distinct().take(orderIdBackfillPerSweep)
-        if (batch.isNotEmpty()) {
-            Timber.d(
-                "Order id backfill [$orderType]: filling ${batch.size} ids, " +
-                        "examined $chunksExamined of ${chunks.size} chunks from chunk $startChunk"
-            )
-        }
-        return batch
-    }
-
-    /**
-     * Local beneficiary ids the server still lists as awaiting a provider result for this sweep's
-     * order type. The status lists carry the server's beneficiary ids (benRegId).
-     */
-    suspend fun awaitingResultBenIds(status: NetworkResponse<DiagnosticBeneficiaryStatusData>): Set<Long> {
-        val regIds = (status as? NetworkResponse.Success)?.data?.awaitingProviderResult.orEmpty()
-        if (regIds.isEmpty()) return emptySet()
-        return withContext(Dispatchers.IO) {
-            regIds.distinct().chunked(sqliteInClauseChunkSize)
-                .flatMap { chunk -> benDao.getBenIdsByRegIds(chunk) }
-                .mapTo(HashSet()) { mapping -> mapping.beneficiaryId }
-        }
-    }
-
-    suspend fun fetchBeneficiariesByStatus(orderType: String, fetchResult: Boolean = true): NetworkResponse<DiagnosticBeneficiaryStatusData> {
-        return withContext(Dispatchers.IO) {
-            val user = preferenceDao.getLoggedInUser()
-                ?: return@withContext NetworkResponse.Error(context.getString(R.string.error_no_user_logged_in))
-            val locationRecord = preferenceDao.getLocationRecord()
-                ?: return@withContext NetworkResponse.Error(context.getString(R.string.error_no_location_record_found))
-
-            val villageId = locationRecord.village.id
-            val providerServiceMapId = user.serviceMapId
-
-            val apiOrderType = if (orderType.equals("SPUTUM_TRUENAT", ignoreCase = true)) "MTB" else orderType
-
-            try {
-                val response = tmcNetworkApiService.getBeneficiariesByStatus(
-                    orderType = apiOrderType,
-                    villageId = villageId,
-                    providerServiceMapId = providerServiceMapId
-                )
-                val statusCode = response.code()
-                if (statusCode == 200) {
-                    val responseString = response.body()?.string()
-                    if (responseString != null) {
-                        val jsonObj = JSONObject(responseString)
-                        val success = jsonObj.optBoolean("success", true)
-                        val resStatusCode = jsonObj.optInt("statusCode", 200)
-                        if (success && (resStatusCode == 200 || resStatusCode == 0)) {
-                            // Real, confirmed `getBeneficiariesByStatus` contract: exactly 5
-                            // buckets — awaitingProviderResult, completed, failed, closed,
-                            // awaitingManualEntry. No awaitingTestCompletion/pollingTimedOut/
-                            // refused buckets exist server-side; those were guessed pre-contract
-                            // and are removed.
-                            val dataObj = jsonObj.optJSONObject("data")
-                            val awaitingProvResList = mutableListOf<Long>()
-                            val completedList = mutableListOf<Long>()
-                            val closedList = mutableListOf<Long>()
-                            val failedList = mutableListOf<Long>()
-                            val awaitingManualEntryList = mutableListOf<Long>()
-
-                            dataObj?.optJSONArray("awaitingProviderResult")?.let { arr ->
-                                for (i in 0 until arr.length()) {
-                                    awaitingProvResList.add(arr.getLong(i))
-                                }
-                            }
-                            dataObj?.optJSONArray("completed")?.let { arr ->
-                                for (i in 0 until arr.length()) {
-                                    completedList.add(arr.getLong(i))
-                                }
-                            }
-                            dataObj?.optJSONArray("closed")?.let { arr ->
-                                for (i in 0 until arr.length()) {
-                                    closedList.add(arr.getLong(i))
-                                }
-                            }
-                            dataObj?.optJSONArray("failed")?.let { arr ->
-                                // Read TB_DIAGNOSTICS once and index it, instead of running
-                                // "SELECT * FROM TB_DIAGNOSTICS" inside the loop and scanning the
-                                // whole materialised list for every failed order.
-                                // The bucket carries benRegIds. Resolve them to local
-                                // beneficiaryIds and index the diagnostics by benId.
-                                //
-                                // This used to match `it.id.toLong() == arr.getLong(i)`, i.e. it
-                                // compared a benRegId against the TB_DIAGNOSTICS autogenerated
-                                // row id. A match was coincidental and returned another
-                                // beneficiary's error message; the same unresolved value was then
-                                // passed as `benId` into isAwaitingReconciliation, so
-                                // reconcileOrderResult could read and overwrite a different
-                                // beneficiary's diagnostics row.
-                                val failedRegIds = (0 until arr.length()).map { arr.getLong(it) }
-                                val failedBenIdByRegId = mutableMapOf<Long, Long>()
-                                failedRegIds.chunked(sqliteInClauseChunkSize).forEach { chunk ->
-                                    benDao.getBenIdsByRegIds(chunk).forEach { mapping ->
-                                        failedBenIdByRegId[mapping.benRegId] = mapping.beneficiaryId
-                                    }
-                                    val unmatched = chunk.filterNot { it in failedBenIdByRegId }
-                                    // A value that matches no benRegId may already BE a local id.
-                                    benDao.getExistingBenIds(unmatched).forEach { benId ->
-                                        failedBenIdByRegId[benId] = benId
-                                    }
-                                }
-                                val diagnosticsByBenId = if (failedRegIds.isNotEmpty()) {
-                                    // Only the failed beneficiaries' rows, not the whole table.
-                                    failedBenIdByRegId.values.distinct()
-                                        .chunked(sqliteInClauseChunkSize)
-                                        .flatMap { benIds -> tbDao.getDiagnosticsForBenIds(benIds) }
-                                        .associateBy { it.benId }
-                                } else {
-                                    emptyMap()
-                                }
-                                for (regId in failedRegIds) {
-                                    val benId = failedBenIdByRegId[regId]
-                                    if (benId == null) {
-                                        Timber.w("Failed-order reconciliation: no local beneficiary for benRegId=$regId, skipping")
-                                        failedList.add(regId)
-                                        continue
-                                    }
-                                    isAwaitingReconciliation(
-                                        benId,
-                                        apiOrderType,
-                                        diagnosticsByBenId[benId]
-                                            ?.let { bens ->
-                                                when {
-                                                    orderType.equals("XRAY_CHEST", ignoreCase = true) ->
-                                                        bens.errorMsgXray
-
-                                                    orderType.equals("MDR_RIF", ignoreCase = true) ->
-                                                        bens.errorMsgRif
-
-                                                    orderType.equals("MTB", ignoreCase = true) ->
-                                                        bens.errorMsgTrueNat
-
-                                                    else -> null
-                                                }
-                                            }
-                                    )
-                                    failedList.add(regId)
-                                }
-                            }
-                            dataObj?.optJSONArray("awaitingManualEntry")?.let { arr ->
-                                for (i in 0 until arr.length()) {
-                                    awaitingManualEntryList.add(arr.getLong(i))
-                                }
-                            }
-
-                            val isXray = orderType.equals("XRAY_CHEST", ignoreCase = true)
-                            val isRif = orderType.equals("MDR_RIF", ignoreCase = true)
-
-                            // 0. Backfill order ids for the two "order exists, no result yet"
-                            // buckets. getBeneficiariesByStatus returns benRegIds only - it never
-                            // carries an order id - so a beneficiary referred somewhere else (the
-                            // registrar tab, say) arrives here with a real backend order, gets a
-                            // status of PENDING or MANUAL_ENTRY written below, and still has no
-                            // local order id. The card reads a missing id as "the referral never
-                            // went through" and offers Retry Referral, which would raise a second
-                            // order for one that already succeeded.
-                            //
-                            // fetchOrderResult is the only call that returns externalOrderId, so
-                            // pull it once per beneficiary that lacks one. Three things keep the
-                            // cost off the screen that triggered this: the "who is missing an id"
-                            // question is answered in bulk rather than per beneficiary; the
-                            // fetches themselves are capped per sweep; and they are chunked like
-                            // the completed bucket below, because one coroutine per entry is what
-                            // caused the 2,664-job cancellation stall documented there.
-                            //
-                            // It must run OUTSIDE withBenIdLock - fetchOrderResult takes the same
-                            // per-benId lock itself and kotlinx Mutex is not reentrant.
-                            if (fetchResult) {
-                                val awaitingRegIds =
-                                    (awaitingProvResList + awaitingManualEntryList).distinct()
-                                val backfillBatch = collectBenIdsNeedingOrderId(
-                                    awaitingRegIds = awaitingRegIds,
-                                    orderType = orderType,
-                                    isXray = isXray,
-                                    isRif = isRif
-                                )
-                                backfillBatch.chunked(completedFetchChunkSize).forEach { benIdChunk ->
-                                    coroutineScope {
-                                        benIdChunk.forEach { benId ->
-                                            // pushSuspectedAfter = false: one push after the whole
-                                            // batch below, not one per beneficiary.
-                                            launch { fetchOrderResult(benId, orderType, pushSuspectedAfter = false) }
-                                        }
-                                    }
-                                }
-                                if (backfillBatch.isNotEmpty()) {
-                                    try {
-                                        tbPushRepo.pushUnSyncedRecordsTBSuspected()
-                                    } catch (e: Exception) {
-                                        Timber.e(e, "Failed to push TB Suspected after order id backfill")
-                                    }
-                                }
-                            }
-
-                            // 1. Awaiting Provider Result — the only real "still in progress"
-                            // bucket (no separate "awaiting test completion" bucket exists).
-                            for (regId in awaitingProvResList) {
-                                val ben = benDao.getBenByRegId(regId) ?: benDao.getBen(regId)
-                                ben?.let { b ->
-                                    benIdLocks.withLock(b.beneficiaryId) {
-                                        // Guard, status check, and write all read the SAME fresh
-                                        // snapshot taken inside this lock — previously the guard
-                                        // read happened before the lock, so a concurrent write
-                                        // (e.g. a fresh createOrder()) landing in between could be
-                                        // silently re-marked SYNCED by this sweep even though it
-                                        // still needed to be pushed to Amrit.
-                                        val fresh = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
-                                        val currentStatus = if (isXray) fresh?.xrayOrderStatus else if (isRif) fresh?.rifOrderStatus else fresh?.trueNatOrderStatus
-                                        // A row stuck at FAILED for this order type has nothing worth
-                                        // protecting — saveFailedOrderStatus() set syncState UNSYNCED
-                                        // itself, which would otherwise block this exact correction
-                                        // forever even though the backend just confirmed the order is
-                                        // genuinely still in progress.
-                                        val isStaleFailed = currentStatus.equals(OrderStatus.FAILED.name, ignoreCase = true)
-                                        if (fresh?.syncState != null && fresh.syncState != SyncState.SYNCED && !isStaleFailed) {
-                                            return@withLock
-                                        }
-                                        val isDone = currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
-                                        Timber.d("STOP-TB polling debug: awaitingProviderResult regId=$regId benId=${b.beneficiaryId} currentStatus=$currentStatus isDone=$isDone")
-                                        if (!isDone) {
-                                            val cache = (fresh ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
-                                                if (isXray) {
-                                                    // Chest X-Ray's reduced 5-value vocabulary collapses
-                                                    // this "in progress" bucket into PENDING.
-                                                    it.copy(
-                                                        xrayOrderStatus = OrderStatus.PENDING.name,
-                                                        isReferredForDigitalChestXray = true,
-                                                        syncState = SyncState.SYNCED
-                                                    )
-                                                } else if (isRif) {
-                                                    // Reduced 5-value vocabulary — see bucket 1 above.
-                                                    it.copy(
-                                                        rifOrderStatus = OrderStatus.PENDING.name,
-                                                        syncState = SyncState.SYNCED
-                                                    )
-                                                } else {
-                                                    it.copy(
-                                                        trueNatOrderStatus = OrderStatus.PENDING.name,
-                                                        isReferredForSputum = true,
-                                                        syncState = SyncState.SYNCED
-                                                    )
-                                                }
-                                            }
-                                            // Only write when the row actually changed. These status buckets
-                                            // re-report the same orders on every poll, so saving unconditionally
-                                            // rewrote the row and invalidated every list observing TB_DIAGNOSTICS
-                                            // once per beneficiary, for no change at all.
-                                            if (cache != fresh) {
-                                                tbDao.saveTbDiagnostics(cache)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // 3. Completed — each beneficiary here is independent (its own
-                            // benId lock, no shared mutable state beyond the ConcurrentHashMaps
-                            // already used elsewhere in this file), so fan these out concurrently
-                            // instead of one-by-one — but a chunk at a time, not all at once.
-                            // completedList is the whole backlog the backend reports as done for
-                            // this order type - a
-                            // real camp device measured 4,000 of them for XRAY_CHEST and 1,500 for
-                            // MTB - and `completedList.map { async { ... } }` created one live
-                            // coroutine for every single one. The comment that used to sit here
-                            // reasoned that OkHttp's per-host cap (5) made that safe; it does cap
-                            // requests in flight, but that is exactly what made it unsafe. The
-                            // other ~5,495 coroutines did not disappear, they queued behind that
-                            // 5-wide pipe holding their Room reads alive, and at ~42 results/sec
-                            // the queue took over two minutes to drain. Measured on the device:
-                            // 433 MB allocated in 18 s, 12 GCs, heap pinned at 160/160 MB with 0%
-                            // free. Leaving the screen then cancelled 2,664 still-queued jobs at
-                            // once and froze the UI for ~1.8 s (180 dropped frames).
-                            //
-                            // Chunking keeps at most [completedFetchChunkSize] coroutines alive,
-                            // which still keeps OkHttp's 5 slots busy - the pipe, not the number
-                            // of waiting coroutines, is what sets throughput - while bounding both
-                            // the live heap and how much there is to cancel on the way out.
-                            // Set by any entry that actually fetched a result, so the single
-                            // post-bucket TB Suspected push below is skipped when nothing changed.
-                            val resultsFetchedForCompleted = java.util.concurrent.atomic.AtomicBoolean(false)
-                            completedList.chunked(completedFetchChunkSize).forEach { completedChunk ->
-                            coroutineScope {
-                                completedChunk.map { regId ->
-                                async {
-                                val ben = benDao.getBenByRegId(regId) ?: benDao.getBen(regId)
-                                ben?.let { b ->
-                                    // This pre-check is intentionally unlocked — it only decides
-                                    // WHICH branch to take (fetchOrderResult, which is itself
-                                    // self-locking and can't be called from inside our own lock
-                                    // without risking a same-benId deadlock, vs. a direct write).
-                                    // A stale decision here only means a missed opportunity to
-                                    // fetch a fresher result this cycle, self-healing on the next
-                                    // sweep — the actual write below re-verifies against a fresh
-                                    // read before committing anything.
-                                    val existing = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
-                                    val currentStatus = if (isXray) existing?.xrayOrderStatus else if (isRif) existing?.rifOrderStatus else existing?.trueNatOrderStatus
-                                    // See bucket 1's isStaleFailed comment — same reasoning here.
-                                    val isStaleFailed = currentStatus.equals(OrderStatus.FAILED.name, ignoreCase = true)
-                                    if (existing?.syncState != null && existing.syncState != SyncState.SYNCED && !isStaleFailed) {
-                                        return@let
-                                    }
-                                    val needsResultFetch = when {
-                                        isXray -> !currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) || existing?.chestXRayResult.isNullOrBlank()
-                                        isRif -> !currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) || existing?.trueNatRifResult.isNullOrBlank()
-                                        else -> !currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true) || existing?.naatResult.isNullOrBlank()
-                                    }
-
-                                    if (needsResultFetch && fetchResult) {
-                                        // pushSuspectedAfter = false: this runs once per entry in
-                                        // a bucket measured at 4,000 entries, and that push reads
-                                        // and POSTs every UNSYNCED TB Suspected row each time.
-                                        // One push after the whole bucket, below.
-                                        fetchOrderResult(b.beneficiaryId, orderType, pushSuspectedAfter = false)
-                                        resultsFetchedForCompleted.set(true)
-                                    }
-                                    if (!fetchResult || !needsResultFetch) {
-                                        benIdLocks.withLock(b.beneficiaryId) {
-                                        // Re-verify against a fresh read before writing — the
-                                        // pre-check above may be stale by the time this lock is
-                                        // acquired (e.g. a concurrent submitManualResult() already
-                                        // landed), so both the sync-guard and the "already done"
-                                        // check are redone here against current state.
-                                        val fresh = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
-                                        val freshStatus = if (isXray) fresh?.xrayOrderStatus else if (isRif) fresh?.rifOrderStatus else fresh?.trueNatOrderStatus
-                                        val isStaleFailed = freshStatus.equals(OrderStatus.FAILED.name, ignoreCase = true)
-                                        if (fresh?.syncState != null && fresh.syncState != SyncState.SYNCED && !isStaleFailed) {
-                                            return@withLock
-                                        }
-                                        if (freshStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true)) {
-                                            return@withLock
-                                        }
-                                        val cache = (fresh ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
-                                            if (isXray) {
-                                                it.copy(
-                                                    xrayOrderStatus = OrderStatus.COMPLETED.name,
-                                                    isReferredForDigitalChestXray = true,
-                                                    isChestXRayDone = true,
-                                                    syncState = SyncState.SYNCED
-                                                )
-                                            } else if (isRif) {
-                                                it.copy(
-                                                    rifOrderStatus = OrderStatus.COMPLETED.name,
-                                                    syncState = SyncState.SYNCED
-                                                )
-                                            } else {
-                                                it.copy(
-                                                    trueNatOrderStatus = OrderStatus.COMPLETED.name,
-                                                    isReferredForSputum = true,
-                                                    isNaatConducted = true,
-                                                    syncState = SyncState.SYNCED
-                                                )
-                                            }
-                                        }
-                                        // Only write when the row actually changed. These status buckets
-                                        // re-report the same orders on every poll, so saving unconditionally
-                                        // rewrote the row and invalidated every list observing TB_DIAGNOSTICS
-                                        // once per beneficiary, for no change at all.
-                                        if (cache != fresh) {
-                                            tbDao.saveTbDiagnostics(cache)
-                                        }
-                                        }
-                                    }
-                                }
-                                }
-                                }.awaitAll()
-                            }
-                            }
-                            if (resultsFetchedForCompleted.get()) {
-                                try {
-                                    tbPushRepo.pushUnSyncedRecordsTBSuspected()
-                                } catch (e: Exception) {
-                                    Timber.e(e, "Failed to push TB Suspected after completed-bucket result fetches")
-                                }
-                            }
-
-                            // 4. Closed — backend's own confirmed closure (EoD expiry, not
-                            // conducted, etc.); the app just reflects it, per the plan's
-                            // backend-authoritative EoD decision.
-                            for (regId in closedList) {
-                                val ben = benDao.getBenByRegId(regId) ?: benDao.getBen(regId)
-                                ben?.let { b ->
-                                    benIdLocks.withLock(b.beneficiaryId) {
-                                        val fresh = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
-                                        val currentStatus = if (isXray) fresh?.xrayOrderStatus else if (isRif) fresh?.rifOrderStatus else fresh?.trueNatOrderStatus
-                                        val isStaleFailed = currentStatus.equals(OrderStatus.FAILED.name, ignoreCase = true)
-                                        if (fresh?.syncState != null && fresh.syncState != SyncState.SYNCED && !isStaleFailed) {
-                                            return@withLock
-                                        }
-                                        val isAlreadyClosed = currentStatus.equals(OrderStatus.CLOSED.name, ignoreCase = true)
-                                        if (!isAlreadyClosed) {
-                                            val cache = (fresh ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
-                                                if (isXray) {
-                                                    it.copy(
-                                                        xrayOrderStatus = OrderStatus.CLOSED.name,
-                                                        isReferredForDigitalChestXray = true,
-                                                        syncState = SyncState.SYNCED
-                                                    )
-                                                } else if (isRif) {
-                                                    it.copy(
-                                                        rifOrderStatus = OrderStatus.CLOSED.name,
-                                                        syncState = SyncState.SYNCED
-                                                    )
-                                                } else {
-                                                    it.copy(
-                                                        trueNatOrderStatus = OrderStatus.CLOSED.name,
-                                                        isReferredForSputum = true,
-                                                        syncState = SyncState.SYNCED
-                                                    )
-                                                }
-                                            }
-                                            // Only write when the row actually changed. These status buckets
-                                            // re-report the same orders on every poll, so saving unconditionally
-                                            // rewrote the row and invalidated every list observing TB_DIAGNOSTICS
-                                            // once per beneficiary, for no change at all.
-                                            if (cache != fresh) {
-                                                tbDao.saveTbDiagnostics(cache)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // 5. Failed
-                            for (regId in failedList) {
-                                val ben = benDao.getBenByRegId(regId) ?: benDao.getBen(regId)
-                                ben?.let { b ->
-                                    benIdLocks.withLock(b.beneficiaryId) {
-                                        val fresh = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
-                                        // Relies solely on the isRecentlyPushed grace-period check below (not a
-                                        // syncState==SYNCED check) - a diagnostics row can stay UNSYNCED indefinitely
-                                        // if its own push to Amrit never succeeds, which would otherwise block the
-                                        // server's confirmed "failed" status from ever landing locally.
-                                        val currentStatus = if (isXray) fresh?.xrayOrderStatus else if (isRif) fresh?.rifOrderStatus else fresh?.trueNatOrderStatus
-                                        val isDone = currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
-                                        // Same staleness guard as the "Polling Timed Out" bucket above.
-                                        val justPushedAt = orderCreatedTimestamps["${b.beneficiaryId}_$orderType"]
-                                        val isRecentlyPushed = justPushedAt != null && System.currentTimeMillis() - justPushedAt < ORDER_STATUS_GRACE_PERIOD_MS
-                                        if (!isDone && !isRecentlyPushed) {
-                                            val cache = (fresh ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
-                                                if (isXray) {
-                                                    it.copy(
-                                                        xrayOrderStatus = OrderStatus.FAILED.name,
-                                                        isReferredForDigitalChestXray = true,
-                                                        syncState = SyncState.SYNCED
-                                                    )
-                                                } else if (isRif) {
-                                                    it.copy(
-                                                        rifOrderStatus = OrderStatus.FAILED.name,
-                                                        syncState = SyncState.SYNCED
-                                                    )
-                                                } else {
-                                                    it.copy(
-                                                        trueNatOrderStatus = OrderStatus.FAILED.name,
-                                                        isReferredForSputum = true,
-                                                        syncState = SyncState.SYNCED
-                                                    )
-                                                }
-                                            }
-                                            // Only write when the row actually changed. These status buckets
-                                            // re-report the same orders on every poll, so saving unconditionally
-                                            // rewrote the row and invalidated every list observing TB_DIAGNOSTICS
-                                            // once per beneficiary, for no change at all.
-                                            if (cache != fresh) {
-                                                tbDao.saveTbDiagnostics(cache)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // No "Refused" bucket — not part of the real getBeneficiariesByStatus
-                            // contract. A declined-before-order referral is stored as CLOSED
-                            // directly by this app (TBSuspectedQuickViewModel), never derived from
-                            // this sweep — same as the "closed" bucket handling above.
-
-                            // 6. Awaiting Manual Entry
-                            for (regId in awaitingManualEntryList) {
-                                val ben = benDao.getBenByRegId(regId) ?: benDao.getBen(regId)
-                                ben?.let { b ->
-                                    benIdLocks.withLock(b.beneficiaryId) {
-                                        val fresh = tbDao.getTbDiagnosticsByBenId(b.beneficiaryId)
-                                        val currentStatus = if (isXray) fresh?.xrayOrderStatus else if (isRif) fresh?.rifOrderStatus else fresh?.trueNatOrderStatus
-                                        val isStaleFailed = currentStatus.equals(OrderStatus.FAILED.name, ignoreCase = true)
-                                        if (fresh?.syncState != null && fresh.syncState != SyncState.SYNCED && !isStaleFailed) {
-                                            return@withLock
-                                        }
-                                        val isDone = currentStatus.equals(OrderStatus.COMPLETED.name, ignoreCase = true)
-                                        if (!isDone) {
-                                            val cache = (fresh ?: TBDiagnosticsCache(benId = b.beneficiaryId)).let {
-                                                if (isXray) {
-                                                    it.copy(
-                                                        xrayOrderStatus = OrderStatus.MANUAL_ENTRY.name,
-                                                        isReferredForDigitalChestXray = true,
-                                                        syncState = SyncState.SYNCED
-                                                    )
-                                                } else if (isRif) {
-                                                    // Reduced 5-value vocabulary.
-                                                    it.copy(
-                                                        rifOrderStatus = OrderStatus.MANUAL_ENTRY.name,
-                                                        syncState = SyncState.SYNCED
-                                                    )
-                                                } else {
-                                                    it.copy(
-                                                        trueNatOrderStatus = OrderStatus.MANUAL_ENTRY.name,
-                                                        isReferredForSputum = true,
-                                                        syncState = SyncState.SYNCED
-                                                    )
-                                                }
-                                            }
-                                            // Only write when the row actually changed. These status buckets
-                                            // re-report the same orders on every poll, so saving unconditionally
-                                            // rewrote the row and invalidated every list observing TB_DIAGNOSTICS
-                                            // once per beneficiary, for no change at all.
-                                            if (cache != fresh) {
-                                                tbDao.saveTbDiagnostics(cache)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
- 
-                            val resultData = DiagnosticBeneficiaryStatusData(
-                                awaitingProviderResult = awaitingProvResList,
-                                completed = completedList,
-                                failed = failedList,
-                                closed = closedList,
-                                awaitingManualEntry = awaitingManualEntryList
-                            )
-                            return@withContext NetworkResponse.Success(resultData)
-                        } else {
-                            val errorMsg = jsonObj.optString("message") ?: "Failed to fetch beneficiary order statuses"
-                            return@withContext NetworkResponse.Error(errorMsg)
-                        }
-                    }
-                }
-                NetworkResponse.Error(context.getString(R.string.error_http_code, statusCode))
-            } catch (e: CancellationException) {
-                // Leaving the screen mid-sweep is ordinary, not a failure - let it propagate
-                // rather than reporting it as one. See the matching catch in fetchOrderResult.
-                throw e
-            } catch (e: Exception) {
-                Timber.e(e, "fetchBeneficiariesByStatus failed for $orderType")
                 NetworkResponse.Error(e.message ?: "Unknown error")
             }
         }

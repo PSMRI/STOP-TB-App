@@ -137,19 +137,34 @@ interface BenSearchQueries {
                   )
             ))
             OR (:source = 10 AND isDeath = 0 AND benId IN (
-                -- TB_SUSPECTED has no RIF field of its own (mdrRifResult is only ever mirrored
-                -- here from TB_DIAGNOSTICS.trueNatRifResult by syncTBSuspectedFromDiagnostics, so
-                -- checking it would be redundant with the td.trueNatRifResult check below) — the
-                -- older SuspectedTBDataset form only ever writes chestXRayResult/naatResult here
-                -- directly, with no TB_DIAGNOSTICS row at all, so that's the gap this union closes.
-                SELECT ts.benId FROM TB_SUSPECTED ts
-                WHERE UPPER(TRIM(IFNULL(ts.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
-                  AND UPPER(TRIM(IFNULL(ts.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED')
+""" + ClinicalAssessmentSql.MATCHING_BEN_IDS + """
+            ))
+            -- Vulnerable Population / TPT-Eligible Groups (STOP-771).
+            -- :vulnerabilityCode '' = All, 'TRIBAL' = Tribal only, else a CommonConstants.RISK_FACTOR_CODES code.
+            -- Risk factors are stored by StringListConverter as "CODE_A|||CODE_B".
+            OR (:source = 11 AND isDeath = 0 AND benId IN (
+                SELECT vb.beneficiaryId FROM BENEFICIARY vb
+                WHERE :vulnerabilityCode IN ('', 'TRIBAL')
+                  AND (
+                    vb.residentialAreaId IN (1, 2)
+                    OR REPLACE(UPPER(TRIM(IFNULL(vb.residentialArea, ''))), '-', ' ') IN ('TRIBAL NPVTG', 'TRIBAL PVTG')
+                  )
                 UNION
-                SELECT td.benId FROM TB_DIAGNOSTICS td
-                WHERE (UPPER(TRIM(IFNULL(td.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
-                       AND UPPER(TRIM(IFNULL(td.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED'))
-                   OR UPPER(TRIM(IFNULL(td.trueNatRifResult,''))) = 'INDETERMINATE'
+                SELECT vs.benId FROM TB_SCREENING vs
+                WHERE :vulnerabilityCode != 'TRIBAL'
+                  AND vs.id = (
+                    SELECT vs2.id FROM TB_SCREENING vs2
+                    WHERE vs2.benId = vs.benId
+                    ORDER BY vs2.visitDate DESC, vs2.id DESC
+                    LIMIT 1
+                  )
+                  AND (
+                    (:vulnerabilityCode = '' AND REPLACE(REPLACE(REPLACE(
+                        '|||' || IFNULL(vs.keyPopulationRiskFactors, '') || '|||',
+                        '|||OTHER|||', '|||'), '|||NOT_APPLICABLE|||', '|||'), '|||', '') != '')
+                    OR (:vulnerabilityCode != '' AND
+                        ('|||' || IFNULL(vs.keyPopulationRiskFactors, '') || '|||') LIKE '%|||' || :vulnerabilityCode || '|||%')
+                  )
             ))
         )
         AND (:filterType = 0
@@ -196,7 +211,7 @@ interface BenSearchQueries {
         END DESC,
         benId DESC
     """)
-    fun searchBen(villageIds: List<Int>, source: Int, filterType: Int, query: String): Flow<List<BenBasicCache>>
+    fun searchBen(villageIds: List<Int>, source: Int, filterType: Int, query: String, vulnerabilityCode: String): Flow<List<BenBasicCache>>
 
     @Query("""
         SELECT * FROM BEN_BASIC_CACHE
@@ -318,19 +333,34 @@ interface BenSearchQueries {
                   )
             ))
             OR (:source = 10 AND isDeath = 0 AND benId IN (
-                -- TB_SUSPECTED has no RIF field of its own (mdrRifResult is only ever mirrored
-                -- here from TB_DIAGNOSTICS.trueNatRifResult by syncTBSuspectedFromDiagnostics, so
-                -- checking it would be redundant with the td.trueNatRifResult check below) — the
-                -- older SuspectedTBDataset form only ever writes chestXRayResult/naatResult here
-                -- directly, with no TB_DIAGNOSTICS row at all, so that's the gap this union closes.
-                SELECT ts.benId FROM TB_SUSPECTED ts
-                WHERE UPPER(TRIM(IFNULL(ts.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
-                  AND UPPER(TRIM(IFNULL(ts.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED')
+""" + ClinicalAssessmentSql.MATCHING_BEN_IDS + """
+            ))
+            -- Vulnerable Population / TPT-Eligible Groups (STOP-771).
+            -- :vulnerabilityCode '' = All, 'TRIBAL' = Tribal only, else a CommonConstants.RISK_FACTOR_CODES code.
+            -- Risk factors are stored by StringListConverter as "CODE_A|||CODE_B".
+            OR (:source = 11 AND isDeath = 0 AND benId IN (
+                SELECT vb.beneficiaryId FROM BENEFICIARY vb
+                WHERE :vulnerabilityCode IN ('', 'TRIBAL')
+                  AND (
+                    vb.residentialAreaId IN (1, 2)
+                    OR REPLACE(UPPER(TRIM(IFNULL(vb.residentialArea, ''))), '-', ' ') IN ('TRIBAL NPVTG', 'TRIBAL PVTG')
+                  )
                 UNION
-                SELECT td.benId FROM TB_DIAGNOSTICS td
-                WHERE (UPPER(TRIM(IFNULL(td.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
-                       AND UPPER(TRIM(IFNULL(td.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED'))
-                   OR UPPER(TRIM(IFNULL(td.trueNatRifResult,''))) = 'INDETERMINATE'
+                SELECT vs.benId FROM TB_SCREENING vs
+                WHERE :vulnerabilityCode != 'TRIBAL'
+                  AND vs.id = (
+                    SELECT vs2.id FROM TB_SCREENING vs2
+                    WHERE vs2.benId = vs.benId
+                    ORDER BY vs2.visitDate DESC, vs2.id DESC
+                    LIMIT 1
+                  )
+                  AND (
+                    (:vulnerabilityCode = '' AND REPLACE(REPLACE(REPLACE(
+                        '|||' || IFNULL(vs.keyPopulationRiskFactors, '') || '|||',
+                        '|||OTHER|||', '|||'), '|||NOT_APPLICABLE|||', '|||'), '|||', '') != '')
+                    OR (:vulnerabilityCode != '' AND
+                        ('|||' || IFNULL(vs.keyPopulationRiskFactors, '') || '|||') LIKE '%|||' || :vulnerabilityCode || '|||%')
+                  )
             ))
         )
         AND (:filterType = 0
@@ -442,7 +472,7 @@ interface BenSearchQueries {
         benId DESC
         LIMIT :limit OFFSET :offset
     """)
-    suspend fun searchBenPage(villageIds: List<Int>, source: Int, filterType: Int, query: String, limit: Int, offset: Int): List<BenBasicCache>
+    suspend fun searchBenPage(villageIds: List<Int>, source: Int, filterType: Int, query: String, vulnerabilityCode: String, limit: Int, offset: Int): List<BenBasicCache>
 
     /**
      * The beneficiary list query for the sources that have no TB predicate: 0 All, 1 ABHA,
@@ -626,19 +656,34 @@ interface BenSearchQueries {
                   )
             ))
             OR (:source = 10 AND isDeath = 0 AND benId IN (
-                -- TB_SUSPECTED has no RIF field of its own (mdrRifResult is only ever mirrored
-                -- here from TB_DIAGNOSTICS.trueNatRifResult by syncTBSuspectedFromDiagnostics, so
-                -- checking it would be redundant with the td.trueNatRifResult check below) — the
-                -- older SuspectedTBDataset form only ever writes chestXRayResult/naatResult here
-                -- directly, with no TB_DIAGNOSTICS row at all, so that's the gap this union closes.
-                SELECT ts.benId FROM TB_SUSPECTED ts
-                WHERE UPPER(TRIM(IFNULL(ts.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
-                  AND UPPER(TRIM(IFNULL(ts.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED')
+""" + ClinicalAssessmentSql.MATCHING_BEN_IDS + """
+            ))
+            -- Vulnerable Population / TPT-Eligible Groups (STOP-771).
+            -- :vulnerabilityCode '' = All, 'TRIBAL' = Tribal only, else a CommonConstants.RISK_FACTOR_CODES code.
+            -- Risk factors are stored by StringListConverter as "CODE_A|||CODE_B".
+            OR (:source = 11 AND isDeath = 0 AND benId IN (
+                SELECT vb.beneficiaryId FROM BENEFICIARY vb
+                WHERE :vulnerabilityCode IN ('', 'TRIBAL')
+                  AND (
+                    vb.residentialAreaId IN (1, 2)
+                    OR REPLACE(UPPER(TRIM(IFNULL(vb.residentialArea, ''))), '-', ' ') IN ('TRIBAL NPVTG', 'TRIBAL PVTG')
+                  )
                 UNION
-                SELECT td.benId FROM TB_DIAGNOSTICS td
-                WHERE (UPPER(TRIM(IFNULL(td.chestXRayResult,''))) IN ('TB PRESUMPTIVE','ABNORMAL BUT NOT TB PRESUMPTIVE')
-                       AND UPPER(TRIM(IFNULL(td.naatResult,''))) IN ('TB NEGATIVE','MTB NOT DETECTED'))
-                   OR UPPER(TRIM(IFNULL(td.trueNatRifResult,''))) = 'INDETERMINATE'
+                SELECT vs.benId FROM TB_SCREENING vs
+                WHERE :vulnerabilityCode != 'TRIBAL'
+                  AND vs.id = (
+                    SELECT vs2.id FROM TB_SCREENING vs2
+                    WHERE vs2.benId = vs.benId
+                    ORDER BY vs2.visitDate DESC, vs2.id DESC
+                    LIMIT 1
+                  )
+                  AND (
+                    (:vulnerabilityCode = '' AND REPLACE(REPLACE(REPLACE(
+                        '|||' || IFNULL(vs.keyPopulationRiskFactors, '') || '|||',
+                        '|||OTHER|||', '|||'), '|||NOT_APPLICABLE|||', '|||'), '|||', '') != '')
+                    OR (:vulnerabilityCode != '' AND
+                        ('|||' || IFNULL(vs.keyPopulationRiskFactors, '') || '|||') LIKE '%|||' || :vulnerabilityCode || '|||%')
+                  )
             ))
         )
         AND (:filterType = 0
@@ -697,7 +742,7 @@ interface BenSearchQueries {
         END DESC,
         benId DESC
     """)
-    suspend fun searchBenOnce(villageIds: List<Int>, source: Int, filterType: Int, query: String): List<BenBasicCache>
+    suspend fun searchBenOnce(villageIds: List<Int>, source: Int, filterType: Int, query: String, vulnerabilityCode: String): List<BenBasicCache>
 
     @Query("SELECT * FROM BEN_BASIC_CACHE WHERE villageId = :selectedVillage AND isDeactivate = 0 AND isNonHH = 1 ORDER BY BEN_BASIC_CACHE.updatedDate DESC")
     fun getNonHHBeneficiaries(selectedVillage: Int): Flow<List<BenBasicCache>>

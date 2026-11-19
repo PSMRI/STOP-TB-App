@@ -54,6 +54,7 @@
     <string name="counselling_follow_up_button">फॉलो अप</string>
     <string name="counselling_in_progress">प्रगति पर है</string>
     <string name="counselling_select_all">सभी चुनें</string>
+    <string name="counselling_sections_completed">%2$d में से %1$d अनुभाग पूर्ण</string>
     <string name="counselling_data_load_error">हम डेटा प्राप्त करने में असमर्थ हैं।\nकृपया बाद में पुनः प्रयास करें।</string>
 
     <!-- Home cards for the four independent Counsellor modules (module separation) -->
@@ -65,5 +66,12 @@
     <string name="home_card_tb_followup_module_subtitle">मासिक उपचार फॉलो-अप</string>
     <string name="icon_title_tpt_module">टीपीटी</string>
     <string name="home_card_tpt_module_subtitle">टीबी निवारक उपचार फॉलो-अप</string>
+
+    <!-- Vulnerable Population / TPT-Eligible Groups list (STOP-771) -->
+    <string name="icon_title_vulnerable_population">संवेदनशील आबादी</string>
+    <string name="home_card_vulnerable_population_subtitle">टीपीटी-पात्र समूह</string>
+    <string name="vulnerability_conditions">संवेदनशीलता की स्थितियाँ</string>
+    <string name="vulnerability_conditions_selected">संवेदनशीलता की स्थितियाँ: %1$s</string>
+    <string name="vulnerability_tribal">जनजातीय (NPVTG / PVTG)</string>
 
 </resources>

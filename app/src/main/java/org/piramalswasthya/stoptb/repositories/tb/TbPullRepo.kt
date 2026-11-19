@@ -48,6 +48,7 @@ import org.piramalswasthya.stoptb.model.GeneralOpdPrescription
 import org.piramalswasthya.stoptb.model.MtbResult
 import org.piramalswasthya.stoptb.model.OpdDrugMasters
 import org.piramalswasthya.stoptb.model.OpdMedicineDraft
+import org.piramalswasthya.stoptb.model.DiagnosticResultEntry
 import org.piramalswasthya.stoptb.model.OrderResultData
 import org.piramalswasthya.stoptb.model.OrderStatus
 import org.piramalswasthya.stoptb.model.RifResult
@@ -326,11 +327,6 @@ class TbPullRepo @Inject constructor(
             logSyncModule("TB_CONFIRMED", "PULL", "SUCCESS", "received" to records.length(), "saved" to it.size)
         }
     }
-
-    // Diagnostic orders from the changes feed: one item per order row, with the same result fields
-    // order/result returns. Only the latest order per beneficiary and test type is applied, through
-    // the same mapping fetchOrderResult uses. RIF goes first, then TrueNat, then X-ray, so the
-    // MTB -> RIF cascade and the X-ray -> TrueNat referral see the orders this batch already holds.
     suspend fun applyFeedDiagnosticOrders(records: JSONArray) = withContext(Dispatchers.IO) {
         val latest = HashMap<Pair<Long, String>, Pair<Long, OrderResultData>>()
         for (i in 0 until records.length()) {
@@ -345,32 +341,19 @@ class TbPullRepo @Inject constructor(
             val orderId = item.optLong("id", 0L)
             val key = benKey to localType
             if ((latest[key]?.first ?: Long.MIN_VALUE) >= orderId) continue
-            latest[key] = orderId to OrderResultData(
-                externalOrderId = item.optStringOrNull("externalOrderId"),
-                orderType = item.optStringOrNull("orderType"),
-                status = item.optStringOrNull("status"),
-                providerStatus = item.optStringOrNull("providerStatus"),
-                resultSummary = item.optStringOrNull("resultSummary"),
-                tbPresence = item.optNullableBoolean("tbPresence"),
-                drugResistancePresence = item.optNullableBoolean("drugResistancePresence"),
-                errorMessage = item.optStringOrNull("errorMessage"),
-                reasonToClose = item.optStringOrNull("reasonToClose")
-            )
+            latest[key] = orderId to parseFeedOrder(item)
         }
-        val typeOrder = listOf("MDR_RIF", "SPUTUM_TRUENAT", "XRAY_CHEST")
+        val typeOrder = listOf("SPUTUM_TRUENAT", "MDR_RIF", "XRAY_CHEST")
         val now = System.currentTimeMillis()
         val skippedBefore = preferenceDao.getFeedSkippedOrders()
         // Skipped-order entries for orders this page applies; removed only once they are applied,
         // so a page that fails part-way leaves them for DiagnosticResultPollWorker.
         val appliedSkipKeys = mutableListOf<String>()
 
-        // Sorted RIF -> TrueNat -> X-ray, resolved to the local beneficiary, and split three ways:
-        // inside the grace period (left for DiagnosticResultPollWorker), needing the MTB -> RIF
-        // cascade (network calls; applied one at a time through applyOrderResult, which already
-        // handles its locking), and everything else, applied below in one transaction.
+        // Sorted TrueNat -> RIF -> X-ray and resolved to the local beneficiary; an older row than
+        // an order this tablet just created is dropped.
         data class FeedOrder(val ben: BenRegCache, val localType: String, val data: OrderResultData)
         val bulk = ArrayList<FeedOrder>()
-        val cascade = ArrayList<Pair<FeedOrder, Boolean>>()
         // benRegId has no index: resolve the page's keys in one query (was a full-table scan per
         // order), then load each beneficiary by its primary key. A key that is not a benRegId
         // falls back to a beneficiaryId lookup, as before.
@@ -380,18 +363,9 @@ class TbPullRepo @Inject constructor(
         for ((key, value) in latest.entries.sortedBy { typeOrder.indexOf(it.key.second) }) {
             val (benKey, localType) = key
             val ben = benDao.getBen(benIdByRegId[benKey] ?: benKey) ?: continue
-            val skipKey = diagnosticOrderRepo.feedSkippedKey(ben.beneficiaryId, localType)
-            // An order this tablet created in the last moments may not be on the hub's feed yet;
-            // the older server row must not overwrite it.
-            val createdAt = diagnosticOrderRepo.orderCreatedTimestamps["${ben.beneficiaryId}_$localType"]
-            if (createdAt != null && now - createdAt < diagnosticOrderRepo.ORDER_STATUS_GRACE_PERIOD_MS) {
-                preferenceDao.addFeedSkippedOrder(skipKey)
-                continue
-            }
-            val rifOrderKnown = latest.containsKey(benKey to "MDR_RIF")
-            val order = FeedOrder(ben, localType, value.second)
-            if (diagnosticOrderRepo.needsRifCascade(localType, value.second, rifOrderKnown)) cascade += order to rifOrderKnown
-            else bulk += order
+            // Nothing to fetch later: the tablet's newer order reaches the feed on its own.
+            if (isOlderThanLocalOrder(ben.beneficiaryId, localType, value.second, now)) continue
+            bulk += FeedOrder(ben, localType, value.second)
         }
 
         // One set of locks and one write transaction for the page. Applying each order on its own
@@ -401,18 +375,9 @@ class TbPullRepo @Inject constructor(
         // order. Rows that come out unchanged are not written at all, so a page that only
         // repeats what the tablet already holds costs no writes.
         var applied = 0
-        // A cascade only arises when this page has no RIF order for the beneficiary, so applying
-        // these TrueNat results first keeps the RIF -> TrueNat -> X-ray order: the X-ray rows
-        // below then see the TrueNat state, as they did when every order was applied in turn.
-        for ((order, rifOrderKnown) in cascade) {
-            val current = tbDao.getTbDiagnosticsByBenId(order.ben.beneficiaryId)?.trueNatOrderId
-            diagnosticOrderRepo.applyOrderResult(order.ben, order.localType, order.data, current, pushSuspectedAfter = false, rifOrderKnown = rifOrderKnown)
-            applied++
-            diagnosticOrderRepo.feedSkippedKey(order.ben.beneficiaryId, order.localType).let { if (it in skippedBefore) appliedSkipKeys += it }
-        }
-
         if (bulk.isNotEmpty()) {
             val truenatIntegrated = deviceIntegrationRepo.isTruenatIntegrated()
+            val hubCreates = deviceIntegrationRepo.hubCreatesOrders()
             var bulkApplied = 0
             // Households of beneficiaries this page confirms. saveTBSuspected() selects "Contact of
             // Known TB" on their members' screenings; this path writes TB_SUSPECTED directly, so
@@ -426,15 +391,11 @@ class TbPullRepo @Inject constructor(
                         // Checked again under the lock: diagnosticOrderRepo.createOrder() saves a new order and records
                         // its time under this same lock, so one placed after the page was sorted
                         // above shows here, and the older feed row must not overwrite it.
-                        val createdAt = diagnosticOrderRepo.orderCreatedTimestamps["${benId}_${order.localType}"]
-                        if (createdAt != null && System.currentTimeMillis() - createdAt < diagnosticOrderRepo.ORDER_STATUS_GRACE_PERIOD_MS) {
-                            preferenceDao.addFeedSkippedOrder(skipKey)
-                            continue
-                        }
+                        if (isOlderThanLocalOrder(benId, order.localType, order.data, System.currentTimeMillis())) continue
                         val rawStatus = order.data.status
                         val status = if (rawStatus.isNullOrBlank()) "IN_PROGRESS" else rawStatus
                         val existing = tbDao.getTbDiagnosticsByBenId(benId)
-                        val merged = diagnosticOrderRepo.mergeOrderResult(existing, benId, order.localType, order.data, status, null, truenatIntegrated)
+                        val merged = diagnosticOrderRepo.mergeOrderResult(existing, benId, order.localType, order.data, status, truenatIntegrated, hubCreates)
                         // Enqueued before the row is saved, as before: WorkManager keeps the work
                         // across a restart, so the referral is not lost if the process dies after
                         // the completed X-ray is stored.
@@ -513,6 +474,23 @@ class TbPullRepo @Inject constructor(
         preferenceDao.removeFeedSkippedOrder(diagnosticOrderRepo.feedSkippedKey(benId, type))
     }
 
+    private val nikshayBackfillDone = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    // Once per process: fill beneficiaries whose Nikshay ID only sits on TB records pulled earlier.
+    suspend fun backfillNikshayIdsOnce() = withContext(Dispatchers.IO) {
+        if (!nikshayBackfillDone.compareAndSet(false, true)) return@withContext
+        try {
+            val updated = benDao.backfillNikshayIdFromTbRecords()
+            Timber.d("Nikshay ID backfill updated $updated beneficiaries")
+        } catch (e: CancellationException) {
+            nikshayBackfillDone.set(false)
+            throw e
+        } catch (e: Exception) {
+            nikshayBackfillDone.set(false)
+            Timber.e(e, "Nikshay ID backfill failed")
+        }
+    }
+
     private suspend fun logTbSkip(module: String, item: JSONObject?, index: Int?, reason: String,
                                   state: SyncState? = null, localUpdatedAt: Long? = null,
                                   serverUpdatedAt: Long? = null) {
@@ -523,6 +501,55 @@ class TbPullRepo @Inject constructor(
             "localSyncState" to state?.name, "localUpdatedAt" to localUpdatedAt,
             "serverUpdatedAt" to serverUpdatedAt)
     }
+
+    /** One `diagnosticOrder` feed record, in the `results` list shape or the older flat one. */
+    private fun parseFeedOrder(item: JSONObject): OrderResultData {
+        val resultsArray = item.optJSONArray("results")
+        val results = resultsArray?.let { array ->
+            (0 until array.length()).mapNotNull { index ->
+                val entry = array.optJSONObject(index) ?: return@mapNotNull null
+                DiagnosticResultEntry(
+                    resultType = entry.optStringOrNull("resultType"),
+                    providerStatus = entry.optStringOrNull("providerStatus"),
+                    resultSummary = entry.optStringOrNull("resultSummary"),
+                    tbPresence = entry.optNullableBoolean("tbPresence"),
+                    tbConfidence = if (entry.has("tbConfidence") && !entry.isNull("tbConfidence")) entry.optDouble("tbConfidence") else null,
+                    drugResistancePresence = entry.optNullableBoolean("drugResistancePresence")
+                )
+            }
+        }
+        return OrderResultData(
+            externalOrderId = item.optStringOrNull("externalOrderId"),
+            orderType = item.optStringOrNull("orderType"),
+            status = item.optStringOrNull("status"),
+            providerStatus = item.optStringOrNull("providerStatus"),
+            resultSummary = item.optStringOrNull("resultSummary"),
+            tbPresence = item.optNullableBoolean("tbPresence"),
+            drugResistancePresence = item.optNullableBoolean("drugResistancePresence"),
+            errorMessage = item.optStringOrNull("errorMessage"),
+            results = results,
+            reasonToCloseXray = item.optStringOrNull("reasonToCloseXray"),
+            reasonToCloseMTB = item.optStringOrNull("reasonToCloseMTB"),
+            reasonToCloseMDRRIF = item.optStringOrNull("reasonToCloseMDRRIF")
+        )
+    }
+
+    private suspend fun isOlderThanLocalOrder(benId: Long, localType: String, data: OrderResultData, now: Long): Boolean {
+        val createdAt = diagnosticOrderRepo.orderCreatedTimestamps["${benId}_$localType"] ?: return false
+        if (now - createdAt >= diagnosticOrderRepo.ORDER_STATUS_GRACE_PERIOD_MS) return false
+        val feedOrderId = data.externalOrderId.asValidOrderId() ?: return true
+        val localOrderId = localOrderIdFor(benId, localType) ?: return true
+        return feedOrderId != localOrderId
+    }
+
+    private suspend fun localOrderIdFor(benId: Long, localType: String): String? =
+        tbDao.getTbDiagnosticsByBenId(benId)?.let { diag ->
+            when {
+                localType.equals("XRAY_CHEST", ignoreCase = true) -> diag.xrayOrderId
+                localType.equals("MDR_RIF", ignoreCase = true) -> diag.rifOrderId
+                else -> diag.trueNatOrderId
+            }
+        }.asValidOrderId()
 
     private fun feedResponse(records: JSONArray): JSONObject =
         JSONObject().put("statusCode", 200).put("data", JSONObject().put("data", records))
@@ -872,6 +899,7 @@ class TbPullRepo @Inject constructor(
                     ) {
                         benDao.getBen(tbDiagnosticsDTO.benId)?.let {
                             tbDao.saveTbDiagnostics(cache)
+                            benDao.linkNikshayId(cache.benId, cache.nikshayId)
                             tbDiagnosticsList.add(cache)
                         }
                     }
@@ -970,6 +998,7 @@ class TbPullRepo @Inject constructor(
                         // on TB_DIAGNOSTICS (records without a parseable updateDate always pass
                         // shouldApplyServerRecord). It is still returned to the caller as before.
                         if (cache != existing) tbDao.saveTbDiagnostics(cache)
+                        benDao.linkNikshayId(benId, cache.nikshayId)
                         tbDiagnosticsList.add(cache)
                     }
                 }
@@ -1128,6 +1157,7 @@ class TbPullRepo @Inject constructor(
                             val beneficiary = benDao.getBen(tbSuspectedDTO.benId)
                             if (beneficiary != null) {
                                 tbDao.saveTbSuspected(cache)
+                                benDao.linkNikshayId(beneficiary.beneficiaryId, cache.nikshayId)
                                 tbSuspectedList.add(cache)
                             } else {
                                 logSyncSkip("TB_SUSPECTED", "PULL", "BENEFICIARY_NOT_FOUND_LOCALLY",

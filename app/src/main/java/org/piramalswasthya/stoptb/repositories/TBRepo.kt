@@ -139,6 +139,8 @@ class TBRepo @Inject constructor(
 
     val allTbScreening: Flow<List<TbScreeningSymptoms>> = tbDao.getAllTbScreeningSymptoms().shareBadges()
 
+    val allTbSuspected: Flow<List<TBSuspectedCache>> = tbLocalRepo.allTbSuspected
+
     suspend fun getDiagnosticsWithPendingOrder(): List<TBDiagnosticsCache> =
         tbLocalRepo.getDiagnosticsWithPendingOrder()
 
@@ -216,6 +218,22 @@ class TBRepo @Inject constructor(
 
     suspend fun saveTBDiagnostics(tbDiagnosticsCache: TBDiagnosticsCache) =
         tbLocalRepo.saveTBDiagnostics(tbDiagnosticsCache)
+
+    fun observeTBDiagnostics(benId: Long): Flow<TBDiagnosticsCache?> = tbLocalRepo.observeTBDiagnostics(benId)
+
+    suspend fun saveTBDiagnosticsFromGeneralForm(form: TBDiagnosticsCache, rifOpenForEntry: Boolean): TBDiagnosticsCache =
+        tbLocalRepo.saveTBDiagnosticsFromGeneralForm(form, rifOpenForEntry)
+
+    suspend fun saveTBDiagnosticsFromForm(form: TBDiagnosticsCache): TBDiagnosticsCache =
+        tbLocalRepo.saveTBDiagnosticsFromForm(form)
+
+    internal fun withStoredRifReasons(form: TBDiagnosticsCache, stored: TBDiagnosticsCache): TBDiagnosticsCache =
+        tbLocalRepo.withStoredRifReasons(form, stored)
+
+    internal fun formRowOverStored(form: TBDiagnosticsCache, stored: TBDiagnosticsCache): TBDiagnosticsCache =
+        tbLocalRepo.formRowOverStored(form, stored)
+
+    suspend fun backfillNikshayIdsOnce() = tbPullRepo.backfillNikshayIdsOnce()
 
     suspend fun getTBSuspected(benId: Long): TBSuspectedCache? =
         tbLocalRepo.getTBSuspected(benId)
@@ -305,10 +323,6 @@ class TBRepo @Inject constructor(
         /** [submitManualResult]'s "stored locally, not yet accepted by the backend" result. */
         const val PENDING_SYNC = "PENDING_SYNC"
 
-        /** Order-id backfill state lives in DiagnosticOrderRepo. */
-        fun resetOrderIdBackfillState() =
-            org.piramalswasthya.stoptb.repositories.tb.DiagnosticOrderRepo.resetOrderIdBackfillState()
-
         internal fun canRecoverChiefComplaints(
             existing: GeneralOpdCache?,
             incoming: List<String>?,
@@ -397,9 +411,6 @@ class TBRepo @Inject constructor(
     ): TBSuspectedCache? =
         diagnosticOrderRepo.suspectedFromDiagnostics(existing, benId, diag, reasonForRefusalMDRRIF)
 
-    suspend fun isAwaitingReconciliation(benId: Long, orderType: String, errorMsg: String?): Boolean =
-        diagnosticOrderRepo.isAwaitingReconciliation(benId, orderType, errorMsg)
-
     suspend fun markTestCompleted(benId: Long, orderType: String): NetworkResponse<String> =
         diagnosticOrderRepo.markTestCompleted(benId, orderType)
 
@@ -408,13 +419,9 @@ class TBRepo @Inject constructor(
         orderType: String,
         responseData: OrderResultData,
         orderIdAtStart: String?,
-        pushSuspectedAfter: Boolean,
-        rifOrderKnown: Boolean = false
+        pushSuspectedAfter: Boolean
     ): String =
-        diagnosticOrderRepo.applyOrderResult(ben, orderType, responseData, orderIdAtStart, pushSuspectedAfter, rifOrderKnown)
-
-    internal fun needsRifCascade(orderType: String, responseData: OrderResultData, rifOrderKnown: Boolean): Boolean =
-        diagnosticOrderRepo.needsRifCascade(orderType, responseData, rifOrderKnown)
+        diagnosticOrderRepo.applyOrderResult(ben, orderType, responseData, orderIdAtStart, pushSuspectedAfter)
 
     internal fun mergeOrderResult(
         existing: TBDiagnosticsCache?,
@@ -422,10 +429,10 @@ class TBRepo @Inject constructor(
         orderType: String,
         responseData: OrderResultData,
         status: String,
-        rifFieldOverride: Pair<String, String?>?,
-        truenatIntegrated: Boolean
+        truenatIntegrated: Boolean,
+        hubCreatesOrders: Boolean = false
     ): org.piramalswasthya.stoptb.repositories.tb.DiagnosticOrderRepo.MergedOrderResult =
-        diagnosticOrderRepo.mergeOrderResult(existing, benId, orderType, responseData, status, rifFieldOverride, truenatIntegrated)
+        diagnosticOrderRepo.mergeOrderResult(existing, benId, orderType, responseData, status, truenatIntegrated, hubCreatesOrders)
 
     suspend fun fetchOrderResult(
         benId: Long,
@@ -433,12 +440,6 @@ class TBRepo @Inject constructor(
         pushSuspectedAfter: Boolean = true
     ): NetworkResponse<String> =
         diagnosticOrderRepo.fetchOrderResult(benId, orderType, pushSuspectedAfter)
-
-    suspend fun awaitingResultBenIds(status: NetworkResponse<org.piramalswasthya.stoptb.network.DiagnosticBeneficiaryStatusData>): Set<Long> =
-        diagnosticOrderRepo.awaitingResultBenIds(status)
-
-    suspend fun fetchBeneficiariesByStatus(orderType: String, fetchResult: Boolean = true): NetworkResponse<DiagnosticBeneficiaryStatusData> =
-        diagnosticOrderRepo.fetchBeneficiariesByStatus(orderType, fetchResult)
 
     // Device integration moved to DeviceIntegrationRepo; kept here so callers don't change.
     suspend fun getVendorHealth(orderType: String): NetworkResponse<String> =
@@ -453,4 +454,6 @@ class TBRepo @Inject constructor(
     fun isXrayIntegrated(): Boolean = deviceIntegrationRepo.isXrayIntegrated()
 
     fun isTruenatIntegrated(): Boolean = deviceIntegrationRepo.isTruenatIntegrated()
+
+    fun hubCreatesOrders(): Boolean = deviceIntegrationRepo.hubCreatesOrders()
 }

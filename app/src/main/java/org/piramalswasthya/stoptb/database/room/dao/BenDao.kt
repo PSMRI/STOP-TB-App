@@ -79,8 +79,28 @@ interface BenDao :
     @Update
     suspend fun updateBen(ben: BenRegCache)
 
-    @Query("UPDATE BENEFICIARY SET nikshayId = :nikshayId WHERE beneficiaryId = :benId")
-    suspend fun updateNikshayId(benId: Long, nikshayId: String)
+    // No-op when unchanged, so BENEFICIARY observers aren't invalidated. Leaves syncState alone.
+    @Query("UPDATE BENEFICIARY SET nikshayId = :nikshayId WHERE beneficiaryId = :benId AND IFNULL(nikshayId, '') != :nikshayId")
+    suspend fun updateNikshayId(benId: Long, nikshayId: String): Int
+
+    // Fills a missing beneficiary Nikshay ID from the latest TB diagnostics, else TB suspected, record.
+    // Same rule as TBRepo.linkNikshayIdToBen: trimmed, blank and "N/A" skipped.
+    @Query("""
+        UPDATE BENEFICIARY SET nikshayId = COALESCE(
+            (SELECT TRIM(d.nikshayId) FROM TB_DIAGNOSTICS d
+                WHERE d.benId = BENEFICIARY.beneficiaryId AND UPPER(TRIM(IFNULL(d.nikshayId, ''))) NOT IN ('', 'N/A')
+                ORDER BY d.visitDate DESC, d.id DESC LIMIT 1),
+            (SELECT TRIM(s.nikshayId) FROM TB_SUSPECTED s
+                WHERE s.benId = BENEFICIARY.beneficiaryId AND UPPER(TRIM(IFNULL(s.nikshayId, ''))) NOT IN ('', 'N/A')
+                ORDER BY s.visitDate DESC, s.id DESC LIMIT 1)
+        )
+        WHERE UPPER(TRIM(IFNULL(nikshayId, ''))) IN ('', 'N/A')
+        AND (
+            EXISTS (SELECT 1 FROM TB_DIAGNOSTICS d WHERE d.benId = BENEFICIARY.beneficiaryId AND UPPER(TRIM(IFNULL(d.nikshayId, ''))) NOT IN ('', 'N/A'))
+            OR EXISTS (SELECT 1 FROM TB_SUSPECTED s WHERE s.benId = BENEFICIARY.beneficiaryId AND UPPER(TRIM(IFNULL(s.nikshayId, ''))) NOT IN ('', 'N/A'))
+        )
+    """)
+    suspend fun backfillNikshayIdFromTbRecords(): Int
 
     @Query("UPDATE BENEFICIARY SET loc_village_id = :villageId, loc_village_name = :villageName, loc_village_nameHindi = :villageNameHindi, loc_village_nameAssamese = :villageNameAssamese, pinCode = :pinCode, residentialAreaId = :residentialAreaId, residentialArea = :residentialArea WHERE householdId = :householdId")
     suspend fun updateVillageOfHouseholdMembers(

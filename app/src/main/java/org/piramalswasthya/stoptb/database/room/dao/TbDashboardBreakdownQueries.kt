@@ -6,6 +6,7 @@ import org.piramalswasthya.stoptb.model.DashboardBreakdownCounts
 
 /**
  * One query per dashboard section returning total / male / female / children / others / senior
+ * (and pregnant, where the dashboard shows it)
  * together (v63 dashboard). Each is the matching TbDashboardQueries COUNT with the gender, child
  * and senior filters moved into the select list, so a section costs one query per write instead
  * of six. Part of [TBDao].
@@ -14,7 +15,7 @@ interface TbDashboardBreakdownQueries {
 
     /** All six dashboard numbers of [TbDashboardQueries.getDashboardTbScreeningCount] in one query. */
     @Query("""
-        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen FROM TB_SCREENING ts
+        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'FEMALE' AND (b.gen_reproductiveStatusId = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS pv WHERE pv.benId = b.beneficiaryId AND pv.keyPopulationRiskFactors LIKE '%PREGNANCY%')) THEN 1 ELSE 0 END), 0) AS pregnant FROM TB_SCREENING ts
         INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
         WHERE (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
         AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
@@ -29,7 +30,8 @@ interface TbDashboardBreakdownQueries {
         " COUNT(DISTINCT CASE WHEN UPPER(COALESCE(b.gender, '')) = 'FEMALE' THEN scr.benId END) AS female," +
         " COUNT(DISTINCT CASE WHEN CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN scr.benId END) AS children," +
         " COUNT(DISTINCT CASE WHEN UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE') THEN scr.benId END) AS others," +
-        " 0 AS seniorCitizen FROM TB_SCREENING scr" +
+        " 0 AS seniorCitizen," +
+        " COUNT(DISTINCT CASE WHEN UPPER(COALESCE(b.gender, '')) = 'FEMALE' AND (b.gen_reproductiveStatusId = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS pv WHERE pv.benId = b.beneficiaryId AND pv.keyPopulationRiskFactors LIKE '%PREGNANCY%')) THEN scr.benId END) AS pregnant FROM TB_SCREENING scr" +
         " INNER JOIN beneficiary b ON b.beneficiaryId = scr.benId" +
         " LEFT JOIN TB_SUSPECTED sus ON b.beneficiaryId = sus.benId" +
         " LEFT JOIN TB_DIAGNOSTICS dx ON b.beneficiaryId = dx.benId" +
@@ -44,7 +46,7 @@ interface TbDashboardBreakdownQueries {
 
     /** All six dashboard numbers of [TbDashboardQueries.getDashboardPastHistoryTbCount] in one query. */
     @Query("""
-        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen FROM TB_SCREENING ts
+        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'FEMALE' AND (b.gen_reproductiveStatusId = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS pv WHERE pv.benId = b.beneficiaryId AND pv.keyPopulationRiskFactors LIKE '%PREGNANCY%')) THEN 1 ELSE 0 END), 0) AS pregnant FROM TB_SCREENING ts
         INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
         WHERE (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
         AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
@@ -58,7 +60,7 @@ interface TbDashboardBreakdownQueries {
 
     /** All six dashboard numbers of [TbDashboardQueries.getDashboardAntiTbDrugsCount] in one query. */
     @Query("""
-        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen FROM TB_SCREENING ts
+        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'FEMALE' AND (b.gen_reproductiveStatusId = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS pv WHERE pv.benId = b.beneficiaryId AND pv.keyPopulationRiskFactors LIKE '%PREGNANCY%')) THEN 1 ELSE 0 END), 0) AS pregnant FROM TB_SCREENING ts
         INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
         WHERE (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
         AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
@@ -72,7 +74,7 @@ interface TbDashboardBreakdownQueries {
 
     /** All six dashboard numbers of [TbDashboardQueries.getDashboardTbSuspectedCount] in one query. */
     @Query("""
-        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen FROM (
+        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen, 0 AS pregnant FROM (
             SELECT b.beneficiaryId, b.gender AS bd_gender, b.dob AS bd_dob FROM TB_SUSPECTED ts
             INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
             WHERE (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
@@ -97,11 +99,13 @@ interface TbDashboardBreakdownQueries {
 
     /** All six dashboard numbers of [TbDashboardQueries.getDashboardNikshayCount] in one query. */
     @Query("""
-        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen FROM TB_SUSPECTED ts
-        INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-        WHERE ts.nikshayId IS NOT NULL AND ts.nikshayId != ''
+        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'FEMALE' AND (b.gen_reproductiveStatusId = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS pv WHERE pv.benId = b.beneficiaryId AND pv.keyPopulationRiskFactors LIKE '%PREGNANCY%')) THEN 1 ELSE 0 END), 0) AS pregnant FROM beneficiary b
+        WHERE UPPER(TRIM(IFNULL(b.nikshayId, ''))) NOT IN ('', 'N/A')
         AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-        AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
+        AND (:startTime = 0 OR :endTime = 0 OR EXISTS (
+            SELECT 1 FROM TB_SUSPECTED ts WHERE ts.benId = b.beneficiaryId
+            AND (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime
+        ))
         AND (:endTime = :endTime)
         AND IFNULL(b.isDeath, 0) = 0
     """)
@@ -109,7 +113,7 @@ interface TbDashboardBreakdownQueries {
 
     /** All six dashboard numbers of [TbDashboardQueries.getDashboardDigitalChestXRayCount] in one query. */
     @Query("""
-        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen FROM (
+        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen, 0 AS pregnant FROM (
             SELECT b.beneficiaryId, b.gender AS bd_gender, b.dob AS bd_dob FROM TB_SUSPECTED ts
             INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
             LEFT JOIN TB_DIAGNOSTICS td ON td.benId = ts.benId
@@ -136,8 +140,8 @@ interface TbDashboardBreakdownQueries {
 
     /** All six dashboard numbers of [TbDashboardQueries.getDashboardSputumCollectionCount] in one query. */
     @Query("""
-        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen FROM (
-            SELECT b.beneficiaryId, b.gender AS bd_gender, b.dob AS bd_dob FROM TB_SUSPECTED ts
+        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'FEMALE' AND (bd_rs = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS pv WHERE pv.benId = bd_id AND pv.keyPopulationRiskFactors LIKE '%PREGNANCY%')) THEN 1 ELSE 0 END), 0) AS pregnant FROM (
+            SELECT b.beneficiaryId, b.gender AS bd_gender, b.dob AS bd_dob, b.gen_reproductiveStatusId AS bd_rs, b.beneficiaryId AS bd_id FROM TB_SUSPECTED ts
             INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
             LEFT JOIN TB_DIAGNOSTICS td ON td.benId = ts.benId
             WHERE ts.isSputumCollected = 1 AND (td.benId IS NULL OR td.trueNatOrderStatus = 'COMPLETED' OR (td.trueNatOrderStatus = 'CLOSED' AND td.reasonForDenialSputum IS NOT NULL))
@@ -148,7 +152,7 @@ interface TbDashboardBreakdownQueries {
             
             
             UNION
-            SELECT b.beneficiaryId, b.gender AS bd_gender, b.dob AS bd_dob FROM TB_DIAGNOSTICS td
+            SELECT b.beneficiaryId, b.gender AS bd_gender, b.dob AS bd_dob, b.gen_reproductiveStatusId AS bd_rs, b.beneficiaryId AS bd_id FROM TB_DIAGNOSTICS td
             INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
             WHERE td.isReferredForSputum = 1 AND (td.trueNatOrderStatus = 'COMPLETED' OR (td.trueNatOrderStatus = 'CLOSED' AND td.reasonForDenialSputum IS NOT NULL))
             AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
@@ -163,8 +167,8 @@ interface TbDashboardBreakdownQueries {
 
     /** All six dashboard numbers of [TbDashboardQueries.getDashboardTrueNatCount] in one query. */
     @Query("""
-        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen FROM (
-            SELECT b.beneficiaryId, b.gender AS bd_gender, b.dob AS bd_dob FROM TB_SUSPECTED ts
+        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'FEMALE' AND (bd_rs = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS pv WHERE pv.benId = bd_id AND pv.keyPopulationRiskFactors LIKE '%PREGNANCY%')) THEN 1 ELSE 0 END), 0) AS pregnant FROM (
+            SELECT b.beneficiaryId, b.gender AS bd_gender, b.dob AS bd_dob, b.gen_reproductiveStatusId AS bd_rs, b.beneficiaryId AS bd_id FROM TB_SUSPECTED ts
             INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
             LEFT JOIN TB_DIAGNOSTICS td ON td.benId = ts.benId
             WHERE ts.isNaatConducted = 1 AND (td.benId IS NULL OR td.trueNatOrderStatus = 'COMPLETED')
@@ -175,7 +179,7 @@ interface TbDashboardBreakdownQueries {
             
             
             UNION
-            SELECT b.beneficiaryId, b.gender AS bd_gender, b.dob AS bd_dob FROM TB_DIAGNOSTICS td
+            SELECT b.beneficiaryId, b.gender AS bd_gender, b.dob AS bd_dob, b.gen_reproductiveStatusId AS bd_rs, b.beneficiaryId AS bd_id FROM TB_DIAGNOSTICS td
             INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
             WHERE td.isNaatConducted = 1 AND td.trueNatOrderStatus = 'COMPLETED'
             AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
@@ -190,8 +194,8 @@ interface TbDashboardBreakdownQueries {
 
     /** All six dashboard numbers of [TbDashboardQueries.getDashboardLiquidCultureCount] in one query. */
     @Query("""
-        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen FROM (
-            SELECT b.beneficiaryId, b.gender AS bd_gender, b.dob AS bd_dob FROM TB_SUSPECTED ts
+        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'FEMALE' AND (bd_rs = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS pv WHERE pv.benId = bd_id AND pv.keyPopulationRiskFactors LIKE '%PREGNANCY%')) THEN 1 ELSE 0 END), 0) AS pregnant FROM (
+            SELECT b.beneficiaryId, b.gender AS bd_gender, b.dob AS bd_dob, b.gen_reproductiveStatusId AS bd_rs, b.beneficiaryId AS bd_id FROM TB_SUSPECTED ts
             INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
             WHERE ts.isLiquidCultureConducted = 1
             AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
@@ -201,7 +205,7 @@ interface TbDashboardBreakdownQueries {
             
             
             UNION
-            SELECT b.beneficiaryId, b.gender AS bd_gender, b.dob AS bd_dob FROM TB_DIAGNOSTICS td
+            SELECT b.beneficiaryId, b.gender AS bd_gender, b.dob AS bd_dob, b.gen_reproductiveStatusId AS bd_rs, b.beneficiaryId AS bd_id FROM TB_DIAGNOSTICS td
             INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
             WHERE td.isLiquidCultureConducted = 1
             AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
@@ -216,8 +220,8 @@ interface TbDashboardBreakdownQueries {
 
     /** All six dashboard numbers of [TbDashboardQueries.getDashboardHwcReferralCount] in one query. */
     @Query("""
-        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen FROM (
-            SELECT b.beneficiaryId, b.gender AS bd_gender, b.dob AS bd_dob FROM beneficiary b
+        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - bd_dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen, COALESCE(SUM(CASE WHEN UPPER(COALESCE(bd_gender, '')) = 'FEMALE' AND (bd_rs = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS pv WHERE pv.benId = bd_id AND pv.keyPopulationRiskFactors LIKE '%PREGNANCY%')) THEN 1 ELSE 0 END), 0) AS pregnant FROM (
+            SELECT b.beneficiaryId, b.gender AS bd_gender, b.dob AS bd_dob, b.gen_reproductiveStatusId AS bd_rs, b.beneficiaryId AS bd_id FROM beneficiary b
             WHERE b.temperature IS NOT NULL AND b.temperature >= 100.0
             AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
             AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN IFNULL(b.updatedDate, 0) >= 100000000000 THEN b.updatedDate WHEN IFNULL(b.updatedDate, 0) > 0 THEN b.updatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
@@ -226,7 +230,7 @@ interface TbDashboardBreakdownQueries {
             
             
             UNION
-            SELECT b.beneficiaryId, b.gender AS bd_gender, b.dob AS bd_dob FROM BEN_VITALS v
+            SELECT b.beneficiaryId, b.gender AS bd_gender, b.dob AS bd_dob, b.gen_reproductiveStatusId AS bd_rs, b.beneficiaryId AS bd_id FROM BEN_VITALS v
             INNER JOIN beneficiary b ON b.beneficiaryId = v.benId
             WHERE ((v.pulseRate IS NOT NULL AND v.pulseRate < 60)
                OR (v.pulseRate IS NOT NULL AND v.pulseRate > 90)
@@ -253,7 +257,7 @@ interface TbDashboardBreakdownQueries {
 
     /** All six dashboard numbers of [TbDashboardQueries.getDashboardUnscreenedCount] in one query. */
     @Query("""
-        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, 0 AS seniorCitizen FROM beneficiary b
+        SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female, COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children, COALESCE(SUM(CASE WHEN UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others, 0 AS seniorCitizen, 0 AS pregnant FROM beneficiary b
         WHERE b.beneficiaryId NOT IN (SELECT benId FROM TB_SCREENING)
         AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
         AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN IFNULL(b.updatedDate, 0) >= 100000000000 THEN b.updatedDate WHEN IFNULL(b.updatedDate, 0) > 0 THEN b.updatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)

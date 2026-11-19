@@ -6,6 +6,7 @@ import androidx.paging.PagingDataAdapter
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.BenBasicDomain
+import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.model.TbDiagnosticsCardFields
 import org.piramalswasthya.stoptb.ui.TbDiagnosticsSnapshot
 import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
@@ -30,7 +31,8 @@ class BenPagingAdapter(
     private val showRedesignedCard: Boolean = false,
     private val source: Int = 0,
     private val showContactTracingForms: Boolean = false,
-    private val showAddMemberButton: Boolean = false
+    private val showAddMemberButton: Boolean = false,
+    private val showVillageName: Boolean = false
 
 ) :
     PagingDataAdapter<BenBasicDomain, BenListAdapter.BenViewHolder>(BenListAdapter.BenDiffUtilCallBack) {
@@ -91,6 +93,7 @@ class BenPagingAdapter(
 
     private var tbScreeningMap: Map<Long, TbScreeningSymptoms> = emptyMap()
     private var retryingBenIds: Set<Long> = emptySet()
+    private var tbSuspectedRecords: List<TBSuspectedCache> = emptyList()
 
     override fun onCreateViewHolder(
         parent: ViewGroup, viewType: Int
@@ -141,7 +144,9 @@ class BenPagingAdapter(
             retryingBenIds = retryingBenIds,
             showContactTracingForms = showContactTracingForms,
             roleManager = roleManager,
-            showAddMemberButton = showAddMemberButton
+            showAddMemberButton = showAddMemberButton,
+            showVillageName = showVillageName,
+            tbSuspectedList = tbSuspectedRecords
         )
     }
 
@@ -185,6 +190,15 @@ class BenPagingAdapter(
         val newMap = list.associateBy { screening -> screening.benId }
         tbScreeningMap = newMap
         notifyLoadedRowsWhere { benId -> oldMap[benId] != newMap[benId] }
+    }
+
+    /** TB_SUSPECTED rows; only the Clinical Assessment list (source 10) shows them on the card. */
+    fun submitTbSuspected(list: List<TBSuspectedCache>) {
+        val old = tbSuspectedRecords.groupBy { it.benId }
+        tbSuspectedRecords = list
+        if (source != 10) return
+        val new = list.groupBy { it.benId }
+        notifyLoadedRowsWhere { benId -> old[benId] != new[benId] }
     }
 
     fun submitBenIds(list: List<Long>) { benIds = swapIds(benIds, list) }

@@ -78,6 +78,50 @@ data class GetDataPaginatedRequests(
 )
 
 @JsonClass(generateAdapter = true)
+data class GetMissingDataBenResponse(
+    val status: String? = null,
+    val message: String? = null,
+    val data: List<MissingDataBenDto>? = null,
+    val pagination: PaginationDto? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class MissingDataBenDto(
+    val beneficiaryId: Long,
+    val isUpdated: Boolean = false,
+    val reason: List<String>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class PaginationDto(
+    val page: Int = 0,
+    val size: Int = 10,
+    val totalElements: Int = 0,
+    val totalPages: Int = 0,
+    val hasNext: Boolean = false
+)
+
+@JsonClass(generateAdapter = true)
+data class UpdateNikshaySyncStatusRequest(
+    val beneficiaryId: Long,
+    val isUpdated: Boolean
+)
+
+@JsonClass(generateAdapter = true)
+data class UpdateNikshaySyncStatusResponse(
+    val status: String?,
+    val message: String?,
+    val data: NikshayUpdateData?
+)
+
+@JsonClass(generateAdapter = true)
+data class NikshayUpdateData(
+    val beneficiaryId: Long,
+    val isUpdated: Boolean,
+    val recordsUpdated: Int
+)
+
+@JsonClass(generateAdapter = true)
 data class NurseWorklistRequest(
     val providerServiceMapID: Int,
     val villageId: Int,
@@ -458,22 +502,29 @@ data class DiagnosticOrderPushRequest(
     val providerServiceMapID: Int,
     val orderType: String,
     val orderEvent: String = "STOP_TB_REFERRAL",
-    // Real backend field name (confirmed against the API doc's own order/push close/refuse
-    // example) — presence of this field is what makes order/push close/refuse the order instead
-    // of pushing it, per the documented contract.
-    val reasonToClose: String? = null,
+    // A reason for the order's test (X-ray or MTB) makes order/push close the order
+    // (beneficiary declined) instead of pushing it to the vendor.
+    val reasonToCloseXray: String? = null,
+    val reasonToCloseMTB: String? = null,
     val patient: PatientRequest
 )
 
+/**
+ * order/manualResult, one test per call:
+ *  - X-ray: [resultSummary] or [reasonToCloseXray]
+ *  - MTB:   [resultSummary] or [reasonToCloseMTB]
+ *  - RIF:   [mdrRifResult] or [reasonToCloseRif], on the same MTB order ([orderType] "MTB"),
+ *    only after the MTB result is TB Positive on the server.
+ * The server rejects more than one reasonToClose* in a call. Null fields are left out of the JSON.
+ */
 data class DiagnosticManualResultRequest(
     val beneficiaryId: Long,
     val orderType: String,
-    // Null when this call represents a "Not Conducted" closure rather than an actual result
-    // (see reasonToClose below) — Chest X-Ray order lifecycle redesign.
     val resultSummary: String? = null,
-    // Real backend field name (confirmed directly against the backend, not just the written API
-    // doc) — sent for the "Not Conducted" closure path only.
-    val reasonToClose: String? = null
+    val mdrRifResult: String? = null,
+    val reasonToCloseXray: String? = null,
+    val reasonToCloseMTB: String? = null,
+    val reasonToCloseRif: String? = null
 )
 
 // Real, confirmed `getBeneficiariesByStatus` response shape — exactly these 5 buckets.
@@ -722,6 +773,7 @@ data class TBSuspectedDTO(
 
 data class TBConfirmedTreatmentDTO(
     val id: Long, val benId: Long, val regimenType: String?,
+    val treatmentType: String? = null, val dsTbRegimen: String? = null, val pmdtRegimen: String? = null,
     val treatmentStartDate: String?, val expectedTreatmentCompletionDate: String?,
     val followUpDate: String?, val monthlyFollowUpDone: String?,
     val anyDiscomfort: Boolean?, val sideEffects: List<String>?,
@@ -733,6 +785,7 @@ data class TBConfirmedTreatmentDTO(
 ) {
     fun toCache(): TBConfirmedTreatmentCache = TBConfirmedTreatmentCache(
         benId = benId, regimenType = regimenType,
+        treatmentType = treatmentType, dsTbRegimen = dsTbRegimen, pmdtRegimen = pmdtRegimen,
         treatmentStartDate = getLongFromDateMultipleSupport(treatmentStartDate) ?: System.currentTimeMillis(),
         expectedTreatmentCompletionDate = getLongFromDateMultipleSupport(expectedTreatmentCompletionDate),
         followUpDate = getLongFromDateMultipleSupport(followUpDate),

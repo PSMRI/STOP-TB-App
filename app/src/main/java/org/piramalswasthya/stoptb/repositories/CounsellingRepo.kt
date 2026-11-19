@@ -130,7 +130,7 @@ class CounsellingRepo @Inject constructor(
                 val overviewData = CounsellingOverviewData(
                     benId = benId,
                     patientName = "${ben.firstName ?: ""} ${ben.lastName ?: ""}".trim(),
-                    nikshayId = ben.nikshayId ?: "",
+                    nikshayId = ben.nikshayId?.takeIf { it.isNotBlank() } ?: "N/A",
                     counsellingDate = displayDateStr,
                     counsellingOfficer = loggedInUser,
                     regDate = ben.regDate,
@@ -752,6 +752,11 @@ class CounsellingRepo @Inject constructor(
                 val versionId = formId * 1000 + formVersionNumber
                 val draftResponse = counsellingRepository.getOrCreateDraft(benId, versionId)
                 val responseId = draftResponse.formResponse.responseId
+
+                // Consent is locked; don't save or re-submit General Info to backend.
+                if (draftResponse.formResponse.status in setOf("SUBMITTED", "COMPLETE", "COMPLETED")) {
+                    return@withContext null
+                }
 
                 val answers = mutableListOf<QuestionResponseEntity>()
                 section.questions.filter { it.visible }.forEach { q ->

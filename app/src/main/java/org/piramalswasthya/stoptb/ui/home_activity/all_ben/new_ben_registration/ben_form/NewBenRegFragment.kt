@@ -18,13 +18,8 @@ import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.Toast
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Matrix
-import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.FileOutputStream
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.core.content.FileProvider
@@ -46,6 +41,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -55,6 +51,7 @@ import org.piramalswasthya.stoptb.databinding.AlertConsentBinding
 import org.piramalswasthya.stoptb.databinding.FragmentNewBenRegBinding
 import org.piramalswasthya.stoptb.databinding.LayoutViewMediaBinding
 import org.piramalswasthya.stoptb.helpers.GpsDiagnostics
+import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
@@ -83,6 +80,7 @@ class NewBenRegFragment : Fragment() {
     // ─── Speech to text ──────────────────────────────────────────────────
     private var micClickedElementId: Int = -1
     private val sttContract = registerForActivityResult(SpeechToTextContract()) { value ->
+        if (_binding == null || !isAdded) return@registerForActivityResult
         val formatted = value.uppercase()
         viewModel.updateValueByIdAndReturnListIndex(micClickedElementId, formatted)
             .takeIf { it >= 0 }
@@ -110,12 +108,6 @@ class NewBenRegFragment : Fragment() {
     private var fusedLocationClient: FusedLocationProviderClient? = null
     private var activeCancellationTokenSource: CancellationTokenSource? = null
 
-    private var isEditingExisting = false
-    private var updateLocationRequested = false
-
-    private var originalLocationState: LocationState? = null
-
-    private var originalCampSite = false
     private var suppressRadioCallbacks = false
     private var fetchTimeoutJob: Job? = null
 
@@ -190,7 +182,7 @@ class NewBenRegFragment : Fragment() {
         binding.cardLocation.visibility = View.VISIBLE
         setupLocationSection()
         if (viewModel.isStandalone && viewModel.recordExists.value == false
-            && !isEditingExisting && viewModel.getIsConsentAgreed()) {
+            && !viewModel.isEditingExisting && viewModel.getIsConsentAgreed()) {
             captureLocationSilently()
         }
 
@@ -254,7 +246,7 @@ class NewBenRegFragment : Fragment() {
         binding.form.rvInputForm.adapter = adapter
         binding.form.rvInputForm.itemAnimator = null
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.formList.collect {
                 if (it.isNotEmpty()) adapter.submitList(it)
             }
@@ -298,9 +290,13 @@ class NewBenRegFragment : Fragment() {
                 State.SAVE_SUCCESS -> {
                     binding.llContent.visibility = View.VISIBLE
                     binding.pbForm.visibility = View.GONE
-                    Toast.makeText(context, resources.getString(R.string.registration_successful), Toast.LENGTH_LONG).show()
+                    val toastMessageResId =
+                        if (viewModel.isDataUpdateFlow) R.string.data_update_successful else R.string.registration_successful
+                    Toast.makeText(context, resources.getString(toastMessageResId), Toast.LENGTH_LONG).show()
                     try {
-                        WorkerUtils.triggerAmritPushWorker(requireContext(), "DIRECT_SAVE")
+                        if (viewModel.isDataUpdateFlow.not()) {
+                            WorkerUtils.triggerAmritPushWorker(requireContext(), "DIRECT_SAVE")
+                        }
                         if (viewModel.isNonHHArg) {
                             val popped = findNavController().popBackStack(R.id.nonHHFragment, false)
                             if (!popped) findNavController().navigateUp()
@@ -322,23 +318,36 @@ class NewBenRegFragment : Fragment() {
 
         // Edit FAB
         binding.fabEdit.setOnClickListener {
-            isEditingExisting = true
-            originalLocationState = viewModel.locationState.value
-            originalCampSite = viewModel.isCampSite.value
-            updateLocationRequested = false
-
-            viewModel.setLocationOverridden(false)
-            suppressRadioCallbacks = true
-            binding.rbUpdateNo.isChecked = true
-            binding.rgCampSite.check(if (originalCampSite) R.id.rb_camp_yes else R.id.rb_camp_no)
-            suppressRadioCallbacks = false
-            viewModel.setRecordExist(false)
-            viewModel.enableEditMode()
-            binding.fabEdit.visibility = View.GONE
-            binding.btnSubmit.visibility = View.VISIBLE
+            fabEditClickEvent()
             adapter.isEnabled = true
             adapter.notifyDataSetChanged()
         }
+
+        // Also runs for a view recreated mid-edit: the session lives in the ViewModel, so this
+        // only restores the controls and keeps a location update already in progress.
+        if (viewModel.isDataUpdateFlow || viewModel.isEditingExisting) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                viewModel.isLoading.first { !it }
+                fabEditClickEvent()
+                adapter.isEnabled = true
+                adapter.notifyDataSetChanged()
+            }
+        }
+    }
+
+    private fun fabEditClickEvent() {
+        viewModel.startEditSession()
+
+        suppressRadioCallbacks = true
+        if (viewModel.locationOverridden) binding.rbUpdateYes.isChecked = true
+        else binding.rbUpdateNo.isChecked = true
+        // Equals the original camp-site choice until the user picks "update = Yes" and changes it
+        binding.rgCampSite.check(if (viewModel.isCampSite.value) R.id.rb_camp_yes else R.id.rb_camp_no)
+        suppressRadioCallbacks = false
+        viewModel.setRecordExist(false)
+        viewModel.enableEditMode()
+        binding.fabEdit.visibility = View.GONE
+        binding.btnSubmit.visibility = View.VISIBLE
     }
 
     // Both fabEdit observers must call this rather than recompute their own check — isDeath
@@ -398,7 +407,7 @@ class NewBenRegFragment : Fragment() {
 
     private fun isLocationEditable(): Boolean {
         if (viewModel.recordExists.value != false) return false
-        return if (isEditingExisting) updateLocationRequested && !viewModel.isCampSite.value
+        return if (viewModel.isEditingExisting) viewModel.locationOverridden && !viewModel.isCampSite.value
         else viewModel.isStandalone
     }
 
@@ -406,12 +415,12 @@ class NewBenRegFragment : Fragment() {
         if (_binding == null) return
         val editing = viewModel.recordExists.value == false
         binding.llUpdateLocation.visibility =
-            if (editing && isEditingExisting) View.VISIBLE else View.GONE
+            if (editing && viewModel.isEditingExisting) View.VISIBLE else View.GONE
         binding.llCampSiteChoice.visibility =
-            if (editing && isEditingExisting && updateLocationRequested) View.VISIBLE else View.GONE
+            if (editing && viewModel.isEditingExisting && viewModel.locationOverridden) View.VISIBLE else View.GONE
         // A new member of a household inherits the household location, so no refresh there
         binding.btnRefreshLocation.visibility =
-            if (viewModel.isStandalone || isEditingExisting) View.VISIBLE else View.GONE
+            if (viewModel.isStandalone || viewModel.isEditingExisting) View.VISIBLE else View.GONE
         binding.btnRefreshLocation.isEnabled =
             isLocationEditable() && viewModel.locationState.value !is LocationState.Fetching
     }
@@ -419,8 +428,8 @@ class NewBenRegFragment : Fragment() {
     private fun updateSubmitButtonState() {
         if (_binding == null) return
         val locationOk = when {
-            isEditingExisting && !updateLocationRequested -> true
-            viewModel.isStandalone || isEditingExisting -> viewModel.isLocationValid()
+            viewModel.isEditingExisting && !viewModel.locationOverridden -> true
+            viewModel.isStandalone || viewModel.isEditingExisting -> viewModel.isLocationValid()
             else -> true
         }
         binding.btnSubmit.isEnabled = locationOk
@@ -437,8 +446,7 @@ class NewBenRegFragment : Fragment() {
     }
 
     private fun onUpdateLocationChanged(yes: Boolean) {
-        if (yes == updateLocationRequested) return
-        updateLocationRequested = yes
+        if (yes == viewModel.locationOverridden) return
         viewModel.setLocationOverridden(yes)
         if (yes) {
             suppressRadioCallbacks = true
@@ -449,8 +457,8 @@ class NewBenRegFragment : Fragment() {
             if (!viewModel.isCampSite.value) captureLocationSilently()
         } else {
             cancelLocationFetch()
-            viewModel.onCampSiteChanged(originalCampSite)
-            originalLocationState?.let { viewModel.restoreLocationState(it) }
+            viewModel.onCampSiteChanged(viewModel.originalCampSite)
+            viewModel.originalLocationState?.let { viewModel.restoreLocationState(it) }
         }
         updateCampSiteBox()
         updateLocationControls()
@@ -837,6 +845,7 @@ class NewBenRegFragment : Fragment() {
         super.onStart()
         val isNonHH = viewModel.isNonHHArg || (viewModel.benIdFromArgs != 0L && viewModel.showLinkHouseholdButton)
         val title = when {
+            viewModel.isDataUpdateFlow -> getString(R.string.beneficiary_details)
             isNonHH                     -> getString(R.string.title_new_non_hh_reg)
             viewModel.relToHeadId == 18 -> getString(R.string.title_new_ben_reg_hof)
             viewModel.relToHeadId > 0   -> getString(R.string.title_new_ben_reg_non_hof)
@@ -874,7 +883,7 @@ class NewBenRegFragment : Fragment() {
             if (alertBinding.checkBox.isChecked) {
                 viewModel.setConsentAgreed()
                 alertDialog.dismiss()
-                if (viewModel.isStandalone && viewModel.recordExists.value == false && !isEditingExisting) {
+                if (viewModel.isStandalone && viewModel.recordExists.value == false && !viewModel.isEditingExisting) {
                     captureLocationSilently()
                 }
             } else {
@@ -892,7 +901,9 @@ class NewBenRegFragment : Fragment() {
             .setCancelable(false)
             .setPositiveButton(getString(R.string.discard)) { dialog, _ ->
                 dialog.dismiss()
-                if (isAdded) {
+                if (viewModel.isDataUpdateFlow) {
+                    findNavController().popBackStack()
+                } else if (isAdded) {
                     val popped = findNavController().popBackStack(R.id.homeFragment, false)
                     if (!popped) {
                         findNavController().popBackStack(R.id.volunteerHomeFragment, false)
@@ -905,7 +916,7 @@ class NewBenRegFragment : Fragment() {
 
     // ─── Preview bottom sheet ────────────────────────────────────────────
     private fun showPreview() {
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             val previewItems = try {
                 viewModel.getFormPreviewData()
             } catch (e: Exception) {
@@ -971,7 +982,7 @@ class NewBenRegFragment : Fragment() {
 
     // ─── Camera ──────────────────────────────────────────────────────────
     private fun takeImage() {
-        lifecycleScope.launchWhenStarted {
+        viewLifecycleOwner.lifecycleScope.launchWhenStarted {
             latestTmpUri = getTmpFileUri()
             takePicture.launch(latestTmpUri)
         }
@@ -992,9 +1003,11 @@ class NewBenRegFragment : Fragment() {
 
         detector.process(image)
             .addOnSuccessListener { faces ->
+                if (_binding == null || !isAdded) return@addOnSuccessListener
                 if (faces.isNotEmpty()) {
+                    val context = requireContext()
                     viewLifecycleOwner.lifecycleScope.launch {
-                        val finalUri = withContext(Dispatchers.Default) { compressPhoto(uri) } ?: uri
+                        val finalUri = withContext(Dispatchers.IO) { compressPhoto(context, uri) } ?: uri
                         viewModel.setImageUriToFormElement(finalUri)
                         binding.form.rvInputForm.adapter?.notifyItemChanged(0)
                         if (continuePreviewAfterPhoto) {
@@ -1009,6 +1022,7 @@ class NewBenRegFragment : Fragment() {
                 }
             }
             .addOnFailureListener {
+                if (_binding == null || !isAdded) return@addOnFailureListener
                 Timber.e(it, "Beneficiary face detection failed")
                 Toast.makeText(requireContext(), getString(R.string.unable_to_validate_photo), Toast.LENGTH_SHORT).show()
                 continuePreviewAfterPhoto = false
@@ -1029,45 +1043,14 @@ class NewBenRegFragment : Fragment() {
     }
 
 
-    /** Resizes to max 1024px on the long side and re-encodes as JPEG (~100-250 KB). Returns null on failure. */
-    private fun compressPhoto(uri: Uri, maxDim: Int = 1024, quality: Int = 70): Uri? {
-        return try {
-            val resolver = requireContext().contentResolver
-
-            // 1. Read size only
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-
-            // 2. Decode a downsampled bitmap
-            var sample = 1
-            while (bounds.outWidth / (sample * 2) >= maxDim || bounds.outHeight / (sample * 2) >= maxDim) sample *= 2
-            val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-            var bmp = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) } ?: return null
-
-            // 3. Keep the correct orientation
-            val rotation = resolver.openInputStream(uri)?.use {
-                when (ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
-                    ExifInterface.ORIENTATION_ROTATE_90 -> 90f
-                    ExifInterface.ORIENTATION_ROTATE_180 -> 180f
-                    ExifInterface.ORIENTATION_ROTATE_270 -> 270f
-                    else -> 0f
-                }
-            } ?: 0f
-
-            // 4. Final scale to maxDim (and rotate if needed)
-            val scale = minOf(1f, maxDim.toFloat() / maxOf(bmp.width, bmp.height))
-            val m = Matrix().apply { postScale(scale, scale); postRotate(rotation) }
-            val out = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
-            if (out !== bmp) bmp.recycle()
-
-            // 5. Write the compressed JPEG
-            val file = File.createTempFile(Konstants.tempBenImagePrefix, ".jpg", requireActivity().cacheDir)
-            FileOutputStream(file).use { out.compress(Bitmap.CompressFormat.JPEG, quality, it) }
-            out.recycle()
-            FileProvider.getUriForFile(requireContext(), "${requireContext().packageName}.provider", file)
-        } catch (e: Exception) {
-            Timber.e(e, "Photo compression failed")
+    /** Shrinks a camera photo to at most 400 KB without stretching it. Returns null on failure. */
+    private fun compressPhoto(context: Context, uri: Uri): Uri? {
+        val file = File.createTempFile(Konstants.tempBenImagePrefix, ".jpg", context.cacheDir)
+        return if (ImageUtils.compressToJpeg(context, uri, file)) {
+            FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+        } else {
+            file.delete()
+            Timber.e("Photo compression failed")
             null
         }
     }
@@ -1092,19 +1075,22 @@ class NewBenRegFragment : Fragment() {
 
     override fun onDestroyView() {
         gpsWatchdogJob?.cancel()
+        fetchTimeoutJob?.cancel()
+        activeCancellationTokenSource?.cancel()
+        activeCancellationTokenSource = null
         stopListeningForLocation()
-        super.onDestroyView()
         activity?.let { act ->
             when (act) {
                 is HomeActivity -> act.restoreToolbarNavigation()
                 is VolunteerActivity -> act.restoreToolbarNavigation()
             }
         }
+        _binding = null
+        super.onDestroyView()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        _binding = null
     }
 
     private fun triggerLinkHouseholdFlow(benId: Long) {
@@ -1129,7 +1115,7 @@ class NewBenRegFragment : Fragment() {
     }
 
     private fun showExistingHouseholdSelectionDialog(benId: Long) {
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             val hhList = viewModel.hhList.firstOrNull()
             if (hhList.isNullOrEmpty()) {
                 Toast.makeText(requireContext(), "No existing households found in this village", Toast.LENGTH_SHORT).show()
@@ -1240,7 +1226,7 @@ class NewBenRegFragment : Fragment() {
     }
 
     private fun showRelationshipSelectionDialog(benId: Long, hhId: Long) {
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             val ben = viewModel.getBenFromId(benId) ?: return@launch
             val isFemale = ben.genderId == 2 || ben.gender?.name?.equals("FEMALE", ignoreCase = true) == true
 

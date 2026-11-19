@@ -22,7 +22,9 @@ import androidx.paging.LoadState
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -30,9 +32,12 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.ui.loadedIds
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.configuration.HouseholdSpouseRelations
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.adapters.BenListAdapter
+import org.piramalswasthya.stoptb.ui.contact_tracing.ContactTracingActivity
+import org.piramalswasthya.stoptb.utils.CommonConstants
 import org.piramalswasthya.stoptb.adapters.BenPagingAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -105,6 +110,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
     private var addMemberAlert: androidx.appcompat.app.AlertDialog? = null
     private var addMemberAlertBinding: AlertNewBenBinding? = null
+    private var addMemberLookupJob: Job? = null
 
     private val viewModel: AllBenViewModel by viewModels()
 
@@ -244,6 +250,10 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             viewModel.downloadCsv(requireContext())
         }
 
+        if (args.source == BenListAdapter.VULNERABLE_POPULATION_SOURCE) {
+            setupVulnerabilityFilter()
+        }
+
         var lastClickTime = 0L
         benAdapter = BenPagingAdapter(
             clickListener = BenListAdapter.BenClickListener(
@@ -372,6 +382,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                         OrderAction.REORDER -> {
                             viewModel.createNewOrder(item.benId, orderType ?: return@BenClickListener, requireContext())
                         }
+                        // "Enter RIF Result" opens the same TrueNat form with MTB locked and only RIF open
+                        // (TBSuspectedQuickDataset.canEnterRif); "RIF Not Conducted" goes through NOT_CONDUCTED.
                         OrderAction.COMPLETE_RIF -> {
                             findNavController().navigate(
                                 AllBenFragmentDirections.actionAllBenFragmentToTBSuspectedQuickFragment(
@@ -469,6 +481,17 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 },
                 clickedAddMember = { item ->
                     if (!isReadOnlyReferralList) addMemberToBeneficiaryHousehold(item)
+                },
+                clickedContactFollowUp = { item ->
+                    if (args.source != BenListAdapter.VULNERABLE_POPULATION_SOURCE) return@BenClickListener
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        // In Camp Mode the push can replace a temp benId after this card captured it;
+                        // open the form with the current ID so camp results and responses resolve.
+                        val currentBenId = benRepo.resolveCurrentBenId(item.benId)
+                        ContactTracingActivity.startForType(
+                            requireContext(), currentBenId, ContactTracingActivity.CONTACT_TYPE_FOLLOW_UP
+                        )
+                    }
                 }
             ),
             showBeneficiaries = true,
@@ -487,7 +510,10 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             showRedesignedCard = true,
             source = args.source,
             showContactTracingForms = args.showContactTracingForms,
-            showAddMemberButton = !isReadOnlyReferralList
+            // Add Member is a Registrar action; hidden on the Counsellor-only Vulnerable Population list (STOP-771).
+            showAddMemberButton = !isReadOnlyReferralList &&
+                    args.source != BenListAdapter.VULNERABLE_POPULATION_SOURCE,
+            showVillageName = true
 
         )
 
@@ -927,7 +953,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         super.onResume()
         updateToolbarTitle()
         viewModel.invalidateCheckedNoPushBenIds()
-        viewModel.fetchBeneficiaryStatuses()
+        // Order statuses and results arrive through the changes feed; no sweep on resume.
         
         val sh = findNavController().currentBackStackEntry?.savedStateHandle
         if (sh?.remove<Boolean>("examine_flow_done") == true) {
@@ -1079,6 +1105,14 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     }
                 }
 
+                // Only the Clinical Assessment list (source 10) shows TB_SUSPECTED on the card;
+                // the other lists skip the whole-table read.
+                if (args.source == 10) launch {
+                    viewModel.allTbSuspected.collectLatest { suspectedList ->
+                        benAdapter.submitTbSuspected(suspectedList)
+                    }
+                }
+
                 launch {
                     viewModel.retryingBenIds.collectLatest { benIds ->
                         benAdapter.submitRetryingBenIds(benIds)
@@ -1106,6 +1140,8 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                 getString(R.string.icon_title_tpt_module)
             } else if (args.source == 10) {
                 getString(R.string.referral_clinical_assessment)
+            } else if (args.source == BenListAdapter.VULNERABLE_POPULATION_SOURCE) {
+                getString(R.string.icon_title_vulnerable_population)
             } else {
                 getString(R.string.icon_title_ben)
             }
@@ -1131,14 +1167,57 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         }
     }
 
+    /**
+     * Vulnerable Population list (source 11, STOP-771): reuses the existing filterText row as the
+     * "Vulnerability conditions" filter. Options: All (default), Tribal, then every TB Screening
+     * risk factor except Other / Not Applicable, labelled from the same translated array the
+     * TB Screening Form uses (R.array.key_population_risk_factor_options, index-aligned with
+     * CommonConstants.RISK_FACTOR_CODES).
+     */
+    private fun setupVulnerabilityFilter() {
+        val riskFactorLabels = resources.getStringArray(R.array.key_population_risk_factor_options)
+        val options: List<Pair<String, String>> = buildList {
+            add("" to getString(R.string.all))
+            add(BenListAdapter.VULNERABILITY_TRIBAL_CODE to getString(R.string.vulnerability_tribal))
+            CommonConstants.RISK_FACTOR_CODES.forEachIndexed { index, code ->
+                if (code == "OTHER" || code == "NOT_APPLICABLE") return@forEachIndexed
+                riskFactorLabels.getOrNull(index)?.let { add(code to it) }
+            }
+        }
+
+        fun renderSelected(code: String) {
+            val label = options.firstOrNull { it.first == code }?.second ?: getString(R.string.all)
+            binding.tvSelectedFilter.text = getString(R.string.vulnerability_conditions_selected, label)
+        }
+
+        binding.filterText.visibility = View.VISIBLE
+        renderSelected(viewModel.vulnerabilityCode.value)
+        binding.filterText.setOnClickListener {
+            val checked = options.indexOfFirst { it.first == viewModel.vulnerabilityCode.value }.coerceAtLeast(0)
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.vulnerability_conditions)
+                .setSingleChoiceItems(options.map { it.second }.toTypedArray(), checked) { dialog, which ->
+                    val code = options[which].first
+                    viewModel.filterVulnerability(code)
+                    renderSelected(code)
+                    dialog.dismiss()
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
+        }
+    }
+
     private fun addMemberToBeneficiaryHousehold(item: org.piramalswasthya.stoptb.model.BenBasicDomain) {
         if (item.isNonHH || item.isDeath || item.isDeactivate) return
-        viewLifecycleOwner.lifecycleScope.launch {
+        addMemberLookupJob?.cancel()
+        addMemberLookupJob = viewLifecycleOwner.lifecycleScope.launch {
             if (viewModel.isHouseholdMemberLimitReached(item.hhId)) {
                 showHouseholdMemberLimitReachedMessage(item.hhId)
                 return@launch
             }
+            addMemberAlertBinding?.let { resetAddMemberDialog(it) }
             viewModel.setSelectedHouseholdForAddMember(item.hhId)
+            if (!isActive || viewModel.selectedHouseholdIdForAddMember != item.hhId) return@launch
             addMemberAlert?.show()
         }
     }
@@ -1148,7 +1227,9 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         val fatherRegistered: Boolean,
         val motherRegistered: Boolean,
         val unmarried: Boolean,
-        val married: Boolean
+        val married: Boolean,
+        val wifeRegistered: Boolean,
+        val husbandRegistered: Boolean
     )
 
     private fun computeHofContextForAddMember(): HofContext {
@@ -1158,7 +1239,15 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         val motherRegistered = list.any { it.familyHeadRelationPosition == 1 }
         val unmarried = hof?.genDetails?.maritalStatusId == 1
         val married = hof?.genDetails?.maritalStatusId == 2
-        return HofContext(hof, fatherRegistered, motherRegistered, unmarried, married)
+        val wifeRegistered = list.any {
+            HouseholdSpouseRelations.isWife(it.familyHeadRelationPosition)
+        }
+        val husbandRegistered = list.any {
+            HouseholdSpouseRelations.isHusband(it.familyHeadRelationPosition)
+        }
+        return HofContext(
+            hof, fatherRegistered, motherRegistered, unmarried, married, wifeRegistered, husbandRegistered
+        )
     }
 
     private fun baseRelationDropdownForAddMember(selectedGender: org.piramalswasthya.stoptb.model.Gender?): List<String> {
@@ -1175,7 +1264,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         baseList: List<String>,
         context: HofContext
     ): List<String> {
-        if (context.hof == null) return baseList
+        if (context.hof == null) return withoutRegisteredSpouseForAddMember(baseList, context)
 
         val relationList = baseList.toMutableList()
         val commonRelations = resources.getStringArray(R.array.nbr_relationship_to_head)
@@ -1200,7 +1289,18 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             relationList.remove(commonRelations[4])
         }
 
-        return relationList
+        return withoutRegisteredSpouseForAddMember(relationList, context)
+    }
+
+    private fun withoutRegisteredSpouseForAddMember(relations: List<String>, context: HofContext): List<String> {
+        val labels = resources.getStringArray(R.array.nbr_relationship_to_head)
+        return HouseholdSpouseRelations.withoutRegisteredSpouse(
+            relations,
+            wifeLabel = labels.getOrNull(4),
+            husbandLabel = labels.getOrNull(5),
+            wifeRegistered = context.wifeRegistered,
+            husbandRegistered = context.husbandRegistered
+        )
     }
 
     private fun genderFromRadioIdForAddMember(alertBinding: AlertNewBenBinding, checkedId: Int): org.piramalswasthya.stoptb.model.Gender? =
@@ -1252,13 +1352,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
         addMemberAlert = MaterialAlertDialogBuilder(requireContext())
             .setView(alertBinding.root)
-            .setOnCancelListener {
-                viewModel.resetSelectedHouseholdForAddMember()
-                alertBinding.rgGender.clearCheck()
-                alertBinding.linearLayout4.visibility = View.GONE
-                alertBinding.actvRth.text = null
-                alertBinding.btnOk.isEnabled = false
-            }
+            .setOnCancelListener { dismissAddMemberDialog(alertBinding) }
             .create()
 
         alertBinding.btnOk.setOnClickListener {
@@ -1276,14 +1370,27 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
                     gender = gender
                 )
             )
-            viewModel.resetSelectedHouseholdForAddMember()
+            dismissAddMemberDialog(alertBinding)
             addMemberAlert?.dismiss()
         }
 
         alertBinding.btnCancel.setOnClickListener {
-            viewModel.resetSelectedHouseholdForAddMember()
+            dismissAddMemberDialog(alertBinding)
             addMemberAlert?.dismiss()
         }
+    }
+
+    private fun dismissAddMemberDialog(alertBinding: AlertNewBenBinding) {
+        addMemberLookupJob?.cancel()
+        viewModel.resetSelectedHouseholdForAddMember()
+        resetAddMemberDialog(alertBinding)
+    }
+
+    private fun resetAddMemberDialog(alertBinding: AlertNewBenBinding) {
+        alertBinding.rgGender.clearCheck()
+        alertBinding.linearLayout4.visibility = View.GONE
+        alertBinding.actvRth.text = null
+        alertBinding.btnOk.isEnabled = false
     }
 
     override fun onDestroy() {

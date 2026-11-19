@@ -94,12 +94,13 @@ enum class ScreeningStatus {
  * TB_SCREENING directly and so observe it on their own, which is correct: those screens should
  * refresh on a screening write. A plain beneficiary list should not.
  */
+
 @DatabaseView(
     viewName = "BEN_BASIC_CACHE",
     value = "SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.updatedDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId" +
             ", b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod" +
             ", b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus" +
-            ", b.loc_village_id as villageId, b.abha_healthIdNumber as abhaId" +
+            ", b.loc_village_id as villageId, b.loc_village_name as villageName, b.abha_healthIdNumber as abhaId" +
             ", b.isNewAbha" +
             // Literals, not subqueries - see the note above the view. Nothing in Kotlin reads
             // these six columns; they only ever appeared in SQL predicates, which now test the
@@ -134,12 +135,12 @@ enum class ScreeningStatus {
             ", b.institutionName" +
             " FROM BENEFICIARY b " +
             "LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId " +
-            // No ORDER BY in the view (v63). It made SQLite sort every non-draft beneficiary
-            // under every COUNT and every query on the view - the dominant cost at 100K+.
-            // List queries that relied on it now say ORDER BY <alias>.updatedDate DESC
-            // themselves (updatedDate is exposed for that). GROUP BY stays dropped: the join is
-            // on HOUSEHOLD's primary key, so it cannot multiply rows.
-            "WHERE b.isDraft = 0"
+            // No ORDER BY in the view. It made SQLite sort every non-draft beneficiary under
+            // every COUNT and every query on the view - the dominant cost at 100K+. List queries
+            // that relied on it now say ORDER BY <alias>.updatedDate DESC themselves (updatedDate
+            // is exposed for that). GROUP BY stays dropped: the join is on HOUSEHOLD's primary
+            // key, so it cannot multiply rows. Door-locked households stay hidden (v70).
+            "WHERE b.isDraft = 0 AND IFNULL(h.isDoorLocked, 0) = 0"
 )
 @Parcelize
 data class BenBasicCache(
@@ -238,7 +239,8 @@ data class BenBasicCache(
     val chestXrayDoneDate: Long? = null,
     val trunatTestDoneDate: Long? = null,
     val otherPlaceOfCurrentLiving: String? = null,
-    val institutionName: String? = null
+    val institutionName: String? = null,
+    val villageName: String? = null
 ) : Parcelable {
     companion object {
         val dateFormat = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
@@ -363,7 +365,8 @@ data class BenBasicCache(
             screeningStatus = screeningStatus,
             symptomsScreenedDate = symptomsScreenedDate,
             chestXrayDoneDate = chestXrayDoneDate,
-            trunatTestDoneDate = trunatTestDoneDate
+            trunatTestDoneDate = trunatTestDoneDate,
+            villageName = villageName?.takeIf { it.isNotBlank() }
         )
     }
 
@@ -404,7 +407,8 @@ data class BenBasicCache(
             trunatTestDoneDate = trunatTestDoneDate,
             placeOfCurrentLiving = placeOfCurrentLiving,
             otherPlaceOfCurrentLiving = otherPlaceOfCurrentLiving,
-            institutionName = institutionName
+            institutionName = institutionName,
+            villageName = villageName?.takeIf { it.isNotBlank() }
         )
     }
 
@@ -996,7 +1000,8 @@ data class BenBasicDomain(
     val trunatTestDoneDate: Long? = null,
     val placeOfCurrentLiving: Int? = null,
     val otherPlaceOfCurrentLiving: String? = null,
-    val institutionName: String? = null
+    val institutionName: String? = null,
+    val villageName: String? = null
 
 ) : Parcelable{
     val dobString: String

@@ -524,7 +524,7 @@
     <string name="symptomatic_tb_screening">टीबी के लक्षणों की जांच</string>
     <string name="tb_asymptomatic_symptoms">बिना लक्षण वाले लोगों की टीबी जांच</string>
     <string name="tb_is_beneficiary_asymptomatic">लाभार्थी लक्षणरहित है</string>
-    <string name="tb_symptom_status">लक्षण की स्थिति</string>
+    <string name="tb_symptom_status">जाँच की स्थिति</string>
     <string name="tb_status_asymptomatic">लक्षणरहित</string>
     <string name="tb_status_symptomatic">लक्षणयुक्त</string>
     <string name="tb_status_asymptomatic_detail">कोई टीबी संबंधी लक्षण नहीं मिला</string>
@@ -719,13 +719,22 @@
         <item>गैर-मातृ मृत्यु</item>
     </string-array>
 
+    <!-- Arrays for TB Confirmed Treatment -->
     <string-array name="tb_regimen_types">
-        <item>डीएस-टीबी (6 महीने)</item>
-        <item>छोटा रेजिमेन (9–12 महीने)</item>
-        <item>लंबा रेजिमेन (18–24 महीने)</item>
-        <item>बीपीएएल रेजिमेन (6 महीने)</item>
-        <item>आईएनएच मोनो (6 महीने)</item>
+        <item>डीएस टीबी (DS TB)</item>
+        <item>पीएमडीटी (PMDT)</item>
     </string-array>
+
+    <string-array name="tb_pmdt_regimens">
+        <item>एच मोनो/पॉली टीबी के लिए उपचार पद्धति (6–9 महीने)</item>
+        <item>लंबी MDR/XDR-TB उपचार पद्धति (18–20 महीने)</item>
+        <item>छोटी MDR/RR-TB उपचार पद्धति (9–11 महीने)</item>
+        <item>BPaLM/BPaL उपचार पद्धति (6–10 महीने)</item>
+    </string-array>
+
+    <string name="ds_tb_regimen">डीएस टीबी उपचार पद्धति</string>
+    <string name="pmdt_regimen">पीएमडीटी उपचार पद्धति</string>
+
 
     <string name="btn_cancel">रद्द करें</string>
     <string name="filter_sort_by">क्रमबद्ध करें</string>
@@ -1104,7 +1113,7 @@
     <string name="order_status_not_conducted">नहीं किया गया</string>
     <string name="order_status_view_mtb_result">एमटीबी परिणाम देखें</string>
     <string name="order_status_view_rif_result">आरआईएफ परिणाम देखें</string>
-    <string name="order_status_rif_block_label">आरआईएफ परीक्षण · एमटीबी पॉजिटिव द्वारा ट्रिगर</string>
+    <string name="order_status_rif_block_label">आरआईएफ परीक्षण</string>
     <string name="order_status_create_new_order">नया ऑर्डर बनाएं</string>
     <string name="order_status_clinical_assessment_referred">क्लिनिकल आकलन एवं निदान हेतु संदर्भित</string>
     <string name="order_status_retry_referral">रेफरल का पुनः प्रयास करें</string>
@@ -1331,6 +1340,50 @@
     <string name="sputum_sample_submitted_at_screening_camp">टीबी स्क्रीनिंग शिविर में बलगम का नमूना जमा किया गया\</string>
 
 
+    <!-- TrueNat MTB / RIF results -->
+    <string name="error_rif_part_of_mtb_order">RIF, MTB ऑर्डर का ही हिस्सा है; RIF का अलग ऑर्डर नहीं बनता</string>
+    <string name="error_order_changed_reopen">फ़ॉर्म खुला रहते हुए इस टेस्ट का ऑर्डर बदल गया। फ़ॉर्म बंद करके फिर से खोलें।</string>
+    <string name="error_form_changed_resubmit">पुष्टि करने के बाद फ़ॉर्म बदल गया। वैल्यू जाँचें और फिर से सबमिट करें।</string>
+    <string name="result_display_mtb_detected">MTB पाया गया (MTB Detected)</string>
+    <string name="result_display_mtb_not_detected">MTB नहीं पाया गया (MTB Not Detected)</string>
+    <string name="result_display_rif_detected">रिफ प्रतिरोध पाया गया (Rif Resistance Detected)</string>
+    <string name="result_display_rif_not_detected">रिफ प्रतिरोध नहीं पाया गया (Rif Resistance Not Detected)</string>
+    <string name="result_display_indeterminate">अनिर्णायक (Indeterminate)</string>
+    <string name="result_display_invalid_error">अमान्य/त्रुटि (Invalid/Error)</string>
+    <string name="confirm_test_xray">छाती का एक्स-रे</string>
+    <string name="confirm_test_mtb">TrueNat MTB</string>
+    <string name="confirm_test_rif">TrueNat RIF</string>
+    <string name="confirm_result_title">%1$s परिणाम की पुष्टि करें</string>
+    <string name="confirm_not_conducted_title">%1$s नहीं किया गया — पुष्टि करें</string>
+    <string name="confirm_result_line">%1$s: %2$s</string>
+    <string name="confirm_not_conducted_value">नहीं किया गया — %1$s</string>
+    <string name="confirm_result_ben_line">%1$s · लाभार्थी आईडी %2$s · %3$s</string>
+    <string name="confirm_result_question">क्या आप %1$s के लिए यह परिणाम सबमिट करना चाहते हैं? सेव करने के बाद इसे बदला नहीं जा सकता।</string>
+    <string name="confirm_result_yes">हाँ, सबमिट करें</string>
+    <string name="confirm_result_no">नहीं</string>
+    <string name="order_status_mtb_result">MTB: %1$s</string>
+    <string name="order_status_rif_result">RIF: %1$s</string>
+    <string name="order_status_waiting_rif">डिवाइस से RIF परिणाम की प्रतीक्षा</string>
+    <string name="order_status_enter_rif_result">RIF परिणाम दर्ज करें</string>
+    <string name="order_status_rif_not_conducted_button">RIF नहीं किया गया</string>
+    <string name="order_status_rif_not_conducted">RIF नहीं किया गया — %1$s</string>
+    <string name="order_status_rif_closed">RIF बंद (परिणाम दर्ज नहीं हुआ)</string>
+    <string name="order_status_feed_auto_update">कैंप हब से अपने आप अपडेट होता है</string>
+    <string name="order_status_invalid_retest">अमान्य — मशीन पर दोबारा जाँच चल रही है</string>
+    <string name="order_status_rif_failed">मशीन पर RIF जाँच विफल हुई</string>
+    <string name="order_status_updated_by_device_suffix">%1$s · डिवाइस द्वारा अपडेट किया गया</string>
+    <string name="order_status_xray_updated_by_device">डिवाइस द्वारा परिणाम अपडेट किया गया: %1$s</string>
+
+    <!-- Missing-data beneficiaries -->
+    <string name="home_card_missing_data_ben_title">अधूरे डेटा वाले लाभार्थी</string>
+    <string name="home_card_missing_data_ben_subtitle">लाभार्थियों की अधूरी जानकारी देखें और अपडेट करें</string>
+    <string name="update_details">विवरण अपडेट करें</string>
+    <string name="label_update">अपडेट करें</string>
+    <string name="label_reason_mssing_data">अधूरे डेटा के कारण:</string>
+    <string name="no_reasons_specified">कोई कारण नहीं बताया गया</string>
+    <string name="data_update_successful">डेटा सफलतापूर्वक अपडेट किया गया</string>
+    <string name="icon_title_missing_data_ben">अधूरे डेटा वाले लाभार्थी</string>
+    <string name="tpt_regimen_requires_start_date">कृपया पहले टीपीटी शुरू होने की तारीख दर्ज करें</string>
 </resources>
 
 

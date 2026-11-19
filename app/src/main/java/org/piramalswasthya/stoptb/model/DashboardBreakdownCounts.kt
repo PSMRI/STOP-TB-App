@@ -7,5 +7,6 @@ data class DashboardBreakdownCounts(
     val female: Int = 0,
     val children: Int = 0,
     val others: Int = 0,
-    val seniorCitizen: Int = 0
+    val seniorCitizen: Int = 0,
+    val pregnant: Int = 0
 )

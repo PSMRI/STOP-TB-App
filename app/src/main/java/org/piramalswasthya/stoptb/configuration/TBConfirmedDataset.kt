@@ -30,6 +30,7 @@ class TBConfirmedDataset(
     }
 
     private var suspectedVisitDate: Long = 0L
+    private var treatmentAlreadyStarted: Boolean = false
     private var treatmentStartDateLong: Long = 0L
     private var lastFollowUpDateLong: Long = 0L
     private var nextFollowUpMonthStart: Long = 0L
@@ -45,15 +46,26 @@ class TBConfirmedDataset(
         "Lost to Follow-up (LFU)" to "Lost to Follow Up"
     )
 
-    private val regimenType = FormElement(
+    private val treatmentType = FormElement(
         id = 1,
-        inputType = InputType.DROPDOWN,
-        title = resources.getString(R.string.regimen_type),
+        inputType = InputType.RADIO,
+        title = resources.getString(R.string.type_of_treatment),
         arrayId = R.array.tb_regimen_types,
         entries = resources.getStringArray(R.array.tb_regimen_types),
         required = true,
         hasDependants = true,
         isEnabled = true
+    )
+
+    private val dsTbRegimen = FormElement(
+        id = 16, inputType = InputType.TEXT_VIEW, title = resources.getString(R.string.ds_tb_regimen),
+        required = true, isEnabled = true
+    )
+
+    private val pmdtRegimen = FormElement(
+        id = 17, inputType = InputType.DROPDOWN, title = resources.getString(R.string.pmdt_regimen),
+        arrayId = R.array.tb_pmdt_regimens, entries = resources.getStringArray(R.array.tb_pmdt_regimens),
+        required = true, isEnabled = true
     )
 
     private val treatmentStartDate = FormElement(
@@ -198,14 +210,18 @@ class TBConfirmedDataset(
     ) {
         val baseList = mutableListOf<FormElement>()
         suspectedVisitDate = suspectedTb?.visitDate ?: ben?.regDate ?: 0L
+        treatmentAlreadyStarted = saved != null
+        treatmentStartDate.min = suspectedVisitDate.takeIf { it > 0L } ?: getOneYearBeforeCurrentDate()
+        treatmentStartDate.max = System.currentTimeMillis()
 
         if (saved == null) {
+            dsTbRegimen.value = resources.getString(R.string.ds_tb_regimen_value)
             treatmentStartDate.value = getDateFromLong(System.currentTimeMillis())
             reasonForDeath.value = resources.getString(R.string.tuberculosis)
 
             baseList.addAll(
                 listOf(
-                    regimenType,
+                    treatmentType,
                     treatmentStartDate,
                     expectedTreatmentCompletionDate,
                     followUpDate,
@@ -228,14 +244,27 @@ class TBConfirmedDataset(
             followUpDate.min = todayStart
             followUpDate.isEnabled = true
         } else {
-            regimenType.value = getLocalValueInArray(R.array.tb_regimen_types, saved.regimenType)
+            val legacyRegimen = saved.regimenType.orEmpty()
+            treatmentType.value = getLocalValueInArray(R.array.tb_regimen_types, saved.treatmentType)
+                ?: if (legacyRegimen.contains("DS-TB", true) || legacyRegimen.contains("2 HRZE", true))
+                    treatmentType.entries?.get(0) else treatmentType.entries?.get(1)
+            dsTbRegimen.value = saved.dsTbRegimen ?: resources.getString(R.string.ds_tb_regimen_value)
+            pmdtRegimen.value = getLocalValueInArray(R.array.tb_pmdt_regimens, saved.pmdtRegimen)
+                ?: when {
+                    legacyRegimen.contains("INH", true) || legacyRegimen.contains("H mono", true) -> resources.getStringArray(R.array.tb_pmdt_regimens)[0]
+                    legacyRegimen.contains("Longer", true) -> resources.getStringArray(R.array.tb_pmdt_regimens)[1]
+                    legacyRegimen.contains("Shorter", true) -> resources.getStringArray(R.array.tb_pmdt_regimens)[2]
+                    legacyRegimen.contains("BPa", true) -> resources.getStringArray(R.array.tb_pmdt_regimens)[3]
+                    else -> null
+                }
+            regimenTypeValue = pmdtRegimen.value ?: dsTbRegimen.value
             followUpDate.isEnabled = true
             treatmentStartDateLong = millisAtStartOfDay(saved.treatmentStartDate)
             lastFollowUpDateLong = saved.followUpDate?.let { millisAtStartOfDay(it) } ?: 0L
 
-            if (!saved.regimenType.isNullOrBlank()) {
-                regimenType.isEnabled = false
-            }
+            treatmentType.isEnabled = saved.followUpDate == null
+            dsTbRegimen.isEnabled = treatmentType.isEnabled
+            pmdtRegimen.isEnabled = treatmentType.isEnabled
 
             saved.treatmentStartDate.takeIf { it > 0 }?.let {
                 treatmentStartDate.value = getDateFromLong(it)
@@ -261,14 +290,15 @@ class TBConfirmedDataset(
 
             treatmentStartDateValue =
                 if (saved.treatmentStartDate > 0) millisAtStartOfDay(saved.treatmentStartDate) else null
-            regimenTypeValue = saved.regimenType
 
             updateFollowUpDateConstraints()
+            calculateExpectedCompletionDate()
             followUpDate.errorText = null
 
             baseList.addAll(
                 listOf(
-                    regimenType,
+                    treatmentType,
+                    if (treatmentType.value == treatmentType.entries?.get(0)) dsTbRegimen else pmdtRegimen,
                     treatmentStartDate,
                     expectedTreatmentCompletionDate
                 )
@@ -331,8 +361,24 @@ class TBConfirmedDataset(
 
     override suspend fun handleListOnValueChanged(formId: Int, index: Int): Int {
         when (formId) {
-            regimenType.id -> {
-                regimenTypeValue = regimenType.value
+            treatmentType.id -> {
+                dsTbRegimen.value = resources.getString(R.string.ds_tb_regimen_value)
+                pmdtRegimen.value = null
+                val isDs = treatmentType.value == treatmentType.entries?.get(0)
+                regimenTypeValue = if (isDs) dsTbRegimen.value else null
+                calculateExpectedCompletionDate()
+                updateFollowUpDateConstraints()
+                checkAndEnableTreatmentCompletion()
+                return triggerDependants(
+                    source = treatmentType,
+                    removeItems = listOf(if (isDs) pmdtRegimen else dsTbRegimen),
+                    addItems = listOf(if (isDs) dsTbRegimen else pmdtRegimen),
+                    position = -2
+                )
+            }
+
+            pmdtRegimen.id -> {
+                regimenTypeValue = pmdtRegimen.value
                 calculateExpectedCompletionDate()
                 updateFollowUpDateConstraints()
                 checkAndEnableTreatmentCompletion()
@@ -447,14 +493,29 @@ class TBConfirmedDataset(
     fun validateAllFields(): Boolean {
         var isValid = true
 
-        if (regimenType.required && regimenType.value.isNullOrEmpty()) {
-            regimenType.errorText = "Regimen type is required"
+        if (treatmentType.required && treatmentType.value.isNullOrEmpty()) {
+            treatmentType.errorText = "Type of treatment is required"
+            isValid = false
+        }
+        val activeRegimen = if (treatmentType.value == treatmentType.entries?.get(0)) dsTbRegimen else pmdtRegimen
+        if (treatmentType.value != null && activeRegimen.required && activeRegimen.value.isNullOrEmpty()) {
+            activeRegimen.errorText = "Regimen is required"
             isValid = false
         }
 
         if (treatmentStartDate.required && treatmentStartDate.value.isNullOrEmpty()) {
             treatmentStartDate.errorText = "Treatment start date is required"
             isValid = false
+        } else if (!treatmentStartDate.value.isNullOrEmpty()) {
+            val start = getLongFromDate(treatmentStartDate.value)
+            if (start > System.currentTimeMillis()) {
+                treatmentStartDate.errorText = "Treatment start date cannot be in the future"
+                isValid = false
+            } /*else if (!treatmentAlreadyStarted && suspectedVisitDate > 0L &&
+                start < millisAtStartOfDay(suspectedVisitDate)) {
+                treatmentStartDate.errorText = "Treatment start date must be on or after diagnosis visit date"
+                isValid = false
+            }*/ else treatmentStartDate.errorText = null
         }
 
         if (!validateCurrentFollowUpDate()) {
@@ -569,81 +630,59 @@ class TBConfirmedDataset(
 
 
     private fun calculateExpectedCompletionDate() {
-        if (regimenTypeValue == null || treatmentStartDateValue == null) return
-
-        val calendar = Calendar.getInstance().apply {
-            timeInMillis = treatmentStartDateValue!!
+        val start = treatmentStartDateValue ?: return
+        val range = regimenMonthRange() ?: run {
+            expectedTreatmentCompletionDate.value = null
+            return
         }
-
-        when (regimenTypeValue) {
-            resources.getStringArray(R.array.tb_regimen_types)[0],
-            resources.getStringArray(R.array.tb_regimen_types)[3],
-            resources.getStringArray(R.array.tb_regimen_types)[4] -> {
-                calendar.add(Calendar.MONTH, 6)
-                expectedTreatmentCompletionDate.value = getDateFromLong(calendar.timeInMillis)
-            }
-
-            resources.getStringArray(R.array.tb_regimen_types)[1] -> {
-                val minDate = Calendar.getInstance().apply {
-                    timeInMillis = treatmentStartDateValue!!
-                    add(Calendar.MONTH, 9)
-                }.timeInMillis
-                val maxDate = Calendar.getInstance().apply {
-                    timeInMillis = treatmentStartDateValue!!
-                    add(Calendar.MONTH, 12)
-                }.timeInMillis
-                expectedTreatmentCompletionDate.value =
-                    "${getDateFromLong(minDate)} to ${getDateFromLong(maxDate)}"
-            }
-
-            resources.getStringArray(R.array.tb_regimen_types)[2] -> {
-                val minDate = Calendar.getInstance().apply {
-                    timeInMillis = treatmentStartDateValue!!
-                    add(Calendar.MONTH, 18)
-                }.timeInMillis
-                val maxDate = Calendar.getInstance().apply {
-                    timeInMillis = treatmentStartDateValue!!
-                    add(Calendar.MONTH, 24)
-                }.timeInMillis
-                expectedTreatmentCompletionDate.value =
-                    "${getDateFromLong(minDate)} to ${getDateFromLong(maxDate)}"
-            }
-        }
+        val startDate = datePlusMonths(start, range.first)
+        val endDate = datePlusMonths(start, range.last)
+        expectedTreatmentCompletionDate.value = if (range.first == range.last) getDateFromLong(startDate)
+        else "${getDateFromLong(startDate)} to ${getDateFromLong(endDate)}"
     }
 
     private fun calculateExpectedCompletionDateLong(): Long {
-        if (regimenTypeValue == null || treatmentStartDateValue == null) return 0L
-        val calendar = Calendar.getInstance().apply {
-            timeInMillis = treatmentStartDateValue!!
-        }
+        val start = treatmentStartDateValue ?: return 0L
+        val range = regimenMonthRange() ?: return 0L
+        return datePlusMonths(start, range.last)
+    }
+
+    private fun regimenMonthRange(): IntRange? {
+        val pmdt = resources.getStringArray(R.array.tb_pmdt_regimens)
         return when (regimenTypeValue) {
-            resources.getStringArray(R.array.tb_regimen_types)[0],
-            resources.getStringArray(R.array.tb_regimen_types)[3],
-            resources.getStringArray(R.array.tb_regimen_types)[4] -> {
-                calendar.add(Calendar.MONTH, 6)
-                calendar.timeInMillis
-            }
-            resources.getStringArray(R.array.tb_regimen_types)[1] -> {
-                calendar.add(Calendar.MONTH, 12)
-                calendar.timeInMillis
-            }
-            resources.getStringArray(R.array.tb_regimen_types)[2] -> {
-                calendar.add(Calendar.MONTH, 24)
-                calendar.timeInMillis
-            }
-            else -> 0L
+            resources.getString(R.string.ds_tb_regimen_value) -> 6..6
+            pmdt.getOrNull(0) -> 6..9
+            pmdt.getOrNull(1) -> 18..20
+            pmdt.getOrNull(2) -> 9..11
+            pmdt.getOrNull(3) -> 6..10
+            else -> null
         }
     }
 
-    private fun checkAndEnableTreatmentCompletion() {
-        if (regimenTypeValue == null || followUpCount == 0) return
+    private fun datePlusMonths(start: Long, months: Int): Long = Calendar.getInstance().apply {
+        timeInMillis = start
+        add(Calendar.MONTH, months)
+    }.timeInMillis
 
+    private fun checkAndEnableTreatmentCompletion() {
+        if (regimenTypeValue == null || followUpCount == 0) {
+            treatmentCompleted.isEnabled = false
+            treatmentCompleted.value = null
+            triggerDependants(
+                source = treatmentCompleted,
+                removeItems = listOf(actualTreatmentCompletionDate, treatmentOutcome, remarks,
+                    reasonForNotCompleting, dateOfDeath, placeOfDeath, reasonForDeath),
+                addItems = emptyList(),
+                position = -2
+            )
+            return
+        }
+
+        val pmdt = resources.getStringArray(R.array.tb_pmdt_regimens)
         val requiredFollowUps = when (regimenTypeValue) {
-            resources.getStringArray(R.array.tb_regimen_types)[0],
-            resources.getStringArray(R.array.tb_regimen_types)[3],
-            resources.getStringArray(R.array.tb_regimen_types)[4] -> 5
-            resources.getStringArray(R.array.tb_regimen_types)[1] -> 9
-            resources.getStringArray(R.array.tb_regimen_types)[2] -> 18
+            resources.getString(R.string.ds_tb_regimen_value), pmdt[0], pmdt[3] -> 5
+            pmdt[2] -> 9
+            pmdt[1] -> 18
             else -> 0
         }
 
@@ -706,9 +745,13 @@ class TBConfirmedDataset(
 
     override fun mapValues(cacheModel: FormDataModel, pageNumber: Int) {
         (cacheModel as TBConfirmedTreatmentCache).let { form ->
-            form.regimenType = getEnglishValueInArray(R.array.tb_regimen_types, regimenType.value)
+            form.treatmentType = getEnglishValueInArray(R.array.tb_regimen_types, treatmentType.value)
+            form.dsTbRegimen = dsTbRegimen.value?.takeIf { treatmentType.value == treatmentType.entries?.get(0) }
+            form.pmdtRegimen = getEnglishValueInArray(R.array.tb_pmdt_regimens, pmdtRegimen.value)
+                ?.takeIf { treatmentType.value == treatmentType.entries?.get(1) }
+            form.regimenType = form.pmdtRegimen ?: form.dsTbRegimen
             form.treatmentStartDate = getLongFromDate(treatmentStartDate.value)
-            form.expectedTreatmentCompletionDate = getLongFromDate(expectedTreatmentCompletionDate.value)
+            form.expectedTreatmentCompletionDate = calculateExpectedCompletionDateLong().takeIf { it > 0L }
             form.followUpDate = getLongFromDate(followUpDate.value)
             form.monthlyFollowUpDone = monthlyFollowUpDone.value
             form.anyDiscomfort = anyDiscomfort.value == anyDiscomfort.entries!![0]

@@ -83,35 +83,47 @@
 
     </LinearLayout>
 
+    <!-- Shown only on the Vulnerable Population list (AllBen source 11): full-width chip so long
+         condition names wrap/ellipsize instead of overflowing the screen edge. -->
     <LinearLayout
         android:id="@+id/filterText"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:layout_marginTop="10dp"
+        android:layout_marginStart="@dimen/margin_normal"
+        android:layout_marginEnd="@dimen/margin_normal"
+        android:background="@drawable/bg_dashboard_chip"
+        android:paddingStart="12dp"
+        android:paddingTop="@dimen/padding_normal"
+        android:paddingEnd="@dimen/padding_normal"
+        android:paddingBottom="@dimen/padding_normal"
         android:visibility="gone"
-        android:gravity="end"
+        android:gravity="center_vertical"
         app:layout_constraintTop_toBottomOf="@+id/ll_search"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
         <TextView
             android:id="@+id/tvSelectedFilter"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textSize="14sp"
+            android:textAlignment="viewStart"
             android:fontFamily="@font/roboto_medium"
             android:textColor="@color/md_theme_light_shadow" />
 
         <ImageView
             android:id="@+id/ivFilter"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="@dimen/_25sdp"
-            android:minHeight="@dimen/_25sdp"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="@dimen/padding_normal"
             android:src="@drawable/ic_filter"
             android:tint="?attr/colorPrimary"
-            android:layout_marginEnd="@dimen/_10sdp"/>
+            android:importantForAccessibility="no" />
 
     </LinearLayout>
 
