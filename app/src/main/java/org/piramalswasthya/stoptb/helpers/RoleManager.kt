@@ -88,6 +88,14 @@ class RoleManager @Inject constructor(
         return listOfNotNull(user?.role.toLegacyAppRole())
     }
 
+    /**
+     * Whether the stored user is assigned [role]. Reads the stored user each time instead of
+     * [assignedRoles], which stays empty until an Activity calls [initializeFromLoggedInUser],
+     * so it is safe to call from a background worker.
+     */
+    fun hasAssignedRole(role: AppRole): Boolean =
+        role in resolveRoles(preferenceDao.getLoggedInUser())
+
     fun privilegesForActiveRole(): ModulePrivilege =
         RoleModuleConfig.privilegeFor(_activeRole.value)
 

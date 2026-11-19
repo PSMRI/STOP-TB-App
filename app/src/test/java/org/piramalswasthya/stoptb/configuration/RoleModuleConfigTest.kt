@@ -26,13 +26,15 @@ class RoleModuleConfigTest {
             AppModule.HOUSEHOLD,
             AppModule.BENEFICIARIES,
             AppModule.NON_HOUSEHOLD,
-            AppModule.MISSING_DATA_BENEFICIARIES
+            // release-2.4: Nikshay missing-data disabled, re-enable later
+            // AppModule.MISSING_DATA_BENEFICIARIES
         )
         assertThat(p.multiRoleHomeModules).containsExactly(
             AppModule.HOUSEHOLD,
             AppModule.BENEFICIARIES,
             AppModule.NON_HOUSEHOLD,
-            AppModule.MISSING_DATA_BENEFICIARIES
+            // release-2.4: Nikshay missing-data disabled, re-enable later
+            // AppModule.MISSING_DATA_BENEFICIARIES
         )
         assertThat(p.canActOnReferral).isFalse()
         assertThat(p.examineDenominatorRule).isEqualTo(ExamineDenominatorRule.REGISTRAR_TWO)
