@@ -79,6 +79,7 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionResponseEntity
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.DynamicFormMetadataDao
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.CounsellingFormResponseDao
 import org.piramalswasthya.stoptb.model.DataMissingBenInfo
+import org.piramalswasthya.stoptb.model.TbBenSummary
 import org.piramalswasthya.stoptb.model.MissingDataInfoStatusConverter
 
 
@@ -123,7 +124,8 @@ import org.piramalswasthya.stoptb.model.MissingDataInfoStatusConverter
         FormResponseEntity::class,
         SectionResponseEntity::class,
         QuestionResponseEntity::class,
-        DataMissingBenInfo::class
+        DataMissingBenInfo::class,
+        TbBenSummary::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
     version = InAppDb.DB_VERSION, exportSchema = true
@@ -1813,6 +1815,38 @@ abstract class InAppDb : RoomDatabase() {
          * v70's door-lock filter. View SQL copied from the generated schema (73.json) so Room's
          * identity check matches.
          */
+        /**
+         * v74: TB_BEN_SUMMARY, one row per beneficiary with their TB list flags and sort keys,
+         * kept up to date by triggers (TbBenSummarySql). Filled once here from existing data.
+         */
+        val MIGRATION_73_74 = object : Migration(73, 74) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(TB_BEN_SUMMARY_CREATE)
+                TB_BEN_SUMMARY_INDEXES.forEach { database.execSQL(it) }
+                TbBenSummarySql.createTriggers(database)
+                database.execSQL(TbBenSummarySql.FILL)
+            }
+        }
+
+        // Same SQL Room generates for TbBenSummary (schemas/74.json).
+        private const val TB_BEN_SUMMARY_CREATE = "CREATE TABLE IF NOT EXISTS `TB_BEN_SUMMARY` (`beneficiaryId` INTEGER NOT NULL," +
+            " `hasScreening` INTEGER NOT NULL, `pregVitals` INTEGER NOT NULL, `xrayList` INTEGER NOT NULL," +
+            " `xrayTier` INTEGER NOT NULL, `xrayKey` INTEGER NOT NULL, `tnOther` INTEGER NOT NULL, `tnTier` INTEGER NOT NULL," +
+            " `tnKey` INTEGER NOT NULL, `hwc` INTEGER NOT NULL, `lc` INTEGER NOT NULL, `caFixed` INTEGER NOT NULL," +
+            " `caD0` INTEGER NOT NULL, `caSym` INTEGER NOT NULL, `caElig` INTEGER NOT NULL, `presumptive` INTEGER NOT NULL," +
+            " `tptIndex` INTEGER NOT NULL, `knownTbCase` INTEGER NOT NULL, PRIMARY KEY(`beneficiaryId`))"
+
+        private val TB_BEN_SUMMARY_INDEXES = listOf(
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_xray` ON `TB_BEN_SUMMARY` (`xrayTier` ASC, `xrayKey` DESC, `beneficiaryId` DESC)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_tn` ON `TB_BEN_SUMMARY` (`tnTier` ASC, `tnKey` DESC, `beneficiaryId` DESC)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_hwc` ON `TB_BEN_SUMMARY` (`hwc`)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_lc` ON `TB_BEN_SUMMARY` (`lc`)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_ca` ON `TB_BEN_SUMMARY` (`caFixed`, `caD0`)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_presumptive` ON `TB_BEN_SUMMARY` (`presumptive`)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_tpt` ON `TB_BEN_SUMMARY` (`tptIndex`)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_known_tb` ON `TB_BEN_SUMMARY` (`knownTbCase`)",
+        )
+
         val MIGRATION_72_73 = object : Migration(72, 73) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
@@ -2325,7 +2359,7 @@ abstract class InAppDb : RoomDatabase() {
 
 
         // Bump together with a new MIGRATION_x_y added to MIGRATIONS below.
-        const val DB_VERSION = 73
+        const val DB_VERSION = 74
 
         // Oldest schema version that can be migrated in place.
         const val OLDEST_MIGRATABLE_VERSION = 2
@@ -2403,7 +2437,8 @@ abstract class InAppDb : RoomDatabase() {
             MIGRATION_69_70,
             MIGRATION_70_71,
             MIGRATION_71_72,
-            MIGRATION_72_73
+            MIGRATION_72_73,
+            MIGRATION_73_74
         )
 
         fun getInstance(appContext: Context): InAppDb {
@@ -2452,6 +2487,8 @@ abstract class InAppDb : RoomDatabase() {
                         // InAppDbMigrationsTest) instead of silently deleting field data. Only
                         // version 1, which has no migration and is not in the field, may be reset.
                         .fallbackToDestructiveMigrationFrom(1)
+                        // TB_BEN_SUMMARY triggers: also on a fresh install, where no migration runs.
+                        .addCallback(TbBenSummarySql.CALLBACK)
                         .build()
 
                     INSTANCE = instance

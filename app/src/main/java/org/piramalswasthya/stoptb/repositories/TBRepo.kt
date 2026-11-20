@@ -140,6 +140,7 @@ class TBRepo @Inject constructor(
     val allTbScreening: Flow<List<TbScreeningSymptoms>> = tbDao.getAllTbScreeningSymptoms().shareBadges()
 
     val allTbSuspected: Flow<List<TBSuspectedCache>> = tbLocalRepo.allTbSuspected
+    fun tbSuspectedFor(benIds: Collection<Long>): Flow<List<TBSuspectedCache>> = tbLocalRepo.tbSuspectedFor(benIds)
 
     suspend fun getDiagnosticsWithPendingOrder(): List<TBDiagnosticsCache> =
         tbLocalRepo.getDiagnosticsWithPendingOrder()

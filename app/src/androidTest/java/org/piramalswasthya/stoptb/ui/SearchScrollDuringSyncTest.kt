@@ -40,6 +40,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.SyncState
+import org.piramalswasthya.stoptb.database.room.TbBenSummarySql
 import org.piramalswasthya.stoptb.database.room.paging.NoCountPagingSource
 import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.Gender
@@ -67,7 +68,8 @@ class SearchScrollDuringSyncTest {
     @Before
     fun createDb() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        db = Room.inMemoryDatabaseBuilder(context, InAppDb::class.java).build()
+        db = Room.inMemoryDatabaseBuilder(context, InAppDb::class.java)
+            .addCallback(TbBenSummarySql.CALLBACK).build()
         for (index in 0 until 200) {
             val ben = BenRegCache(
                 beneficiaryId = FIRST_BEN_ID + index, isDeath = false, reasonOfDeathId = 0, placeOfDeathId = 0,

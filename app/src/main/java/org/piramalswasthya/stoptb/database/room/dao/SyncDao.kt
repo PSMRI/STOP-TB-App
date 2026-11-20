@@ -122,4 +122,33 @@ interface SyncDao {
                 "ORDER BY id; "
     )
     fun getSyncStatus(selectedVillage: Int): Flow<List<SyncStatusCache>>
+
+    /**
+     * Records not yet synced (UNSYNCED or SYNCING) in [getSyncStatus]'s groups, summed: what the
+     * home and sign-in badges show. Each part starts from the syncState index instead of
+     * counting every record of the village by state (1M device DB: 6.5 s on the host).
+     */
+    @Query(
+        "SELECT " +
+            "(SELECT COUNT(*) FROM beneficiary b1 WHERE b1.syncState IN (0, 1) AND b1.isDeactivate = 0 AND b1.isDraft = 0" +
+            " AND b1.loc_village_id = :selectedVillage)" +
+            " + (SELECT COUNT(*) FROM TB_SCREENING t INNER JOIN beneficiary b ON b.beneficiaryId = t.benId" +
+            " AND b.loc_village_id = :selectedVillage WHERE t.syncState IN (0, 1))" +
+            " + (SELECT COUNT(*) FROM (SELECT DISTINCT t.benId, t.syncState FROM TB_SUSPECTED t INNER JOIN beneficiary b" +
+            " ON b.beneficiaryId = t.benId AND b.loc_village_id = :selectedVillage WHERE t.syncState IN (0, 1)))" +
+            " + (SELECT COUNT(*) FROM beneficiary b2 WHERE b2.syncState IN (0, 1) AND b2.isDeactivate = 0 AND b2.isDraft = 0" +
+            " AND b2.loc_village_id = :selectedVillage AND (b2.height IS NOT NULL OR b2.weight IS NOT NULL))" +
+            " + (SELECT COUNT(*) FROM BEN_VITALS t INNER JOIN beneficiary b ON b.beneficiaryId = t.benId" +
+            " AND b.loc_village_id = :selectedVillage WHERE t.syncState IN (0, 1))" +
+            " + (SELECT COUNT(*) FROM GENERAL_OPD t INNER JOIN beneficiary b ON b.beneficiaryId = t.benId" +
+            " AND b.loc_village_id = :selectedVillage WHERE t.syncState IN (0, 1))" +
+            " + (SELECT COUNT(*) FROM TB_DIAGNOSTICS t INNER JOIN beneficiary b ON b.beneficiaryId = t.benId" +
+            " AND b.loc_village_id = :selectedVillage WHERE t.syncState IN (0, 1))" +
+            // per beneficiary: MIN(syncState) != SYNCED means some row is not synced
+            " + (SELECT COUNT(DISTINCT t.benId) FROM TB_CONFIRMED_TREATMENT t INNER JOIN beneficiary b" +
+            " ON b.beneficiaryId = t.benId AND b.loc_village_id = :selectedVillage WHERE t.syncState IN (0, 1))" +
+            " + (SELECT COUNT(*) FROM t_form_response fr INNER JOIN beneficiary b ON b.beneficiaryId = fr.beneficiaryId" +
+            " AND b.loc_village_id = :selectedVillage WHERE fr.syncStatus != 'SYNCED')"
+    )
+    fun getUnsyncedRecordCount(selectedVillage: Int): Flow<Int>
 }

@@ -12,7 +12,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.piramalswasthya.stoptb.database.room.InAppDb
-import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.utils.CampHubUrlValidator
 import org.piramalswasthya.stoptb.helpers.Konstants
@@ -71,8 +70,7 @@ class SignInViewModel @Inject constructor(
         viewModelScope.launch {
             launch {
                 userRepo.unProcessedRecordCount.collect { value ->
-                    _unprocessedRecordsCount.value =
-                        value.filter { it.syncState != SyncState.SYNCED }.sumOf { it.count }
+                    _unprocessedRecordsCount.value = value
                 }
             }
         }

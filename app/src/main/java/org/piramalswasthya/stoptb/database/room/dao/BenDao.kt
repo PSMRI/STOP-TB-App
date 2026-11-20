@@ -13,6 +13,30 @@ data class VillageHeadcount(
     val unscreened: Int = 0,
 )
 
+/** Tuberculosis screen card counts of one village ([BenCountQueries.villageTbCardCounts]). */
+data class TbCardCounts(
+    val screened: Int = 0,
+    val presumptive: Int = 0,
+    val confirmed: Int = 0,
+)
+
+/** Referrals screen card counts of one village ([BenCountQueries.villageReferralCardCounts]). */
+data class ReferralCardCounts(
+    val xray: Int = 0,
+    val trueNat: Int = 0,
+    val hwc: Int = 0,
+    val liquidCulture: Int = 0,
+    val clinical: Int = 0,
+)
+
+/** Home counts of one village, from one pass over it ([BenCountQueries.villageBenCounts]). */
+data class VillageBenCounts(
+    val allBen: Int = 0,
+    val nonHH: Int = 0,
+    val population: Int = 0,
+    val unscreened: Int = 0,
+)
+
 /**
  * Abnormal vitals / physical-sign predicate on BEN_VITALS (aliased `v`), shared by the
  * HWC-referral (source = 5) queries below. Kept as a `const val` so it stays a compile-time
@@ -36,25 +60,12 @@ internal const val ABNORMAL_VITALS_CONDITION = """(
 
 /**
  * Beneficiaries belonging on the Liquid Culture referral card (source = 8 queries and
- * getLiquidCultureBenCount). If the TB_SCREENING branch changes, update the TB Screening
- * post-submit popup logic that mirrors it (feat/liquid_culture_referral).
+ * getLiquidCultureBenCount). The rule (suspected / diagnostics liquid culture conducted, or a
+ * screening answer that recommends it) is TB_BEN_SUMMARY.lc, see TbBenSummarySql. If the
+ * TB_SCREENING part changes, update the TB Screening post-submit popup logic that mirrors it.
  */
 internal const val LIQUID_CULTURE_REFERRAL_CONDITION = """(
-    benId IN (
-        SELECT ts.benId FROM TB_SUSPECTED ts
-        WHERE ts.isLiquidCultureConducted IS NOT NULL
-    )
-    OR benId IN (
-        SELECT td.benId FROM TB_DIAGNOSTICS td
-        WHERE td.isLiquidCultureConducted IS NOT NULL
-    )
-    OR benId IN (
-        SELECT tbs.benId FROM TB_SCREENING tbs
-        WHERE tbs.recommendedForLiquidCultureTest = 1
-           OR tbs.historyOfTb = 1
-           OR tbs.takingAntiTBDrugs = 1
-           OR tbs.familySufferingFromTB = 1
-    )
+    benId IN (SELECT beneficiaryId FROM TB_BEN_SUMMARY WHERE lc = 1)
 )"""
 
 @Dao
@@ -457,7 +468,9 @@ interface BenDao :
     @Query("SELECT COUNT(*) > 0 FROM BENEFICIARY WHERE beneficiaryId = :benId AND reasonOfDeath = :cause")
     suspend fun isDeathByCauseAnc(benId: Long, cause: String): Boolean
 
-    @Query("UPDATE BENEFICIARY SET processed = 'N', syncState = 0 WHERE isDraft = 0 AND syncState != 2 AND (beneficiaryId <= 0 OR benRegId <= 0)")
+    // syncState IN (0, 1) is syncState != SYNCED; written so it uses ind_ben_sync_processed
+    // (+isDraft keeps SQLite off the isDraft index, which scans every row: 1M DB 1.6 s -> 4 ms).
+    @Query("UPDATE BENEFICIARY SET processed = 'N', syncState = 0 WHERE +isDraft = 0 AND syncState IN (0, 1) AND (beneficiaryId <= 0 OR benRegId <= 0)")
     suspend fun requeueTempBeneficiariesForRegistration()
 
     @Query("UPDATE BENEFICIARY SET symptomsScreenedDate = :date, screeningStatus = 'SYMPTOMS_SCREENED', syncState = :unsynced, processed = 'U', serverUpdatedStatus = 2 WHERE beneficiaryId = :benId")

@@ -236,42 +236,52 @@ interface TBDao :
     suspend fun householdHasOtherConfirmedTbCase(householdId: Long, benId: Long): Boolean
 
     /**
-     * Screenings for household members who are contacts of a confirmed TB case.
-     * householdId 0 returns every such screening.
+     * Screenings for household members who are contacts of a confirmed TB case
+     * (TB_BEN_SUMMARY.knownTbCase). householdId 0 returns every such screening.
+     * Skips screenings that already hold exactly the "Contact of Known TB Patients" selection
+     * ([contactId] in the ids, the code in the codes, no Not Applicable), so a pull with nothing
+     * new to select reads almost nothing. The caller still checks each row it gets.
      */
     @Query("""
         SELECT t.*
         FROM TB_SCREENING t
         INNER JOIN BENEFICIARY self ON self.beneficiaryId = t.benId
-        WHERE IFNULL(self.householdId, 0) > 0
-          AND (:householdId = 0 OR self.householdId = :householdId)
+        WHERE self.householdId IN (
+                SELECT other.householdId
+                FROM TB_BEN_SUMMARY k
+                INNER JOIN BENEFICIARY other ON other.beneficiaryId = k.beneficiaryId
+                WHERE k.knownTbCase = 1
+                  AND IFNULL(other.householdId, 0) > 0
+                  AND (:householdId = 0 OR other.householdId = :householdId)
+                  AND IFNULL(other.isDeactivate, 0) = 0
+                  AND IFNULL(other.isDeath, 0) = 0
+                  AND IFNULL(other.isDraft, 0) = 0
+          )
           AND IFNULL(self.isDeactivate, 0) = 0
           AND IFNULL(self.isDeath, 0) = 0
           AND IFNULL(self.isDraft, 0) = 0
+          AND NOT (
+                ('|||' || IFNULL(t.keyPopulationRiskFactors, '') || '|||') GLOB '*|||CONTACT_OF_KNOWN_TB_PATIENTS|||*'
+                AND UPPER(IFNULL(t.keyPopulationRiskFactors, '')) NOT LIKE '%NOT_APPLICABLE%'
+                AND UPPER(IFNULL(t.keyPopulationRiskFactors, '')) NOT LIKE '%NOT APPLICABLE%'
+                AND UPPER(IFNULL(t.keyPopulationRiskFactors, '')) NOT LIKE '%CONTACT OF KNOWN TB PATIENTS%'
+                AND (',' || REPLACE(REPLACE(REPLACE(IFNULL(t.keyPopulationRiskFactorIds, ''), '[', ''), ']', ''), ' ', '') || ',')
+                    LIKE '%,' || :contactId || ',%'
+                AND (',' || REPLACE(REPLACE(REPLACE(IFNULL(t.keyPopulationRiskFactorIds, ''), '[', ''), ']', ''), ' ', '') || ',')
+                    NOT LIKE '%,' || :notApplicableId || ',%'
+          )
           AND EXISTS (
                 SELECT 1
                 FROM BENEFICIARY other
-                LEFT JOIN TB_SUSPECTED ts ON other.beneficiaryId = ts.benId
-                LEFT JOIN TB_DIAGNOSTICS td ON other.beneficiaryId = td.benId
+                INNER JOIN TB_BEN_SUMMARY k ON k.beneficiaryId = other.beneficiaryId
                 WHERE other.householdId = self.householdId
                   AND other.beneficiaryId != self.beneficiaryId
                   AND IFNULL(other.isDeactivate, 0) = 0
                   AND IFNULL(other.isDeath, 0) = 0
                   AND IFNULL(other.isDraft, 0) = 0
-                  AND (
-                        IFNULL(ts.isTBConfirmed, 0) = 1
-                        OR IFNULL(ts.isConfirmed, 0) = 1
-                        OR IFNULL(td.isTBConfirmed, 0) = 1
-                        OR IFNULL(td.isConfirmed, 0) = 1
-                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
-                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
-                        OR EXISTS (
-                            SELECT 1 FROM TB_CONFIRMED_TREATMENT tc
-                            WHERE tc.benId = other.beneficiaryId
-                        )
-                  )
+                  AND k.knownTbCase = 1
           )
     """)
-    suspend fun getScreeningsForKnownTbContacts(householdId: Long): List<TBScreeningCache>
+    suspend fun getScreeningsForKnownTbContacts(householdId: Long, contactId: Int, notApplicableId: Int): List<TBScreeningCache>
 }
 

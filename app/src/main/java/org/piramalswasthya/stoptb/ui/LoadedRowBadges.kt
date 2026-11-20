@@ -28,6 +28,9 @@ class LoadedRowBadges(scope: CoroutineScope, rowBadgeRepo: RowBadgeRepo) {
 
     private val loadedBenIds = MutableStateFlow<Set<Long>>(emptySet())
 
+    /** The ids of the rows the list has loaded, for other per-row lookups. */
+    val loadedIds: Flow<Set<Long>> get() = loadedBenIds
+
     fun onRowsLoaded(benIds: Set<Long>) {
         loadedBenIds.value = benIds
     }

@@ -15,6 +15,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.SyncState
+import org.piramalswasthya.stoptb.database.room.TbBenSummarySql
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.BenWithTbSuspectedCache
@@ -41,7 +42,8 @@ class TbListPagingEquivalenceTest {
     @Before
     fun createDb() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        db = Room.inMemoryDatabaseBuilder(context, InAppDb::class.java).allowMainThreadQueries().build()
+        db = Room.inMemoryDatabaseBuilder(context, InAppDb::class.java)
+            .addCallback(TbBenSummarySql.CALLBACK).allowMainThreadQueries().build()
         seed()
     }
 

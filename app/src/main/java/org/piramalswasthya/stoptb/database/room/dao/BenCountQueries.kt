@@ -126,6 +126,40 @@ interface BenCountQueries {
     """)
     fun getHouseholdMemberCounts(selectedVillage: Int): Flow<List<HouseholdMemberCount>>
 
+    /**
+     * [getChildCountsForAllBen] for the given beneficiaries only. The lists need it for the rows
+     * they have loaded; the village-wide form took 8-27 s per run on a tablet at 1M and re-ran on
+     * every beneficiary write.
+     */
+    @Query("""
+        SELECT parent.beneficiaryId as benId, COUNT(child.beneficiaryId) as childCount
+        FROM BENEFICIARY parent
+        LEFT JOIN BENEFICIARY child
+            ON child.householdId = parent.householdId
+            AND child.beneficiaryId != parent.beneficiaryId
+            AND (parent.firstName IS NULL OR parent.firstName = '' OR child.motherName LIKE parent.firstName || '%')
+        WHERE parent.beneficiaryId IN (:benIds)
+            AND parent.isDraft = 0
+            AND parent.loc_village_id = :selectedVillage
+            AND parent.isDeactivate = 0
+        GROUP BY parent.beneficiaryId
+    """)
+    fun getChildCountsForBens(selectedVillage: Int, benIds: List<Long>): Flow<List<BenChildCount>>
+
+    /** [getHouseholdMemberCounts] for the households of the given beneficiaries only. */
+    @Query("""
+        SELECT householdId AS hhId, COUNT(*) AS memberCount
+        -- The household index: SQLite otherwise walks the whole village (1M DB 0.9 s -> 0.01 s).
+        FROM BENEFICIARY INDEXED BY index_BENEFICIARY_householdId
+        WHERE householdId IN (SELECT householdId FROM BENEFICIARY WHERE beneficiaryId IN (:benIds))
+          AND isDraft = 0
+          AND isDeactivate = 0
+          AND loc_village_id = :selectedVillage
+          AND householdId IS NOT NULL
+        GROUP BY householdId
+    """)
+    fun getHouseholdMemberCountsForBens(selectedVillage: Int, benIds: List<Long>): Flow<List<HouseholdMemberCount>>
+
     @Query("""
         SELECT COUNT(child.beneficiaryId)
         FROM BENEFICIARY parent
@@ -204,21 +238,7 @@ interface BenCountQueries {
         WHERE villageId = :selectedVillage
           AND isDeactivate = 0
           AND isDeath = 0
-          AND benId IN (
-            SELECT b2.beneficiaryId FROM BENEFICIARY b2
-            WHERE b2.temperature IS NOT NULL AND b2.temperature >= 100.0
-            UNION
-            SELECT v.benId FROM BEN_VITALS v
-            WHERE ${ABNORMAL_VITALS_CONDITION}
-            UNION
-            SELECT ts.benId FROM TB_SUSPECTED ts
-            WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
-              AND UPPER(IFNULL(ts.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
-            UNION
-            SELECT td.benId FROM TB_DIAGNOSTICS td
-            WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
-              AND UPPER(IFNULL(td.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
-          )
+          AND benId IN (${ReferralListSql.HWC_BEN_IDS})
     """)
     fun getHwcBenDataCount(selectedVillage: Int): Flow<Int>
 
@@ -227,23 +247,8 @@ interface BenCountQueries {
         WHERE villageId = :selectedVillage
           AND isDeactivate = 0
           AND isDeath = 0
-          -- Same membership as source 6 in searchBenPaged: pregnant beneficiaries (by
-          -- reproductive status or recorded in vitals) are not referred for X-ray at all.
-          AND reproductiveStatusId != 1
-          AND benId NOT IN (SELECT v.benId FROM BEN_VITALS v WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%')
-          AND (
-            benId IN (
-              SELECT ts.benId FROM TB_SUSPECTED ts
-              WHERE ts.isChestXRayDone IS NOT NULL
-            )
-            OR benId IN (
-              SELECT td.benId FROM TB_DIAGNOSTICS td
-              WHERE td.isChestXRayDone IS NOT NULL
-            )
-            OR benId IN (
-              SELECT tbs.benId FROM TB_SCREENING tbs
-            )
-          )
+          -- Same membership as source 6 in searchBenPage.
+          AND ${ReferralListSql.XRAY}
     """)
     fun getDigitalChestXRayBenCount(selectedVillage: Int): Flow<Int>
 
@@ -252,52 +257,8 @@ interface BenCountQueries {
         WHERE villageId = :selectedVillage
           AND isDeactivate = 0
           AND isDeath = 0
-          AND (
-            benId IN (
-              SELECT ts.benId FROM TB_SUSPECTED ts
-              WHERE ts.isNaatConducted IS NOT NULL
-                 OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
-            )
-            OR benId IN (
-              SELECT td.benId FROM TB_DIAGNOSTICS td
-              -- Must match the source = 7 membership rule in searchBenPaged exactly, or the
-              -- card's badge disagrees with the list it opens. See the note there.
-              WHERE td.trueNatOrderId IS NOT NULL
-                 OR td.trueNatOrderStatus IS NOT NULL
-                 OR td.isNaatConducted IS NOT NULL
-                 OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
-            )
-            -- reproductiveStatusId is a BEN_BASIC_CACHE column, not a TB_SCREENING one. Having
-            -- it inside this subquery made the subquery correlated, so SQLite re-scanned the
-            -- whole of TB_SCREENING once per beneficiary - O(beneficiaries x screenings), which
-            -- measured 5.3 SECONDS on a mid-range device at 5,000 beneficiaries and grows
-            -- quadratically. Hoisted to the outer level, which is logically identical (same
-            -- row counts verified at 5k and 25k) and uncorrelated, it runs in ~44ms.
-            -- Same pregnancy rule as source 7 in searchBenPaged: by reproductive status or as
-            -- recorded in vitals.
-            OR ((reproductiveStatusId = 1 OR benId IN (
-                  SELECT v.benId FROM BEN_VITALS v WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%'
-                )) AND benId IN (SELECT tbs.benId FROM TB_SCREENING tbs))
-            OR benId IN (
-              SELECT tbs.benId FROM TB_SCREENING tbs
-              WHERE
-                tbs.recommendedForTruenatTest = 1
-                OR tbs.referredForSputumCollection = 1
-                OR (
-                  tbs.bloodInSputum = 1
-                  OR tbs.coughMoreThan2Weeks = 1
-                  OR tbs.feverMoreThan2Weeks = 1
-                  OR tbs.riseOfFever = 1
-                  OR tbs.lossOfAppetite = 1
-                  OR tbs.lossOfWeight = 1
-                  OR tbs.nightSweats = 1
-                  OR tbs.historyOfTb = 1
-                  OR tbs.takingAntiTBDrugs = 1
-                  OR tbs.familySufferingFromTB = 1
-                  OR UPPER(IFNULL(tbs.asymptomatic, '')) = 'NO'
-                )
-            )
-          )
+          -- Same membership as source 7 in searchBenPage.
+          AND ${ReferralListSql.TRUENAT}
     """)
     fun getTrueNatBenCount(selectedVillage: Int): Flow<Int>
 
@@ -373,6 +334,58 @@ interface BenCountQueries {
         isSeniorCitizen: Int,
         isPregnant: Int = 0
     ): Flow<Int>
+
+    /**
+     * All seven Confirmed tile numbers in one query: [getDashboardFilteredTbConfirmedCount] for
+     * total / MALE / FEMALE / children / OTHERS / senior / pregnant. The confirmed set is the same;
+     * gender, age and pregnancy are beneficiary columns, so they are grouped over it.
+     */
+    @Query("""
+        SELECT COUNT(*) AS total,
+            COALESCE(SUM(CASE WHEN UPPER(COALESCE(c.gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male,
+            COALESCE(SUM(CASE WHEN UPPER(COALESCE(c.gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female,
+            COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - c.dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children,
+            COALESCE(SUM(CASE WHEN UPPER(COALESCE(c.gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others,
+            COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - c.dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen,
+            COALESCE(SUM(CASE WHEN UPPER(COALESCE(c.gender, '')) = 'FEMALE' AND (c.reproductiveStatusId = 1
+                OR EXISTS (SELECT 1 FROM BEN_VITALS v WHERE v.benId = c.benId AND v.keyPopulationRiskFactors LIKE '%PREGNANCY%')) THEN 1 ELSE 0 END), 0) AS pregnant
+        FROM (
+            SELECT DISTINCT b.benId, b.gender, b.dob, b.reproductiveStatusId
+            FROM BEN_BASIC_CACHE b
+            LEFT JOIN TB_SUSPECTED sus ON b.benId = sus.benId
+            LEFT JOIN TB_DIAGNOSTICS dx ON b.benId = dx.benId
+            WHERE b.isDeactivate = 0
+              AND b.isDeath = 0
+              AND b.villageId IN (:assignedVillageIds)
+              AND (:endTime = :endTime)
+              AND (
+                    (""" + TbCaseSql.SUSPECTED_CONFIRMED + """
+                        AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN sus.visitDate >= 100000000000 THEN sus.visitDate WHEN sus.visitDate > 0 THEN sus.visitDate * 1000 WHEN IFNULL(sus.serverUpdatedDate, 0) >= 100000000000 THEN sus.serverUpdatedDate WHEN IFNULL(sus.serverUpdatedDate, 0) > 0 THEN sus.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime))
+                    OR
+                    (""" + TbCaseSql.DIAGNOSTICS_CONFIRMED + """
+                        AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN dx.visitDate >= 100000000000 THEN dx.visitDate WHEN dx.visitDate > 0 THEN dx.visitDate * 1000 WHEN IFNULL(dx.serverUpdatedDate, 0) >= 100000000000 THEN dx.serverUpdatedDate WHEN IFNULL(dx.serverUpdatedDate, 0) > 0 THEN dx.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime))
+                  )
+        ) c
+    """)
+    fun getDashboardTbConfirmedBreakdown(assignedVillageIds: List<Int>, startTime: Long, endTime: Long): Flow<DashboardBreakdownCounts>
+
+    /** All seven ABHA tile numbers in one query: [getDashboardAbhaCount] grouped the same way. */
+    @Query("""
+        SELECT COUNT(*) AS total,
+            COALESCE(SUM(CASE WHEN UPPER(COALESCE(BEN_BASIC_CACHE.gender, '')) = 'MALE' THEN 1 ELSE 0 END), 0) AS male,
+            COALESCE(SUM(CASE WHEN UPPER(COALESCE(BEN_BASIC_CACHE.gender, '')) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female,
+            COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - BEN_BASIC_CACHE.dob/1000)/60/60/24/365 AS INTEGER) < 15 THEN 1 ELSE 0 END), 0) AS children,
+            COALESCE(SUM(CASE WHEN UPPER(COALESCE(BEN_BASIC_CACHE.gender, '')) NOT IN ('MALE', 'FEMALE') THEN 1 ELSE 0 END), 0) AS others,
+            COALESCE(SUM(CASE WHEN CAST((strftime('%s','now') - BEN_BASIC_CACHE.dob/1000)/60/60/24/365 AS INTEGER) >= 60 THEN 1 ELSE 0 END), 0) AS seniorCitizen,
+            COALESCE(SUM(CASE WHEN UPPER(COALESCE(BEN_BASIC_CACHE.gender, '')) = 'FEMALE' AND (BEN_BASIC_CACHE.reproductiveStatusId = 1
+                OR EXISTS (SELECT 1 FROM BEN_VITALS v WHERE v.benId = BEN_BASIC_CACHE.benId AND v.keyPopulationRiskFactors LIKE '%PREGNANCY%')) THEN 1 ELSE 0 END), 0) AS pregnant
+        FROM BEN_BASIC_CACHE
+        WHERE isDeactivate = 0 AND isDeath = 0 AND abhaId IS NOT NULL
+        AND villageId IN (:assignedVillageIds)
+        AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN IFNULL(regDate, 0) >= 100000000000 THEN regDate WHEN IFNULL(regDate, 0) > 0 THEN regDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
+        AND (:endTime = :endTime)
+    """)
+    fun getDashboardAbhaBreakdown(assignedVillageIds: List<Int>, startTime: Long, endTime: Long): Flow<DashboardBreakdownCounts>
 
 
     @Query("""
@@ -475,4 +488,70 @@ interface BenCountQueries {
           AND villageId IN (:villageIds)
     """)
     fun getVillageHeadcount(villageIds: List<Int>): Flow<VillageHeadcount>
+
+    /**
+     * The home screen's village counts in one pass: All Beneficiaries ([getAllBenCount]),
+     * Non-Household ([getNonHHCount]) and population / unscreened ([getVillageHeadcount]).
+     * Each of those reads every beneficiary of the village; at 1M the three ran side by side
+     * at startup and took 2-7 s each on a tablet.
+     */
+    @Query("""
+        SELECT
+            COUNT(*) AS allBen,
+            COUNT(CASE WHEN isNonHH = 1 THEN 1 END) AS nonHH,
+            COUNT(CASE WHEN isDeath = 0 THEN 1 END) AS population,
+            COUNT(CASE WHEN isDeath = 0 AND screeningStatus = 'UNSCREENED'
+                       AND NOT EXISTS (SELECT 1 FROM TB_SCREENING s WHERE s.benId = BEN_BASIC_CACHE.benId)
+                  THEN 1 END) AS unscreened
+        FROM BEN_BASIC_CACHE
+        WHERE villageId = :villageId AND isDeactivate = 0
+    """)
+    suspend fun villageBenCounts(villageId: Int): VillageBenCounts
+
+    /**
+     * Home glance "presumptive" count: TbDao.getDashboardPresumptiveTbCount with no filters
+     * (all dates, any gender), read from TB_BEN_SUMMARY.presumptive.
+     */
+    @Query(
+        "SELECT COUNT(*) FROM TB_BEN_SUMMARY s CROSS JOIN BENEFICIARY b ON b.beneficiaryId = s.beneficiaryId" +
+            " WHERE s.presumptive = 1 AND b.isDraft = 0 AND b.isDeactivate = 0 AND IFNULL(b.isDeath, 0) = 0" +
+            " AND b.loc_village_id IN (:villageIds)"
+    )
+    suspend fun villagePresumptiveCount(villageIds: List<Int>): Int
+
+    /**
+     * The three Tuberculosis cards in one pass: [getTbScreenedBenCount],
+     * [BenTbListQueries.getTbPresumptiveListCount] and [BenTbListQueries.getTbConfirmedListCount].
+     */
+    @Query(
+        "SELECT COUNT(CASE WHEN s.hasScreening = 1 THEN 1 END) AS screened," +
+            " COUNT(CASE WHEN s.presumptive = 1 THEN 1 END) AS presumptive," +
+            " COUNT(CASE WHEN b.benId IN " + TbCaseSql.CONFIRMED_BEN_IDS + " THEN 1 END) AS confirmed" +
+            " FROM BEN_BASIC_CACHE b LEFT JOIN TB_BEN_SUMMARY s ON s.beneficiaryId = b.benId" +
+            " WHERE b.villageId = :villageId AND b.isDeactivate = 0 AND b.isDeath = 0"
+    )
+    suspend fun villageTbCardCounts(villageId: Int): TbCardCounts
+
+    /**
+     * The five Referrals cards in one pass, same rules as [getDigitalChestXRayBenCount],
+     * [getTrueNatBenCount], [getHwcBenDataCount], [getLiquidCultureBenCount] and
+     * [getClinicalAssessmentBenCount] (see ReferralListSql / ClinicalAssessmentSql).
+     */
+    @Query("""
+        SELECT
+            COUNT(CASE WHEN b.reproductiveStatusId != 1 AND s.xrayList = 1 AND s.pregVitals = 0 THEN 1 END) AS xray,
+            COUNT(CASE WHEN s.tnOther = 1
+                       OR ((b.reproductiveStatusId = 1 OR s.pregVitals = 1) AND s.hasScreening = 1) THEN 1 END) AS trueNat,
+            COUNT(CASE WHEN s.hwc = 1 OR b.benId IN (
+                       SELECT b2.beneficiaryId FROM BENEFICIARY b2 WHERE b2.temperature IS NOT NULL AND b2.temperature >= 100.0
+                  ) THEN 1 END) AS hwc,
+            COUNT(CASE WHEN s.lc = 1 THEN 1 END) AS liquidCulture,
+            COUNT(CASE WHEN s.caFixed = 1 OR (s.caD0 = 1 AND (s.caSym = 1 OR b.reproductiveStatusId = 1)
+                       AND (b.reproductiveStatusId = 1
+                            OR CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 14
+                            OR s.caElig = 1)) THEN 1 END) AS clinical
+        FROM BEN_BASIC_CACHE b LEFT JOIN TB_BEN_SUMMARY s ON s.beneficiaryId = b.benId
+        WHERE b.villageId = :villageId AND b.isDeactivate = 0 AND b.isDeath = 0
+    """)
+    suspend fun villageReferralCardCounts(villageId: Int): ReferralCardCounts
 }

@@ -116,6 +116,8 @@ class TbLocalRepo @Inject constructor(
 
     val allTbSuspected: Flow<List<TBSuspectedCache>> = tbDao.getAllTbSuspected()
 
+    fun tbSuspectedFor(benIds: Collection<Long>): Flow<List<TBSuspectedCache>> = tbDao.getTbSuspectedFor(benIds.toList())
+
     suspend fun getDiagnosticsList(): List<TBDiagnosticsCache> = withContext(Dispatchers.IO) {
         tbDao.getDiagnosticsList()
     }
@@ -403,25 +405,32 @@ class TbLocalRepo @Inject constructor(
      */
     suspend fun applyKnownTbContactRiskFactors(householdId: Long? = null) {
         withContext(Dispatchers.IO) {
-            val screenings = tbDao.getScreeningsForKnownTbContacts(householdId?.takeIf { it > 0L } ?: 0L)
+            val screenings = tbDao.getScreeningsForKnownTbContacts(
+                householdId?.takeIf { it > 0L } ?: 0L,
+                KeyPopulationRiskFactorAutoSelect.optionId(KeyPopulationRiskFactorAutoSelect.CONTACT_OF_KNOWN_TB_CODE),
+                KeyPopulationRiskFactorAutoSelect.optionId(KeyPopulationRiskFactorAutoSelect.NOT_APPLICABLE_CODE)
+            )
             var updated = 0
-            for (candidate in screenings) {
-                // Re-read inside a transaction and change only the risk-factor fields: the list
-                // above is a snapshot, and a form save in between must not be undone by writing
-                // that older row back.
-                val changed = database.withTransaction {
-                    val screening = tbDao.getTbScreeningById(candidate.id) ?: return@withTransaction false
-                    val selection = KeyPopulationRiskFactorAutoSelect.addContactOfKnownTb(
-                        screening.keyPopulationRiskFactorIds,
-                        screening.keyPopulationRiskFactors
-                    ) ?: return@withTransaction false
-                    screening.keyPopulationRiskFactorIds = selection.ids
-                    screening.keyPopulationRiskFactors = selection.codes
-                    screening.syncState = SyncState.UNSYNCED
-                    tbDao.saveTbScreening(screening)
-                    true
+            // One transaction per batch, not per row: at scale a pull can select thousands.
+            for (batch in screenings.chunked(KNOWN_TB_CONTACT_BATCH)) {
+                updated += database.withTransaction {
+                    var changed = 0
+                    for (candidate in batch) {
+                        // Re-read inside the transaction and change only the risk-factor fields: the
+                        // list above is a snapshot, and a form save in between must not be undone.
+                        val screening = tbDao.getTbScreeningById(candidate.id) ?: continue
+                        val selection = KeyPopulationRiskFactorAutoSelect.addContactOfKnownTb(
+                            screening.keyPopulationRiskFactorIds,
+                            screening.keyPopulationRiskFactors
+                        ) ?: continue
+                        screening.keyPopulationRiskFactorIds = selection.ids
+                        screening.keyPopulationRiskFactors = selection.codes
+                        screening.syncState = SyncState.UNSYNCED
+                        tbDao.saveTbScreening(screening)
+                        changed++
+                    }
+                    changed
                 }
-                if (changed) updated++
             }
             if (updated > 0) {
                 Timber.d("Selected Contact of Known TB Patients on $updated screening record(s)")
@@ -442,3 +451,5 @@ class TbLocalRepo @Inject constructor(
         }
     }
 }
+
+private const val KNOWN_TB_CONTACT_BATCH = 200

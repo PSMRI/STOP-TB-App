@@ -16,7 +16,6 @@ import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.MyContextWrapper
 import org.piramalswasthya.stoptb.helpers.NetworkResponse
 import org.piramalswasthya.stoptb.helpers.TokenExpiryManager
-import org.piramalswasthya.stoptb.model.SyncStatusCache
 import org.piramalswasthya.stoptb.model.LocationEntity
 import org.piramalswasthya.stoptb.model.LocationRecord
 import org.piramalswasthya.stoptb.model.User
@@ -45,7 +44,8 @@ class UserRepo @Inject constructor(
 ) {
 
     private val selectedVillage get() = preferenceDao.getLocationRecord()?.village?.id ?: 0
-    val unProcessedRecordCount: Flow<List<SyncStatusCache>> get() = syncDao.getSyncStatus(selectedVillage)
+    /** Records not yet synced, for the home and sign-in badges. */
+    val unProcessedRecordCount: Flow<Int> get() = syncDao.getUnsyncedRecordCount(selectedVillage)
 
     /** Same locale as login/home (prefs); [ApplicationContext] alone stays English on many devices. */
     private fun userMessageContext(): Context =

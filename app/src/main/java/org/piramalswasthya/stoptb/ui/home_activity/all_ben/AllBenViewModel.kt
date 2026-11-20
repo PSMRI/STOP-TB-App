@@ -19,6 +19,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -29,6 +30,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.model.BenBasicDomain
@@ -162,11 +164,17 @@ class AllBenViewModel @Inject constructor(
         }
     }.cachedIn(viewModelScope)
 
-    val childCounts: Flow<Map<Long, Int>> = recordsRepo.childCountsByBen
-    val householdMemberCounts: Flow<Map<Long, Int>> = recordsRepo.householdMemberCounts
-    val householdHeadNames: Flow<Map<Long, String>> = recordsRepo.householdHeadNames
     // PR 6 (6.3): row badges for the rows the list has loaded, not whole tables (RowBadgeRepo).
     private val rowBadges = LoadedRowBadges(viewModelScope, rowBadgeRepo)
+
+    // Household details for the loaded rows only: the village-wide maps took seconds per run at
+    // 1M (child counts 8-27 s on a tablet) and re-ran on every beneficiary write.
+    private fun <T> forLoadedRows(query: (Set<Long>) -> Flow<Map<Long, T>>): Flow<Map<Long, T>> =
+        rowBadges.loadedIds.flatMapLatest { ids -> if (ids.isEmpty()) flowOf(emptyMap()) else query(ids) }
+
+    val childCounts: Flow<Map<Long, Int>> = forLoadedRows(recordsRepo::childCountsFor)
+    val householdMemberCounts: Flow<Map<Long, Int>> = forLoadedRows(recordsRepo::householdMemberCountsFor)
+    val householdHeadNames: Flow<Map<Long, String>> = forLoadedRows(recordsRepo::householdHeadNamesFor)
 
     fun onRowsLoaded(benIds: Set<Long>) = rowBadges.onRowsLoaded(benIds)
 
@@ -180,16 +188,16 @@ class AllBenViewModel @Inject constructor(
     val unsyncedGeneralOpdBenIds: Flow<List<Long>> = rowBadges.unsyncedGeneralOpdBenIds
     val syncingGeneralOpdBenIds: Flow<List<Long>> = rowBadges.syncingGeneralOpdBenIds
     val anthropometryFilledBenIds: Flow<List<Long>> = rowBadges.anthropometryBenIds
-    // Not limited to the loaded rows (contact tracing records): built into sets here, off Main,
-    // so the adapter doesn't convert the whole list on the main thread on every emission.
-    val contactFollowUpDoneBenIds: Flow<Set<Long>> = contactTracingRepo.observeContactFollowUpDoneBenIds()
-        .map { benIds -> benIds.toHashSet() }.flowOn(Dispatchers.Default)
-    val tptFollowUpDoneBenIds: Flow<Set<Long>> = contactTracingRepo.observeTptFollowUpTargetReachedBenIds()
-        .map { benIds -> benIds.toHashSet() }.flowOn(Dispatchers.Default)
-    val tptEligibleBenIds: Flow<Set<Long>> = contactTracingRepo.observeTptEligibleBenIds()
-        .map { benIds -> benIds.toHashSet() }.flowOn(Dispatchers.Default)
-    val tptRegistrationDoneBenIds: Flow<Set<Long>> = contactTracingRepo.observeTptRegistrationDoneBenIds()
-        .map { benIds -> benIds.toHashSet() }.flowOn(Dispatchers.Default)
+    // Contact tracing / TPT badges for the loaded rows only (the whole response tables are
+    // read otherwise), built into sets off Main so the adapter doesn't convert on every emission.
+    private fun loadedSet(query: (Set<Long>) -> Flow<List<Long>>): Flow<Set<Long>> =
+        rowBadges.loadedIds.flatMapLatest { ids -> if (ids.isEmpty()) flowOf(emptyList()) else query(ids) }
+            .map { benIds -> benIds.toHashSet() }.flowOn(Dispatchers.Default)
+
+    val contactFollowUpDoneBenIds: Flow<Set<Long>> = loadedSet { contactTracingRepo.observeContactFollowUpDoneBenIds(it) }
+    val tptFollowUpDoneBenIds: Flow<Set<Long>> = loadedSet { contactTracingRepo.observeTptFollowUpTargetReachedBenIds(it) }
+    val tptEligibleBenIds: Flow<Set<Long>> = loadedSet { contactTracingRepo.observeTptEligibleBenIds(it) }
+    val tptRegistrationDoneBenIds: Flow<Set<Long>> = loadedSet { contactTracingRepo.observeTptRegistrationDoneBenIds(it) }
 
     /** Diagnosis = TB_DIAGNOSTICS (new saves) OR TB_SUSPECTED (legacy saves), for the loaded rows. */
     val diagnosisBenIds: Flow<List<Long>> = rowBadges.diagnosisBenIds
@@ -296,7 +304,9 @@ class AllBenViewModel @Inject constructor(
     val allTbScreening: Flow<List<TbScreeningSymptoms>> =
         rowBadges.tbScreeningSymptoms
 
-    val allTbSuspected = tbRepo.allTbSuspected
+    // Clinical Assessment cards: TB_SUSPECTED for the loaded rows only (was the whole table).
+    val allTbSuspected: Flow<List<TBSuspectedCache>> =
+        rowBadges.loadedIds.flatMapLatest { ids -> if (ids.isEmpty()) flowOf(emptyList()) else tbRepo.tbSuspectedFor(ids) }
 
     sealed class OrderActionResult {
         object Idle : OrderActionResult()

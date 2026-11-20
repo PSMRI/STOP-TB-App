@@ -87,6 +87,10 @@ interface TbBadgeQueries {
     @Query("SELECT * FROM TB_SUSPECTED")
     fun getAllTbSuspected(): Flow<List<org.piramalswasthya.stoptb.model.TBSuspectedCache>>
 
+    /** [getAllTbSuspected] for the given beneficiaries only, in the same (id) order. */
+    @Query("SELECT * FROM TB_SUSPECTED WHERE benId IN (:benIds) ORDER BY id")
+    fun getTbSuspectedFor(benIds: List<Long>): Flow<List<org.piramalswasthya.stoptb.model.TBSuspectedCache>>
+
     // ── PR 6: the same badges scoped to the rows a paged list has loaded (<= ~300 ids) ──
     // The list screens used to observe these for every row of the table, re-read on each write.
 

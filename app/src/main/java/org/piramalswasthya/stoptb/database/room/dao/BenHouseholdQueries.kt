@@ -31,6 +31,21 @@ interface BenHouseholdQueries {
     """)
     fun getHouseholdHeadNames(selectedVillage: Int): Flow<List<HouseholdHeadName>>
 
+    /** [getHouseholdHeadNames] for the households of the given beneficiaries only. */
+    @Query("""
+        SELECT householdId AS hhId,
+               TRIM(COALESCE(firstName, '') || ' ' || COALESCE(lastName, '')) AS fullName
+        -- The household index: SQLite otherwise walks the whole village (1M DB 0.9 s -> 0.01 s).
+        FROM BENEFICIARY INDEXED BY index_BENEFICIARY_householdId
+        WHERE householdId IN (SELECT householdId FROM BENEFICIARY WHERE beneficiaryId IN (:benIds))
+          AND isDraft = 0
+          AND isDeactivate = 0
+          AND loc_village_id = :selectedVillage
+          AND householdId IS NOT NULL
+          AND familyHeadRelationPosition = 19
+    """)
+    fun getHouseholdHeadNamesForBens(selectedVillage: Int, benIds: List<Long>): Flow<List<HouseholdHeadName>>
+
     @Query("SELECT * FROM BEN_BASIC_CACHE WHERE hhId = :hhId ORDER BY BEN_BASIC_CACHE.updatedDate DESC")
     fun getAllBasicBenForHousehold(hhId: Long): Flow<List<BenBasicCache>>
 

@@ -51,8 +51,14 @@ interface BenTbListQueries {
     @Query(CONFIRMED_PAGED_SQL + " LIMIT :limit OFFSET :offset")
     suspend fun getTbConfirmedPage(villageId: Int, query: String, limit: Int, offset: Int): List<BenWithTbSuspectedCache>
 
-    /** Home card count for the Presumptive list: same rows as [getTbScreeningList], counted in SQL. */
-    @Query("SELECT COUNT(*) FROM (" + PRESUMPTIVE_LIST_SQL + ")")
+    /**
+     * Home card count for the Presumptive list: same rows as [getTbScreeningList], counted from
+     * TB_BEN_SUMMARY.presumptive instead of re-checking every screening row.
+     */
+    @Query(
+        "SELECT COUNT(*) FROM BEN_BASIC_CACHE b JOIN TB_BEN_SUMMARY s ON s.beneficiaryId = b.benId" +
+            " WHERE b.villageId = :villageId AND b.isDeactivate = 0 AND b.isDeath = 0 AND s.presumptive = 1"
+    )
     fun getTbPresumptiveListCount(villageId: Int): Flow<Int>
 
     /** Home card count for the Confirmed list: same rows as [getTbConfirmedList], counted in SQL. */
@@ -120,19 +126,13 @@ interface BenTbListQueries {
             " AND " + BenListSearchSql.MATCHES + PAGED_ORDER
 
         /**
-         * The Presumptive list's pages: the same beneficiaries as [PRESUMPTIVE_LIST_SQL] (some
-         * screening/suspected/diagnostics combination is presumptive), written as EXISTS so SQLite
-         * walks beneficiaries in list order and stops after a page. The GROUP BY form must find and
-         * sort every match first: 1M device DB, host 6.2-7.6 s -> 0.05 s for the first page, rows and
-         * order identical (695,123). The count keeps the GROUP BY form, which counts faster.
-         * TbListPagingEquivalenceTest compares the two forms.
+         * The Presumptive list's pages: the same beneficiaries as [PRESUMPTIVE_LIST_SQL], read from
+         * TB_BEN_SUMMARY.presumptive. SQLite walks beneficiaries in list order and stops after a
+         * page. TbListPagingEquivalenceTest compares the two forms.
          */
         const val PRESUMPTIVE_PAGED_SQL = "SELECT b.* FROM BEN_BASIC_CACHE b" +
             " WHERE b.villageId = :villageId AND b.isDeactivate = 0 AND b.isDeath = 0" +
-            " AND EXISTS (SELECT 1 FROM TB_SCREENING scr" +
-            " LEFT JOIN TB_SUSPECTED sus ON sus.benId = scr.benId" +
-            " LEFT JOIN TB_DIAGNOSTICS dx ON dx.benId = scr.benId" +
-            " WHERE scr.benId = b.benId AND " + TbCaseSql.PRESUMPTIVE + ")" +
+            " AND EXISTS (SELECT 1 FROM TB_BEN_SUMMARY s WHERE s.beneficiaryId = b.benId AND s.presumptive = 1)" +
             " AND " + BenListSearchSql.MATCHES + PAGED_ORDER
 
         /** Shared by the Confirmed list and its home-card count. Definition: [TbCaseSql.CONFIRMED]. */

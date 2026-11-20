@@ -18,6 +18,7 @@ import org.piramalswasthya.stoptb.database.room.dao.HouseholdDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.utils.HelperUtil
+import kotlinx.coroutines.flow.distinctUntilChanged
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -28,7 +29,8 @@ class RecordsRepo @Inject constructor(
     private val benDao: BenDao,
     private val missingBenInfoDao: DataMissingBenInfoDao,
     private val  preferenceDao: PreferenceDao,
-    private val database: InAppDb
+    private val database: InAppDb,
+    private val villageCountsRepo: VillageCountsRepo,
 ) {
 //    private val selectedVillage = preferenceDao.getLocationRecord()?.village?.id ?: 0
     private val selectedVillage get() = preferenceDao.getLocationRecord()?.village?.id ?: 0
@@ -75,6 +77,20 @@ class RecordsRepo @Inject constructor(
         benDao.getHouseholdHeadNames(selectedVillage)
             .map { list -> list.associate { it.hhId to it.fullName } }
 
+    // For the rows a list has loaded (LoadedRowBadges ids): same values, without reading the
+    // whole village.
+    fun childCountsFor(benIds: Set<Long>): Flow<Map<Long, Int>> =
+        benDao.getChildCountsForBens(selectedVillage, benIds.toList())
+            .map { list -> list.associate { it.benId to it.childCount } }
+
+    fun householdMemberCountsFor(benIds: Set<Long>): Flow<Map<Long, Int>> =
+        benDao.getHouseholdMemberCountsForBens(selectedVillage, benIds.toList())
+            .map { list -> list.associate { it.hhId to it.memberCount } }
+
+    fun householdHeadNamesFor(benIds: Set<Long>): Flow<Map<Long, String>> =
+        benDao.getHouseholdHeadNamesForBens(selectedVillage, benIds.toList())
+            .map { list -> list.associate { it.hhId to it.fullName } }
+
     val anthropometryFilledBenIds: Flow<List<Long>> get() =
         benDao.getAnthropometryFilledBenIds()
 
@@ -101,8 +117,13 @@ class RecordsRepo @Inject constructor(
         return if (source in sourcesWithoutTbPredicates) {
             noCountSource(BEN_VIEW) { limit, offset -> benDao.searchBenPageWithoutTbTables(villageIds, source, filterType, query, limit, offset) }
         } else {
-            noCountSource(BEN_VIEW, "BENEFICIARY", "BEN_VITALS", "TB_SUSPECTED", "TB_DIAGNOSTICS", "TB_SCREENING") { limit, offset ->
-                benDao.searchBenPage(villageIds, source, filterType, query, vulnerabilityCode, limit, offset)
+            noCountSource(BEN_VIEW, "BENEFICIARY", "BEN_VITALS", "TB_SUSPECTED", "TB_DIAGNOSTICS", "TB_SCREENING", "TB_BEN_SUMMARY") { limit, offset ->
+                // X-ray / TrueNat: same rows and order as searchBenPage, read in index order.
+                when (source) {
+                    6 -> benDao.xrayReferralPage(villageIds, filterType, query, limit, offset)
+                    7 -> benDao.trueNatReferralPage(villageIds, filterType, query, limit, offset)
+                    else -> benDao.searchBenPage(villageIds, source, filterType, query, vulnerabilityCode, limit, offset)
+                }
             }
         }
     }
@@ -111,9 +132,17 @@ class RecordsRepo @Inject constructor(
         benDao.searchBenOnce(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query, vulnerabilityCode)
             .map { it.asBasicDomainModel() }
 
-    val allBenListCount get() = benDao.getAllBenCount(selectedVillage)
+    // Home cards: one shared, throttled query for the village (VillageCountsRepo).
+    // Tuberculosis / Referrals cards: one shared, cached query per screen (VillageCountsRepo).
+    private fun tbCard(pick: (org.piramalswasthya.stoptb.database.room.dao.TbCardCounts) -> Int) =
+        villageCountsRepo.tbCards(selectedVillage).map(pick).distinctUntilChanged()
+
+    private fun referralCard(pick: (org.piramalswasthya.stoptb.database.room.dao.ReferralCardCounts) -> Int) =
+        villageCountsRepo.referralCards(selectedVillage).map(pick).distinctUntilChanged()
+
+    val allBenListCount get() = villageCountsRepo.counts(selectedVillage).map { it.allBen }.distinctUntilChanged()
     val allMissingDataBenListCount get() = missingBenInfoDao.getDataCount(selectedVillage)
-    val nonHHListCount get() = benDao.getNonHHCount(selectedVillage)
+    val nonHHListCount get() = villageCountsRepo.counts(selectedVillage).map { it.nonHH }.distinctUntilChanged()
     val nonHHList get() = benDao.getNonHHBeneficiaries(selectedVillage)
         .map { list -> list.map { it.asBasicDomainModel() } }
 
@@ -170,11 +199,11 @@ class RecordsRepo @Inject constructor(
     val getNcdEligibleListCount get() = benDao.getBenWithCbacCount(selectedVillage)
     val getNcdrefferedListCount get() = benDao.getReferredBenCount(selectedVillage)
     val getHwcReferedListCount get() = benDao.getReferredHWCBenCount(selectedVillage)
-    val digitalChestXrayReferralCount get() = benDao.getDigitalChestXRayBenCount(selectedVillage)
-    val trueNatReferralCount get() = benDao.getTrueNatBenCount(selectedVillage)
-    val liquidCultureReferralCount get() = benDao.getLiquidCultureBenCount(selectedVillage)
-    val hwcReferralCount get() = benDao.getHwcBenDataCount(selectedVillage)
-    val clinicalAssessmentReferralCount get() = benDao.getClinicalAssessmentBenCount(selectedVillage)
+    val digitalChestXrayReferralCount get() = referralCard { it.xray }
+    val trueNatReferralCount get() = referralCard { it.trueNat }
+    val liquidCultureReferralCount get() = referralCard { it.liquidCulture }
+    val hwcReferralCount get() = referralCard { it.hwc }
+    val clinicalAssessmentReferralCount get() = referralCard { it.clinical }
 
     val getNcdPriorityList get() = getNcdEligibleList.map {
         it.filter { it.savedCbacRecords.isNotEmpty() && it.savedCbacRecords.maxBy { it.createdDate }.total_score > 4 }
@@ -213,19 +242,19 @@ class RecordsRepo @Inject constructor(
     fun tbScreeningPaged(query: String) =
         Pager(tbListPagingConfig) { noCountSource(BEN_VIEW, "TB_SCREENING") { limit, offset -> benDao.getTbScreeningBenPage(selectedVillage, query, limit, offset) } }
             .flow.map { page -> page.map { row -> row.asTbScreeningDomainModel() } }
-    val tbScreeningListCount get() = benDao.getTbScreenedBenCount(selectedVillage)
+    val tbScreeningListCount get() = tbCard { it.screened }
 
     fun tbPresumptivePaged(query: String) =
-        Pager(tbListPagingConfig) { noCountSource(*TB_CASE_LIST_TABLES, "TB_SCREENING") { limit, offset -> benDao.getTbPresumptivePage(selectedVillage, query, limit, offset) } }
+        Pager(tbListPagingConfig) { noCountSource(*TB_CASE_LIST_TABLES, "TB_SCREENING", "TB_BEN_SUMMARY") { limit, offset -> benDao.getTbPresumptivePage(selectedVillage, query, limit, offset) } }
             .flow.map { page -> page.map { row -> row.asTbSuspectedDomainModel() } }
     // Counted in SQL: was the whole Presumptive list (with @Relation children) loaded just for .size.
-    val tbSuspectedListCount get() = benDao.getTbPresumptiveListCount(selectedVillage)
+    val tbSuspectedListCount get() = tbCard { it.presumptive }
 
     fun tbConfirmedPaged(query: String) =
         Pager(tbListPagingConfig) { noCountSource(*TB_CASE_LIST_TABLES) { limit, offset -> benDao.getTbConfirmedPage(selectedVillage, query, limit, offset) } }
             .flow.map { page -> page.map { row -> row.asTbSuspectedDomainModel() } }
     // Counted in SQL: was the whole Confirmed list loaded just for .size.
-    val tbConfirmedListCount get() = benDao.getTbConfirmedListCount(selectedVillage)
+    val tbConfirmedListCount get() = tbCard { it.confirmed }
 
     val leprosySuspectedListCount get() = benDao.getLeprosyScreeningBenCountBySymptoms(selectedVillage, 0)
     val leprosyConfirmedCasesListCount get() = benDao.getConfirmedLeprosyCaseCount(selectedVillage = selectedVillage)
