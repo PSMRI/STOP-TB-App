@@ -10,6 +10,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
 import org.piramalswasthya.stoptb.utils.throttleLatest
@@ -203,10 +204,12 @@ class TBRepo @Inject constructor(
     val syncingGeneralOpdBenIds: Flow<List<Long>> =
         generalOpdBenIdStates.map { rows -> rows.filter { it.syncState == SyncState.SYNCING }.map { it.benId } }.flowOn(Dispatchers.Default)
 
-    val tbSuspectedBenIds: Flow<List<Long>> = tbDao.getAllTbSuspectedBenIds().shareBadges()
+    fun hasTbScreening(benId: Long): Flow<Boolean> = tbDao.hasTbScreening(benId).distinctUntilChanged()
 
-    /** benIds that have a record in TB_DIAGNOSTICS (new diagnostics table) */
-    val tbDiagnosticsBenIds: Flow<List<Long>> = tbDao.getAllTbDiagnosticsBenIds().shareBadges()
+    fun hasGeneralOpd(benId: Long): Flow<Boolean> = tbDao.hasGeneralOpd(benId).distinctUntilChanged()
+
+    /** A TB_DIAGNOSTICS (new saves) or TB_SUSPECTED (legacy saves) record. */
+    fun hasTbDiagnosis(benId: Long): Flow<Boolean> = tbDao.hasTbDiagnosis(benId).distinctUntilChanged()
 
     suspend fun saveGeneralOpd(generalOpdCache: GeneralOpdCache) =
         tbLocalRepo.saveGeneralOpd(generalOpdCache)

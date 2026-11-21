@@ -50,6 +50,21 @@ interface TbBadgeQueries {
     @Query("SELECT benId FROM TB_DIAGNOSTICS")
     fun getAllTbDiagnosticsBenIds(): Flow<List<Long>>
 
+    // One beneficiary's form status (Examine sheet): an index lookup instead of every id.
+
+    @Query("SELECT EXISTS(SELECT 1 FROM TB_SCREENING WHERE benId = :benId)")
+    fun hasTbScreening(benId: Long): Flow<Boolean>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM GENERAL_OPD WHERE benId = :benId)")
+    fun hasGeneralOpd(benId: Long): Flow<Boolean>
+
+    /** TB_DIAGNOSTICS (new saves) or TB_SUSPECTED (legacy saves). */
+    @Query(
+        "SELECT EXISTS(SELECT 1 FROM TB_DIAGNOSTICS WHERE benId = :benId)" +
+            " OR EXISTS(SELECT 1 FROM TB_SUSPECTED WHERE benId = :benId)"
+    )
+    fun hasTbDiagnosis(benId: Long): Flow<Boolean>
+
     /**
      * The card-rendering subset of TB_DIAGNOSTICS - see [TbDiagnosticsCardFields] for why the
      * list screens must not observe the whole 46-column entity for every beneficiary.

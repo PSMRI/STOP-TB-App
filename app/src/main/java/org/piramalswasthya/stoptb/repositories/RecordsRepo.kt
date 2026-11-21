@@ -92,8 +92,8 @@ class RecordsRepo @Inject constructor(
         benDao.getHouseholdHeadNamesForBens(selectedVillage, benIds.toList())
             .map { list -> list.associate { it.hhId to it.fullName } }
 
-    val anthropometryFilledBenIds: Flow<List<Long>> get() =
-        benDao.getAnthropometryFilledBenIds()
+    fun isAnthropometryFilled(benId: Long): Flow<Boolean> =
+        benDao.isAnthropometryFilled(benId).distinctUntilChanged()
 
     /** Sources whose list touches no TB table: 0 All, 1 ABHA, 2 RCH, 3 age 30+, 4 eligible couple. */
     private val sourcesWithoutTbPredicates = setOf(0, 1, 2, 3, 4)

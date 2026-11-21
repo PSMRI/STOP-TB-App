@@ -116,6 +116,24 @@ class PagedScreensEquivalenceTest {
         assertEquals(RowBadgeRepo.RowBadges(), repo.badgesFor(emptySet()).first())
     }
 
+    @Test
+    fun examineStatusLookupsEqualWholeTableMembership() = runBlocking {
+        val anthropometry = db.benDao.getAnthropometryFilledBenIds().first().toSet()
+        val vitals = db.vitalDao.getAllVitalBenIds().first().toSet()
+        val screening = db.tbDao.getAllTbScreeningBenIds().first().toSet()
+        val opd = db.tbDao.getAllGeneralOpdBenIds().first().toSet()
+        val diagnosis = (db.tbDao.getAllTbDiagnosticsBenIds().first() + db.tbDao.getAllTbSuspectedBenIds().first()).toSet()
+        assertTrue("seed should fill every form for someone",
+            listOf(anthropometry, vitals, screening, opd, diagnosis).all { ids -> ids.isNotEmpty() })
+        for (benId in (FIRST_BEN_ID until FIRST_BEN_ID + 120) + listOf(-1L)) {
+            assertEquals("anthropometry $benId", benId in anthropometry, db.benDao.isAnthropometryFilled(benId).first())
+            assertEquals("vitals $benId", benId in vitals, db.vitalDao.hasVitals(benId).first())
+            assertEquals("screening $benId", benId in screening, db.tbDao.hasTbScreening(benId).first())
+            assertEquals("opd $benId", benId in opd, db.tbDao.hasGeneralOpd(benId).first())
+            assertEquals("diagnosis $benId", benId in diagnosis, db.tbDao.hasTbDiagnosis(benId).first())
+        }
+    }
+
     /** AllHouseholdViewModel's old filter and sort, as they were. */
     private fun oldHouseholdFilter(list: List<HouseHoldBasicDomain>, filter: String): List<HouseHoldBasicDomain> {
         val filtered = if (filter.isBlank()) list else {

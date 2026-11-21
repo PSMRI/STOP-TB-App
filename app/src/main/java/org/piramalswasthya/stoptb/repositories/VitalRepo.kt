@@ -5,6 +5,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.flowOn
@@ -78,6 +79,8 @@ class VitalRepo @Inject constructor(
             .shareIn(appScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), replay = 1)
 
     val vitalBenIds: Flow<List<Long>> = vitalBenIdStates.map { rows -> rows.map { it.benId } }.flowOn(Dispatchers.Default)
+
+    fun hasVitals(benId: Long): Flow<Boolean> = vitalDao.hasVitals(benId).distinctUntilChanged()
     val unsyncedVitalBenIds: Flow<List<Long>> =
         vitalBenIdStates.map { rows -> rows.filter { it.syncState == SyncState.UNSYNCED }.map { it.benId } }.flowOn(Dispatchers.Default)
     val syncingVitalBenIds: Flow<List<Long>> =
