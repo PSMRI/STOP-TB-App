@@ -229,10 +229,17 @@ class DashboardFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        // Only the visible ViewPager2 page is RESUMED; off-screen pages stay STARTED.
+        viewModel.setDashboardVisible(true)
         (activity as? HomeActivity)?.updateActionBar(
             R.drawable.ic_dashboard,
             getString(R.string.dashboard)
         )
+    }
+
+    override fun onPause() {
+        viewModel.setDashboardVisible(false)
+        super.onPause()
     }
 
     override fun onDestroyView() {

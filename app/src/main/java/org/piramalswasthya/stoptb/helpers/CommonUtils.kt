@@ -11,8 +11,6 @@ import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.BenBasicDomainForForm
 import org.piramalswasthya.stoptb.model.BenWithCbacReferDomain
 import org.piramalswasthya.stoptb.model.BenWithMalariaConfirmedDomain
-import org.piramalswasthya.stoptb.model.BenWithTbScreeningDomain
-import org.piramalswasthya.stoptb.model.BenWithTbSuspectedDomain
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.Period
@@ -95,32 +93,6 @@ fun filterBenFormList(list: List<BenBasicDomainForForm>, text: String): List<Ben
                 it.fatherName?.lowercase()?.contains(filterText) ?: false
     }
 }
-
-fun filterTbScreeningList(list: List<BenWithTbScreeningDomain>, filterText: String) =
-    list.filter {
-        it.ben.benId.toString().lowercase().contains(filterText) ||
-                it.ben.age.lowercase().contains(filterText) ||
-                it.ben.familyHeadName.lowercase().contains(filterText) ||
-                it.ben.benFullName.lowercase().contains(filterText) ||
-                it.ben.spouseName?.lowercase()?.contains(filterText) ?: false ||
-                it.ben.fatherName?.lowercase()?.contains(filterText) ?: false ||
-                it.ben.mobileNo.lowercase().contains(filterText) ||
-                it.ben.gender.lowercase().contains(filterText) ||
-                it.ben.rchId.takeIf { it1 -> it1?.isDigitsOnly() == true }?.contains(filterText) ?: false
-    }
-
-fun filterTbSuspectedList(list: List<BenWithTbSuspectedDomain>, filterText: String) =
-    list.filter {
-        it.ben.benId.toString().lowercase().contains(filterText) ||
-                it.ben.age.lowercase().contains(filterText) ||
-                it.ben.familyHeadName.lowercase().contains(filterText) ||
-                it.ben.benFullName.lowercase().contains(filterText) ||
-                it.ben.spouseName?.lowercase()?.contains(filterText) ?: false ||
-                it.ben.fatherName?.lowercase()?.contains(filterText) ?: false ||
-                it.ben.mobileNo.lowercase().contains(filterText) ||
-                it.ben.gender.lowercase().contains(filterText) ||
-                it.ben.rchId.takeIf { it1 -> it1?.isDigitsOnly() == true }?.contains(filterText) ?: false
-    }
 
 fun filterMalariaConfirmedList(list: List<BenWithMalariaConfirmedDomain>, filterText: String) =
     list.filter {

@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.database.room.dao
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -33,6 +34,28 @@ interface HouseholdDao {
 
     @Query("SELECT h.*, count(b.householdId) as numMembers FROM HOUSEHOLD as h left outer join BENEFICIARY b on b.householdId = h.householdId WHERE h.isDraft = 0 and h.loc_village_Id = :selectedVillage and ifnull(h.isDoorLocked, 0) = 0 group by h.householdId")
     fun getAllHouseholdWithNumMembers(selectedVillage: Int): Flow<List<HouseholdBasicCache>>
+
+    /**
+     * PR 6: All Household, paged. Same rows as [getAllHouseholdWithNumMembers]; the search (ID,
+     * head's full name, head's phone) and the sort (active first, newest first) the screen ran
+     * in Kotlin over the whole list now run here. `query` lowercased, '' = all. The household
+     * id tie-break keeps the order the list had from the GROUP BY. [doorLocked] picks the
+     * door-locked list (isDoorLocked = 1) instead of the main one.
+     */
+    @Query("""
+        SELECT h.*, COUNT(b.householdId) AS numMembers FROM HOUSEHOLD AS h
+        LEFT OUTER JOIN BENEFICIARY b ON b.householdId = h.householdId
+        WHERE h.isDraft = 0 AND h.loc_village_Id = :selectedVillage
+        AND (CASE WHEN :doorLocked THEN h.isDoorLocked = 1 ELSE IFNULL(h.isDoorLocked, 0) = 0 END)
+        AND (:query = ''
+            OR CAST(h.householdId AS TEXT) LIKE '%' || :query || '%'
+            OR (IFNULL(h.fam_familyHeadName, '') || ' ' || IFNULL(h.fam_familyName, '')) LIKE '%' || :query || '%'
+            OR CAST(h.fam_familyHeadPhoneNo AS TEXT) LIKE '%' || :query || '%')
+        GROUP BY h.householdId
+        ORDER BY h.isDeactivate ASC, h.createdTimeStamp DESC, h.householdId ASC
+        LIMIT :limit OFFSET :offset
+    """)
+    suspend fun getHouseholdsWithNumMembersPage(selectedVillage: Int, doorLocked: Boolean, query: String, limit: Int, offset: Int): List<HouseholdBasicCache>
 
     @Query("SELECT h.*, count(b.householdId) as numMembers FROM HOUSEHOLD as h left outer join BENEFICIARY b on b.householdId = h.householdId WHERE h.isDraft = 0 and h.loc_village_Id = :selectedVillage and h.isDoorLocked = 1 group by h.householdId")
     fun getDoorLockHouseholds(selectedVillage: Int): Flow<List<HouseholdBasicCache>>

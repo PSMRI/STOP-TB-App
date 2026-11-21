@@ -91,6 +91,10 @@ interface CounsellingFormResponseDao {
     @Query("SELECT * FROM t_form_response")
     suspend fun getAllFormResponses(): List<CompleteFormResponse>
 
+    /** PR 6: the live responses of one form version, without their section/question rows. */
+    @Query("SELECT * FROM t_form_response WHERE formVersionId = :formVersionId AND isHistorySnapshot = 0")
+    suspend fun getLiveResponsesForVersion(formVersionId: Int): List<FormResponseEntity>
+
     // isHistorySnapshot = 0 keeps this scoped to the live response only, so re-syncing the
     // current response (e.g. the village-wide Contact/TPT prefetch in PullTBFromAmritWorker)
     // never deletes previously stored TPT Follow-up History snapshot rows (see refreshTptHistory),
@@ -381,6 +385,20 @@ interface CounsellingFormResponseDao {
     )
     fun getFormDoneBenIds(formType: String): Flow<List<Long>>
 
+    /** [getFormDoneBenIds] for the given beneficiaries only (the rows a list has loaded). */
+    @Query(
+        """
+        SELECT DISTINCT r.beneficiaryId FROM t_form_response r
+        JOIN t_form_version v ON r.formVersionId = v.versionId
+        JOIN t_dynamic_form f ON v.formId = f.formId
+        JOIN t_section_response sr ON sr.formResponseId = r.responseId
+        JOIN t_question_response qr ON qr.sectionResponseId = sr.sectionResponseId
+        WHERE r.beneficiaryId IN (:benIds) AND f.formType = :formType AND r.isHistorySnapshot = 0
+          AND (r.status = 'SUBMITTED' OR r.status = 'COMPLETE' OR r.status = 'COMPLETED')
+        """
+    )
+    fun getFormDoneBenIdsFor(formType: String, benIds: List<Long>): Flow<List<Long>>
+
     // Aggregate, all-beneficiaries variant of observePreSubmitResponseStatus — used to gate the
     // Contact Follow Up "done" badge for TPT_ELIGIBLE beneficiaries on TPT_FOLLOW_UP PRE_SUBMIT
     // actually being submitted, matching ExamineViewModel.isContactFollowUpDone's stricter check.
@@ -397,6 +415,21 @@ interface CounsellingFormResponseDao {
         """
     )
     fun getPreSubmitDoneBenIds(formType: String): Flow<List<Long>>
+
+    /** [getPreSubmitDoneBenIds] for the given beneficiaries only (the rows a list has loaded). */
+    @Query(
+        """
+        SELECT DISTINCT r.beneficiaryId FROM t_form_response r
+        JOIN t_section_response sr ON sr.formResponseId = r.responseId
+        JOIN t_form_section fs ON fs.sectionId = sr.sectionId
+        JOIN t_form_version v ON r.formVersionId = v.versionId
+        JOIN t_dynamic_form f ON v.formId = f.formId
+        WHERE r.beneficiaryId IN (:benIds) AND f.formType = :formType AND r.isHistorySnapshot = 0
+          AND fs.sectionPhase = 'PRE_SUBMIT'
+          AND (r.status = 'SUBMITTED' OR r.status = 'COMPLETE' OR r.status = 'COMPLETED')
+        """
+    )
+    fun getPreSubmitDoneBenIdsFor(formType: String, benIds: List<Long>): Flow<List<Long>>
 
     // One-shot, single-beneficiary variant of getFormDoneBenIds — lets a caller check local
     // submission state directly (e.g. ContactTracingRepositoryImpl.getContactTracingStatus)
@@ -446,6 +479,31 @@ interface CounsellingFormResponseDao {
     )
     fun getAllSubmittedFollowUpCounts(): Flow<List<BeneficiaryFollowUpCount>>
 
+    /** [getAllSubmittedFollowUpCounts] for the given beneficiaries only (the rows a list has loaded). */
+    @Query(
+        """
+        SELECT beneficiaryId, formVersionId, MAX(submittedCount) AS submittedCount FROM (
+            SELECT r.beneficiaryId AS beneficiaryId, r.formVersionId AS formVersionId, COUNT(DISTINCT r.responseId) AS submittedCount
+            FROM t_form_response r
+            JOIN t_section_response sr ON sr.formResponseId = r.responseId
+            JOIN t_form_section fs ON fs.sectionId = sr.sectionId
+            WHERE r.beneficiaryId IN (:benIds) AND r.isHistorySnapshot = 0 AND r.status = 'COMPLETE' AND fs.sectionPhase = 'POST_SUBMIT'
+            GROUP BY r.beneficiaryId, r.formVersionId
+
+            UNION ALL
+
+            SELECT r.beneficiaryId AS beneficiaryId, r.formVersionId AS formVersionId, COUNT(DISTINCT r.responseId) AS submittedCount
+            FROM t_form_response r
+            JOIN t_section_response sr ON sr.formResponseId = r.responseId
+            JOIN t_form_section fs ON fs.sectionId = sr.sectionId
+            WHERE r.beneficiaryId IN (:benIds) AND r.isHistorySnapshot = 1 AND fs.sectionPhase = 'POST_SUBMIT'
+            GROUP BY r.beneficiaryId, r.formVersionId
+        )
+        GROUP BY beneficiaryId, formVersionId
+        """
+    )
+    fun getSubmittedFollowUpCountsFor(benIds: List<Long>): Flow<List<BeneficiaryFollowUpCount>>
+
     @Query(
         """
         SELECT r.beneficiaryId AS beneficiaryId, r.formVersionId AS formVersionId, qo.optionValue AS optionValue
@@ -459,6 +517,21 @@ interface CounsellingFormResponseDao {
         """
     )
     fun getAllRegimenAnswers(questionUuid: String): Flow<List<BeneficiaryRegimenAnswer>>
+
+    /** [getAllRegimenAnswers] for the given beneficiaries only (the rows a list has loaded). */
+    @Query(
+        """
+        SELECT r.beneficiaryId AS beneficiaryId, r.formVersionId AS formVersionId, qo.optionValue AS optionValue
+        FROM t_form_response r
+        JOIN t_section_response sr ON sr.formResponseId = r.responseId
+        JOIN t_form_section fs ON fs.sectionId = sr.sectionId
+        JOIN t_question_response qr ON qr.sectionResponseId = sr.sectionResponseId
+        JOIN t_section_question sq ON sq.questionId = qr.questionId
+        JOIN t_question_option qo ON qo.optionId = qr.optionId
+        WHERE r.beneficiaryId IN (:benIds) AND r.isHistorySnapshot = 0 AND fs.sectionPhase = 'PRE_SUBMIT' AND sq.questionUuid = :questionUuid
+        """
+    )
+    fun getRegimenAnswersFor(questionUuid: String, benIds: List<Long>): Flow<List<BeneficiaryRegimenAnswer>>
 
     // Bulk, phase-agnostic variant of getAnsweredOptionValueAnyPhase — feeds the beneficiary
     // list's Examine badge (see IContactTracingRepository.observeTptEligibleBenIds), which needs
@@ -478,6 +551,20 @@ interface CounsellingFormResponseDao {
         """
     )
     fun getAllClinicalScreeningStatusAnswers(questionUuid: String): Flow<List<BeneficiaryRegimenAnswer>>
+
+    /** [getAllClinicalScreeningStatusAnswers] for the given beneficiaries only (the rows a list has loaded). */
+    @Query(
+        """
+        SELECT r.beneficiaryId AS beneficiaryId, r.formVersionId AS formVersionId, qo.optionValue AS optionValue
+        FROM t_form_response r
+        JOIN t_section_response sr ON sr.formResponseId = r.responseId
+        JOIN t_question_response qr ON qr.sectionResponseId = sr.sectionResponseId
+        JOIN t_section_question sq ON sq.questionId = qr.questionId
+        JOIN t_question_option qo ON qo.optionId = qr.optionId
+        WHERE r.beneficiaryId IN (:benIds) AND r.isHistorySnapshot = 0 AND sq.questionUuid = :questionUuid
+        """
+    )
+    fun getClinicalScreeningStatusAnswersFor(questionUuid: String, benIds: List<Long>): Flow<List<BeneficiaryRegimenAnswer>>
 }
 
 data class BeneficiaryPreSubmitFilledCount(

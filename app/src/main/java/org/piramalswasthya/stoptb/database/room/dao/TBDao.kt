@@ -19,7 +19,11 @@ import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
 
 @Dao
-interface TBDao {
+interface TBDao :
+    TbDashboardQueries,
+    TbBadgeQueries,
+    TbDiagnosticOrderQueries,
+    TbDashboardBreakdownQueries {
 
     @Query("SELECT * FROM TB_SCREENING WHERE benId =:benId limit 1")
     suspend fun getTbScreening(benId: Long): TBScreeningCache?
@@ -33,112 +37,14 @@ interface TBDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveTbScreening(tbScreeningCaches: List<TBScreeningCache>)
 
-    /** Existing rows for a whole pull chunk in one statement instead of one per record. */
-    @Query("SELECT * FROM TB_SCREENING WHERE benId IN (:benIds)")
-    suspend fun getTbScreeningByBenIds(benIds: List<Long>): List<TBScreeningCache>
-
     @Query("SELECT * FROM GENERAL_OPD WHERE benId =:benId limit 1")
     suspend fun getGeneralOpd(benId: Long): GeneralOpdCache?
-
-    @Query("SELECT benId FROM TB_SCREENING")
-    fun getAllTbScreeningBenIds(): Flow<List<Long>>
-
-    /** id + syncState in one pass; callers split it instead of running three queries. */
-    @Query("SELECT benId, syncState FROM TB_SCREENING")
-    fun getTbScreeningBenIdSyncStates(): Flow<List<org.piramalswasthya.stoptb.model.BenIdSyncState>>
-
-    /** id + syncState in one pass; callers split it instead of running three queries. */
-    @Query("SELECT benId, syncState FROM GENERAL_OPD")
-    fun getGeneralOpdBenIdSyncStates(): Flow<List<org.piramalswasthya.stoptb.model.BenIdSyncState>>
 
     @Query("SELECT benId FROM TB_SCREENING WHERE syncState = :syncState")
     fun getTbScreeningBenIdsBySyncState(syncState: SyncState): Flow<List<Long>>
 
-    @Query("SELECT benId FROM GENERAL_OPD")
-    fun getAllGeneralOpdBenIds(): Flow<List<Long>>
-
     @Query("SELECT benId FROM GENERAL_OPD WHERE syncState = :syncState")
     fun getGeneralOpdBenIdsBySyncState(syncState: SyncState): Flow<List<Long>>
-
-    @Query("SELECT benId FROM TB_SUSPECTED")
-    fun getAllTbSuspectedBenIds(): Flow<List<Long>>
-
-    @Query("SELECT benId FROM TB_DIAGNOSTICS")
-    fun getAllTbDiagnosticsBenIds(): Flow<List<Long>>
-
-    /**
-     * The card-rendering subset of TB_DIAGNOSTICS - see [TbDiagnosticsCardFields] for why the
-     * list screens must not observe the whole 46-column entity for every beneficiary.
-     */
-    @Query(
-        "SELECT benId, isReferredForDigitalChestXray, reasonForDenialChestXray, " +
-                "reasonForDenialChestXrayOther, reasonNotConductedChestXray, " +
-                "reasonNotConductedChestXrayOther, chestXRayResult, isReferredForSputum, " +
-                "reasonForDenialSputum, reasonForDenialSputumOther, reasonNotConductedNaat, " +
-                "reasonNotConductedNaatOther, naatResult, reasonNotConductedRif, " +
-                "reasonNotConductedRifOther, trueNatRifResult, liquidCultureResult, " +
-                "xrayOrderId, xrayOrderStatus, trueNatOrderId, trueNatOrderStatus, " +
-                "rifOrderId, rifOrderStatus, errorMsgXray, errorMsgTrueNat, errorMsgRif, " +
-                "xrayManualResultPendingSync, trueNatManualResultPendingSync, " +
-                "rifManualResultPendingSync, " +
-                "(SELECT MAX(s.visitDate) FROM TB_SCREENING s WHERE s.benId = TB_DIAGNOSTICS.benId) " +
-                "AS latestScreeningAt FROM TB_DIAGNOSTICS"
-    )
-    fun getAllTbDiagnosticsCardFields(): Flow<List<TbDiagnosticsCardFields>>
-
-    /**
-     * The values the beneficiary cards derive "Presumptive / Asymptomatic" from. Kept
-     * narrow deliberately: `SELECT *` here loaded 50 columns per beneficiary, four of them
-     * TypeConverter-parsed lists, to render one label. See [TbScreeningSymptoms].
-     */
-    @Query(
-        "SELECT benId, coughMoreThan2Weeks, bloodInSputum, feverMoreThan2Weeks, riseOfFever, " +
-                "lossOfAppetite, lossOfWeight, nightSweats, historyOfTb, takingAntiTBDrugs, " +
-                "familySufferingFromTB, asymptomatic, chestPain, shortnessOfBreath, fatigue, " +
-                "otherSymptoms, failureToGainWeightInChildren, decreasedActivityOrPlayfulnessInChildren " +
-                "FROM TB_SCREENING"
-    )
-    fun getAllTbScreeningSymptoms(): Flow<List<TbScreeningSymptoms>>
-
-    @Query("SELECT * FROM TB_SUSPECTED")
-    fun getAllTbSuspected(): Flow<List<TBSuspectedCache>>
-
-    @Query("SELECT * FROM TB_DIAGNOSTICS")
-    suspend fun getDiagnosticsList(): List<TBDiagnosticsCache>
-
-    /**
-     * The beneficiaries in [benIds] that already hold a usable order id for one test type.
-     *
-     * The order-id backfill (removed with the getBeneficiariesByStatus sweep) used to decide this one
-     * beneficiary at a time - a `getBenByRegId` plus a whole-row `getTbDiagnosticsByBenId` per
-     * entry, over the entire in-flight backlog - which is thousands of statements queued on the
-     * single Room executor before the first one is even needed. Asking SQLite which ids are
-     * already present answers the same question in one statement per chunk, and reads one
-     * column instead of forty-six.
-     *
-     * "Usable" means the same thing the backfill means by it: non-null, non-blank, not the
-     * "N/A" placeholder the backend sends when an order exists but carries no external id.
-     */
-    @Query(
-        "SELECT benId FROM TB_DIAGNOSTICS WHERE benId IN (:benIds) " +
-                "AND xrayOrderId IS NOT NULL AND TRIM(xrayOrderId) <> '' " +
-                "AND UPPER(TRIM(xrayOrderId)) <> 'N/A'"
-    )
-    suspend fun getBenIdsWithXrayOrderId(benIds: List<Long>): List<Long>
-
-    @Query(
-        "SELECT benId FROM TB_DIAGNOSTICS WHERE benId IN (:benIds) " +
-                "AND trueNatOrderId IS NOT NULL AND TRIM(trueNatOrderId) <> '' " +
-                "AND UPPER(TRIM(trueNatOrderId)) <> 'N/A'"
-    )
-    suspend fun getBenIdsWithTrueNatOrderId(benIds: List<Long>): List<Long>
-
-    @Query(
-        "SELECT benId FROM TB_DIAGNOSTICS WHERE benId IN (:benIds) " +
-                "AND rifOrderId IS NOT NULL AND TRIM(rifOrderId) <> '' " +
-                "AND UPPER(TRIM(rifOrderId)) <> 'N/A'"
-    )
-    suspend fun getBenIdsWithRifOrderId(benIds: List<Long>): List<Long>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertGeneralOpd(generalOpdCache: GeneralOpdCache): Long
@@ -217,6 +123,9 @@ interface TBDao {
     @Query("SELECT * FROM TB_SUSPECTED WHERE benId =:benId ORDER BY id DESC limit 1")
     suspend fun getTbSuspected(benId: Long): TBSuspectedCache?
 
+    @Query("SELECT * FROM TB_SUSPECTED WHERE id = :id")
+    suspend fun getTbSuspectedById(id: Int): TBSuspectedCache?
+
     @Query("""
     SELECT *
     FROM TB_CONFIRMED_TREATMENT
@@ -294,382 +203,6 @@ interface TBDao {
     @Query("UPDATE TB_CONFIRMED_TREATMENT SET syncState = 0 WHERE syncState = 1")
     suspend fun resetConfirmedSyncingToUnsynced()
 
-    // Dashboard queries - TB Screening count by gender with time + village filter
-    @Query("""
-        SELECT COUNT(*) FROM TB_SCREENING ts
-        INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-        WHERE (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-        AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-        AND (:endTime = :endTime)
-        AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-        AND (:isPregnant = 0 OR (UPPER(COALESCE(b.gender, '')) = 'FEMALE' AND (
-            b.gen_reproductiveStatusId = 1 OR EXISTS (
-                SELECT 1 FROM BEN_VITALS v WHERE v.benId = b.beneficiaryId AND v.keyPopulationRiskFactors LIKE '%PREGNANCY%'
-            )
-        )))
-        AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-        AND (:isSeniorCitizen  = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
-    """)
-    fun getDashboardTbScreeningCount(assignedVillageIds: List<Int>, villageName: String, startTime: Long, endTime: Long, gender: String, isChild: Int, isSeniorCitizen: Int, isPregnant: Int = 0
-    ): Flow<Int>
-
-
-    // Dashboard query - Presumptive TB: any starred verbal screening symptom = Yes OR Positive Chest X-ray
-    @Query("""
-    SELECT COUNT(DISTINCT ts.benId) FROM TB_SCREENING ts
-    INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-    LEFT JOIN TB_SUSPECTED tsu ON b.beneficiaryId = tsu.benId
-    LEFT JOIN TB_DIAGNOSTICS td ON b.beneficiaryId = td.benId
-    WHERE (
-        ts.coughMoreThan2Weeks = 1
-        OR ts.bloodInSputum = 1
-        OR ts.feverMoreThan2Weeks = 1
-        OR ts.lossOfWeight = 1
-        OR ts.nightSweats = 1
-        OR ts.riseOfFever = 1
-        OR ts.lossOfAppetite = 1
-        OR ts.familySufferingFromTB = 1
-        OR ts.contactWithTBPatient = 1
-        OR ts.historyOfTBInLastFiveYrs = 1
-        OR ts.historyOfTb = 1
-        OR ts.takingAntiTBDrugs = 1
-        OR UPPER(IFNULL(tsu.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
-        OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE')
-    )
-    AND IFNULL(tsu.isConfirmed, 0) = 0
-    AND IFNULL(tsu.isTBConfirmed, 0) = 0
-    AND IFNULL(td.isTBConfirmed, 0) = 0
-    AND UPPER(IFNULL(td.naatResult, '')) NOT IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
-    AND UPPER(IFNULL(td.liquidCultureResult, '')) != 'POSITIVE'
-    AND NOT EXISTS (SELECT 1 FROM TB_CONFIRMED_TREATMENT tc WHERE tc.benId = b.beneficiaryId)
-    AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-    AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-    AND (:endTime = :endTime)
-    AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-    AND (:isPregnant = 0 OR (UPPER(COALESCE(b.gender, '')) = 'FEMALE' AND (
-        b.gen_reproductiveStatusId = 1 OR EXISTS (
-            SELECT 1 FROM BEN_VITALS v
-            WHERE v.benId = b.beneficiaryId AND v.keyPopulationRiskFactors LIKE '%PREGNANCY%'
-        )
-    )))
-    AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-""")
-    fun getDashboardPresumptiveTbCount(
-        assignedVillageIds: List<Int>,
-        villageName: String,
-        startTime: Long,
-        endTime: Long,
-        gender: String,
-        isChild: Int,
-        isPregnant: Int = 0
-    ): Flow<Int>
-
-    @Query("""
-        SELECT COUNT(*) FROM TB_SCREENING ts
-        INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-        WHERE (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-        AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-        AND (:endTime = :endTime)
-        AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-        AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-        AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
-        AND ts.historyOfTb = 1
-        AND (:isPregnant = 0 OR (UPPER(COALESCE(b.gender, '')) = 'FEMALE' AND (
-            b.gen_reproductiveStatusId = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS v WHERE v.benId = b.beneficiaryId AND v.keyPopulationRiskFactors LIKE '%PREGNANCY%')
-        )))
-    """)
-    fun getDashboardPastHistoryTbCount(
-        assignedVillageIds: List<Int>,
-        villageName: String,
-        startTime: Long,
-        endTime: Long,
-        gender: String,
-        isChild: Int,
-        isSeniorCitizen: Int,
-        isPregnant: Int = 0
-    ): Flow<Int>
-
-    @Query("""
-        SELECT COUNT(*) FROM TB_SCREENING ts
-        INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-        WHERE (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-        AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-        AND (:endTime = :endTime)
-        AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-        AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-        AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
-        AND ts.takingAntiTBDrugs = 1
-        AND (:isPregnant = 0 OR (UPPER(COALESCE(b.gender, '')) = 'FEMALE' AND (
-            b.gen_reproductiveStatusId = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS v WHERE v.benId = b.beneficiaryId AND v.keyPopulationRiskFactors LIKE '%PREGNANCY%')
-        )))
-    """)
-    fun getDashboardAntiTbDrugsCount(
-        assignedVillageIds: List<Int>,
-        villageName: String,
-        startTime: Long,
-        endTime: Long,
-        gender: String,
-        isChild: Int,
-        isSeniorCitizen: Int,
-        isPregnant: Int = 0
-    ): Flow<Int>
-
-    // Dashboard queries - TB Suspected count by gender with time + village filter
-    @Query("""
-        SELECT COUNT(*) FROM (
-            SELECT b.beneficiaryId FROM TB_SUSPECTED ts
-            INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-            WHERE (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-            AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-            AND (:endTime = :endTime)
-            AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-            AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-            AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
-            UNION
-            SELECT b.beneficiaryId FROM TB_DIAGNOSTICS td
-            INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
-            WHERE (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-            AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN td.visitDate >= 100000000000 THEN td.visitDate WHEN td.visitDate > 0 THEN td.visitDate * 1000 WHEN IFNULL(td.serverUpdatedDate, 0) >= 100000000000 THEN td.serverUpdatedDate WHEN IFNULL(td.serverUpdatedDate, 0) > 0 THEN td.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-            AND (:endTime = :endTime)
-            AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-            AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-            AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
-        )
-    """)
-    fun getDashboardTbSuspectedCount(assignedVillageIds: List<Int>, villageName: String, startTime: Long, endTime: Long, gender: String, isChild: Int,isSeniorCitizen: Int): Flow<Int>
-
-    // Dashboard queries - TB Confirmed count by gender with time + village filter
-    @Query("""
-        SELECT COUNT(*) FROM (
-            SELECT b.beneficiaryId FROM TB_SUSPECTED ts
-            INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-            WHERE ts.isConfirmed = 1
-            AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-            AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-            AND (:endTime = :endTime)
-            AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-            AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-            AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
-            UNION
-            SELECT b.beneficiaryId FROM TB_DIAGNOSTICS td
-            INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
-            WHERE td.isConfirmed = 1
-            AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-            AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN td.visitDate >= 100000000000 THEN td.visitDate WHEN td.visitDate > 0 THEN td.visitDate * 1000 WHEN IFNULL(td.serverUpdatedDate, 0) >= 100000000000 THEN td.serverUpdatedDate WHEN IFNULL(td.serverUpdatedDate, 0) > 0 THEN td.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-            AND (:endTime = :endTime)
-            AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-            AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-            AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
-        )
-    """)
-    fun getDashboardTbConfirmedCount(assignedVillageIds: List<Int>, villageName: String, startTime: Long, endTime: Long, gender: String, isChild: Int, isSeniorCitizen: Int): Flow<Int>
-
-    // NIKSHAY IDs count (beneficiaries with an ID) with time + village filter.
-    // Date window: a TB_SUSPECTED visit in range. TB_DIAGNOSTICS is left out on purpose, since
-    // polling writes there and would re-run this count.
-    @Query("""
-        SELECT COUNT(*) FROM beneficiary b
-        WHERE UPPER(TRIM(IFNULL(b.nikshayId, ''))) NOT IN ('', 'N/A')
-        AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-        AND (:startTime = 0 OR :endTime = 0 OR EXISTS (
-            SELECT 1 FROM TB_SUSPECTED ts WHERE ts.benId = b.beneficiaryId
-            AND (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime
-        ))
-        AND (:endTime = :endTime)
-        AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-        AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-        AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
-        AND (:isPregnant = 0 OR (UPPER(COALESCE(b.gender, '')) = 'FEMALE' AND (
-            b.gen_reproductiveStatusId = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS v WHERE v.benId = b.beneficiaryId AND v.keyPopulationRiskFactors LIKE '%PREGNANCY%')
-        )))
-    """)
-    fun getDashboardNikshayCount(
-        assignedVillageIds: List<Int>,
-        villageName: String,
-        startTime: Long,
-        endTime: Long,
-        gender: String,
-        isChild: Int,
-        isSeniorCitizen: Int,
-        isPregnant: Int = 0,
-    ): Flow<Int>
-
-    @Query("""
-        SELECT COUNT(*) FROM (
-            SELECT b.beneficiaryId FROM TB_SUSPECTED ts
-            INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-            LEFT JOIN TB_DIAGNOSTICS td ON td.benId = ts.benId
-            WHERE ts.isChestXRayDone = 1 AND (td.benId IS NULL OR td.xrayOrderStatus = 'COMPLETED')
-            AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-            AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-            AND (:endTime = :endTime)
-            AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-            AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-            AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
-            UNION
-            SELECT b.beneficiaryId FROM TB_DIAGNOSTICS td
-            INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
-            WHERE td.isChestXRayDone = 1 AND td.xrayOrderStatus = 'COMPLETED'
-            AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-            AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN td.visitDate >= 100000000000 THEN td.visitDate WHEN td.visitDate > 0 THEN td.visitDate * 1000 WHEN IFNULL(td.serverUpdatedDate, 0) >= 100000000000 THEN td.serverUpdatedDate WHEN IFNULL(td.serverUpdatedDate, 0) > 0 THEN td.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-            AND (:endTime = :endTime)
-            AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-            AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-            AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
-        )
-    """)
-    fun getDashboardDigitalChestXRayCount(assignedVillageIds: List<Int>, villageName: String, startTime: Long, endTime: Long, gender: String, isChild: Int, isSeniorCitizen: Int): Flow<Int>
-
-    @Query("""
-        SELECT COUNT(*) FROM (
-            SELECT b.beneficiaryId FROM TB_SUSPECTED ts
-            INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-            LEFT JOIN TB_DIAGNOSTICS td ON td.benId = ts.benId
-            WHERE ts.isSputumCollected = 1 AND (td.benId IS NULL OR td.trueNatOrderStatus = 'COMPLETED' OR (td.trueNatOrderStatus = 'CLOSED' AND td.reasonForDenialSputum IS NOT NULL))
-            AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-            AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-            AND (:endTime = :endTime)
-            AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-            AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-            AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
-            UNION
-            SELECT b.beneficiaryId FROM TB_DIAGNOSTICS td
-            INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
-            WHERE td.isReferredForSputum = 1 AND (td.trueNatOrderStatus = 'COMPLETED' OR (td.trueNatOrderStatus = 'CLOSED' AND td.reasonForDenialSputum IS NOT NULL))
-            AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-            AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN td.visitDate >= 100000000000 THEN td.visitDate WHEN td.visitDate > 0 THEN td.visitDate * 1000 WHEN IFNULL(td.serverUpdatedDate, 0) >= 100000000000 THEN td.serverUpdatedDate WHEN IFNULL(td.serverUpdatedDate, 0) > 0 THEN td.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-            AND (:endTime = :endTime)
-            AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-            AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-            AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
-        ) AS matched
-        INNER JOIN beneficiary pregnantBen ON pregnantBen.beneficiaryId = matched.beneficiaryId
-        WHERE (:isPregnant = 0 OR (UPPER(COALESCE(pregnantBen.gender, '')) = 'FEMALE' AND (
-            pregnantBen.gen_reproductiveStatusId = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS v WHERE v.benId = pregnantBen.beneficiaryId AND v.keyPopulationRiskFactors LIKE '%PREGNANCY%')
-        )))
-    """)
-    fun getDashboardSputumCollectionCount(assignedVillageIds: List<Int>, villageName: String, startTime: Long, endTime: Long, gender: String, isChild: Int, isSeniorCitizen: Int, isPregnant: Int = 0): Flow<Int>
-
-    @Query("""
-        SELECT COUNT(*) FROM (
-            SELECT b.beneficiaryId FROM TB_SUSPECTED ts
-            INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-            LEFT JOIN TB_DIAGNOSTICS td ON td.benId = ts.benId
-            WHERE ts.isNaatConducted = 1 AND (td.benId IS NULL OR td.trueNatOrderStatus = 'COMPLETED')
-            AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-            AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-            AND (:endTime = :endTime)
-            AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-            AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-            AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
-            UNION
-            SELECT b.beneficiaryId FROM TB_DIAGNOSTICS td
-            INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
-            WHERE td.isNaatConducted = 1 AND td.trueNatOrderStatus = 'COMPLETED'
-            AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-            AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN td.visitDate >= 100000000000 THEN td.visitDate WHEN td.visitDate > 0 THEN td.visitDate * 1000 WHEN IFNULL(td.serverUpdatedDate, 0) >= 100000000000 THEN td.serverUpdatedDate WHEN IFNULL(td.serverUpdatedDate, 0) > 0 THEN td.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-            AND (:endTime = :endTime)
-            AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-            AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-            AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
-        ) AS matched
-        INNER JOIN beneficiary pregnantBen ON pregnantBen.beneficiaryId = matched.beneficiaryId
-        WHERE (:isPregnant = 0 OR (UPPER(COALESCE(pregnantBen.gender, '')) = 'FEMALE' AND (
-            pregnantBen.gen_reproductiveStatusId = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS v WHERE v.benId = pregnantBen.beneficiaryId AND v.keyPopulationRiskFactors LIKE '%PREGNANCY%')
-        )))
-    """)
-    fun getDashboardTrueNatCount(assignedVillageIds: List<Int>, villageName: String, startTime: Long, endTime: Long, gender: String, isChild: Int, isSeniorCitizen: Int, isPregnant: Int = 0): Flow<Int>
-
-    @Query("""
-        SELECT COUNT(*) FROM (
-            SELECT b.beneficiaryId FROM TB_SUSPECTED ts
-            INNER JOIN beneficiary b ON b.beneficiaryId = ts.benId
-            WHERE ts.isLiquidCultureConducted = 1
-            AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-            AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN ts.visitDate >= 100000000000 THEN ts.visitDate WHEN ts.visitDate > 0 THEN ts.visitDate * 1000 WHEN IFNULL(ts.serverUpdatedDate, 0) >= 100000000000 THEN ts.serverUpdatedDate WHEN IFNULL(ts.serverUpdatedDate, 0) > 0 THEN ts.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-            AND (:endTime = :endTime)
-            AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-            AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-            AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
-            UNION
-            SELECT b.beneficiaryId FROM TB_DIAGNOSTICS td
-            INNER JOIN beneficiary b ON b.beneficiaryId = td.benId
-            WHERE td.isLiquidCultureConducted = 1
-            AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-            AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN td.visitDate >= 100000000000 THEN td.visitDate WHEN td.visitDate > 0 THEN td.visitDate * 1000 WHEN IFNULL(td.serverUpdatedDate, 0) >= 100000000000 THEN td.serverUpdatedDate WHEN IFNULL(td.serverUpdatedDate, 0) > 0 THEN td.serverUpdatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-            AND (:endTime = :endTime)
-            AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-            AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-            AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
-        ) AS matched
-        INNER JOIN beneficiary pregnantBen ON pregnantBen.beneficiaryId = matched.beneficiaryId
-        WHERE (:isPregnant = 0 OR (UPPER(COALESCE(pregnantBen.gender, '')) = 'FEMALE' AND (
-            pregnantBen.gen_reproductiveStatusId = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS v WHERE v.benId = pregnantBen.beneficiaryId AND v.keyPopulationRiskFactors LIKE '%PREGNANCY%')
-        )))
-    """)
-    fun getDashboardLiquidCultureCount(assignedVillageIds: List<Int>, villageName: String, startTime: Long, endTime: Long, gender: String, isChild: Int,isSeniorCitizen: Int, isPregnant: Int = 0): Flow<Int>
-
-    @Query("""
-        SELECT COUNT(*) FROM (
-            SELECT b.beneficiaryId FROM beneficiary b
-            WHERE b.temperature IS NOT NULL AND b.temperature >= 100.0
-            AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-            AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN IFNULL(b.updatedDate, 0) >= 100000000000 THEN b.updatedDate WHEN IFNULL(b.updatedDate, 0) > 0 THEN b.updatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-            AND (:endTime = :endTime)
-            AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-            AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-            AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
-            UNION
-            SELECT b.beneficiaryId FROM BEN_VITALS v
-            INNER JOIN beneficiary b ON b.beneficiaryId = v.benId
-            WHERE ((v.pulseRate IS NOT NULL AND v.pulseRate < 60)
-               OR (v.pulseRate IS NOT NULL AND v.pulseRate > 90)
-               OR (v.bpSystolic IS NOT NULL AND v.bpSystolic < 90)
-               OR (v.bpSystolic IS NOT NULL AND v.bpSystolic >= 140)
-               OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic < 60)
-               OR (v.bpDiastolic IS NOT NULL AND v.bpDiastolic >= 90)
-               OR (v.rbs IS NOT NULL AND v.rbs >= 100)
-               OR (v.pallorId = 1 OR UPPER(TRIM(IFNULL(v.pallor, ''))) IN ('PRESENT', 'YES'))
-               OR (v.icterusId = 1 OR UPPER(TRIM(IFNULL(v.icterus, ''))) IN ('PRESENT', 'YES'))
-               OR (v.cyanosisId = 1 OR UPPER(TRIM(IFNULL(v.cyanosis, ''))) IN ('PRESENT', 'YES'))
-               OR (v.clubbingId = 1 OR UPPER(TRIM(IFNULL(v.clubbing, ''))) IN ('PRESENT', 'YES'))
-               OR (v.lymphadenopathyId = 1 OR UPPER(TRIM(IFNULL(v.lymphadenopathy, ''))) IN ('PRESENT', 'YES'))
-               OR (v.oedemaId = 1 OR UPPER(TRIM(IFNULL(v.oedema, ''))) IN ('PRESENT', 'YES')))
-            AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-            AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN IFNULL(v.capturedAt, 0) >= 100000000000 THEN v.capturedAt WHEN IFNULL(v.capturedAt, 0) > 0 THEN v.capturedAt * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-            AND (:endTime = :endTime)
-            AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-            AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-            AND (:isSeniorCitizen = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) >= 60))
-        ) AS matched
-        INNER JOIN beneficiary pregnantBen ON pregnantBen.beneficiaryId = matched.beneficiaryId
-        WHERE (:isPregnant = 0 OR (UPPER(COALESCE(pregnantBen.gender, '')) = 'FEMALE' AND (
-            pregnantBen.gen_reproductiveStatusId = 1 OR EXISTS (SELECT 1 FROM BEN_VITALS v WHERE v.benId = pregnantBen.beneficiaryId AND v.keyPopulationRiskFactors LIKE '%PREGNANCY%')
-        )))
-    """)
-    fun getDashboardHwcReferralCount(assignedVillageIds: List<Int>, villageName: String, startTime: Long, endTime: Long, gender: String, isChild: Int,isSeniorCitizen: Int, isPregnant: Int = 0): Flow<Int>
-
-
-
-    // Dashboard query - Unscreened: beneficiary has no TB_SCREENING record at all
-    @Query("""
-        SELECT COUNT(*) FROM beneficiary b
-        WHERE b.beneficiaryId NOT IN (SELECT benId FROM TB_SCREENING)
-        AND (b.loc_village_id IN (:assignedVillageIds) AND (:villageName = '' OR b.loc_village_name = :villageName OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || ' (%' ESCAPE CHAR(92) OR b.loc_village_name LIKE REPLACE(REPLACE(REPLACE(:villageName, CHAR(92), CHAR(92) || CHAR(92)), '%', CHAR(92) || '%'), '_', CHAR(92) || '_') || '(%' ESCAPE CHAR(92)))
-        AND (:startTime = 0 OR :endTime = 0 OR (CASE WHEN IFNULL(b.updatedDate, 0) >= 100000000000 THEN b.updatedDate WHEN IFNULL(b.updatedDate, 0) > 0 THEN b.updatedDate * 1000 ELSE 0 END) BETWEEN :startTime AND :endTime)
-        AND (:endTime = :endTime)
-        AND IFNULL(b.isDeath, 0) = 0 AND (:gender = '' OR (:gender != 'OTHERS' AND UPPER(COALESCE(b.gender, '')) = UPPER(:gender)) OR (:gender = 'OTHERS' AND UPPER(COALESCE(b.gender, '')) NOT IN ('MALE', 'FEMALE')))
-        AND (:isChild = 0 OR (CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER) < 15))
-    """)
-    fun getDashboardUnscreenedCount(
-        assignedVillageIds: List<Int>,
-        villageName: String,
-        startTime: Long,
-        endTime: Long,
-        gender: String,
-        isChild: Int
-    ): Flow<Int>
-
     /**
      * True when another living household member is a confirmed TB case.
      * Pass householdId 0 or the person's own id to get false.
@@ -703,42 +236,52 @@ interface TBDao {
     suspend fun householdHasOtherConfirmedTbCase(householdId: Long, benId: Long): Boolean
 
     /**
-     * Screenings for household members who are contacts of a confirmed TB case.
-     * householdId 0 returns every such screening.
+     * Screenings for household members who are contacts of a confirmed TB case
+     * (TB_BEN_SUMMARY.knownTbCase). householdId 0 returns every such screening.
+     * Skips screenings that already hold exactly the "Contact of Known TB Patients" selection
+     * ([contactId] in the ids, the code in the codes, no Not Applicable), so a pull with nothing
+     * new to select reads almost nothing. The caller still checks each row it gets.
      */
     @Query("""
         SELECT t.*
         FROM TB_SCREENING t
         INNER JOIN BENEFICIARY self ON self.beneficiaryId = t.benId
-        WHERE IFNULL(self.householdId, 0) > 0
-          AND (:householdId = 0 OR self.householdId = :householdId)
+        WHERE self.householdId IN (
+                SELECT other.householdId
+                FROM TB_BEN_SUMMARY k
+                INNER JOIN BENEFICIARY other ON other.beneficiaryId = k.beneficiaryId
+                WHERE k.knownTbCase = 1
+                  AND IFNULL(other.householdId, 0) > 0
+                  AND (:householdId = 0 OR other.householdId = :householdId)
+                  AND IFNULL(other.isDeactivate, 0) = 0
+                  AND IFNULL(other.isDeath, 0) = 0
+                  AND IFNULL(other.isDraft, 0) = 0
+          )
           AND IFNULL(self.isDeactivate, 0) = 0
           AND IFNULL(self.isDeath, 0) = 0
           AND IFNULL(self.isDraft, 0) = 0
+          AND NOT (
+                ('|||' || IFNULL(t.keyPopulationRiskFactors, '') || '|||') GLOB '*|||CONTACT_OF_KNOWN_TB_PATIENTS|||*'
+                AND UPPER(IFNULL(t.keyPopulationRiskFactors, '')) NOT LIKE '%NOT_APPLICABLE%'
+                AND UPPER(IFNULL(t.keyPopulationRiskFactors, '')) NOT LIKE '%NOT APPLICABLE%'
+                AND UPPER(IFNULL(t.keyPopulationRiskFactors, '')) NOT LIKE '%CONTACT OF KNOWN TB PATIENTS%'
+                AND (',' || REPLACE(REPLACE(REPLACE(IFNULL(t.keyPopulationRiskFactorIds, ''), '[', ''), ']', ''), ' ', '') || ',')
+                    LIKE '%,' || :contactId || ',%'
+                AND (',' || REPLACE(REPLACE(REPLACE(IFNULL(t.keyPopulationRiskFactorIds, ''), '[', ''), ']', ''), ' ', '') || ',')
+                    NOT LIKE '%,' || :notApplicableId || ',%'
+          )
           AND EXISTS (
                 SELECT 1
                 FROM BENEFICIARY other
-                LEFT JOIN TB_SUSPECTED ts ON other.beneficiaryId = ts.benId
-                LEFT JOIN TB_DIAGNOSTICS td ON other.beneficiaryId = td.benId
+                INNER JOIN TB_BEN_SUMMARY k ON k.beneficiaryId = other.beneficiaryId
                 WHERE other.householdId = self.householdId
                   AND other.beneficiaryId != self.beneficiaryId
                   AND IFNULL(other.isDeactivate, 0) = 0
                   AND IFNULL(other.isDeath, 0) = 0
                   AND IFNULL(other.isDraft, 0) = 0
-                  AND (
-                        IFNULL(ts.isTBConfirmed, 0) = 1
-                        OR IFNULL(ts.isConfirmed, 0) = 1
-                        OR IFNULL(td.isTBConfirmed, 0) = 1
-                        OR IFNULL(td.isConfirmed, 0) = 1
-                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
-                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
-                        OR EXISTS (
-                            SELECT 1 FROM TB_CONFIRMED_TREATMENT tc
-                            WHERE tc.benId = other.beneficiaryId
-                        )
-                  )
+                  AND k.knownTbCase = 1
           )
     """)
-    suspend fun getScreeningsForKnownTbContacts(householdId: Long): List<TBScreeningCache>
+    suspend fun getScreeningsForKnownTbContacts(householdId: Long, contactId: Int, notApplicableId: Int): List<TBScreeningCache>
 }
 

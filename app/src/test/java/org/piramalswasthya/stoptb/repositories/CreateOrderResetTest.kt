@@ -23,10 +23,15 @@ import org.piramalswasthya.stoptb.model.OrderStatus
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.User
 import org.piramalswasthya.stoptb.network.AmritApiService
+import org.piramalswasthya.stoptb.repositories.tb.BenIdLocks
+import org.piramalswasthya.stoptb.repositories.tb.DeviceIntegrationRepo
+import org.piramalswasthya.stoptb.repositories.tb.DiagnosticOrderRepo
+import org.piramalswasthya.stoptb.repositories.tb.TbLocalRepo
+import org.piramalswasthya.stoptb.repositories.tb.TbPushRepo
 import retrofit2.Response
 
 /**
- * TBRepo.createOrder writes the row a new order starts from.
+ * DiagnosticOrderRepo.createOrder writes the row a new order starts from.
  * The network and Room are mocked; the row passed to TBDao.saveTbDiagnostics is checked.
  *
  * Suspend DAO / API methods are answered by method name: a suspend call carries a Continuation
@@ -47,7 +52,7 @@ class CreateOrderResetTest {
         }
 
     /** A repository whose hub is reachable, with a logged-in user, the beneficiary, [stored] and the server's answer. */
-    private fun repoForOrderPush(stored: TBDiagnosticsCache, serverStatus: String): TBRepo {
+    private fun repoForOrderPush(stored: TBDiagnosticsCache, serverStatus: String): DiagnosticOrderRepo {
         val user = mock(User::class.java)
         Mockito.`when`(user.serviceMapId).thenReturn(1734)
         val ben = mock(BenRegCache::class.java)
@@ -74,9 +79,12 @@ class CreateOrderResetTest {
                 )
             }
         ))
-        return TBRepo(
+        // createOrder lives in DiagnosticOrderRepo (split out of TBRepo).
+        return DiagnosticOrderRepo(
             tbDao, benDao, preferenceDao, mock(UserRepo::class.java), api, mock(InAppDb::class.java),
-            mock(DrugMasterRepo::class.java), mock(SyncRetryStore::class.java), mock(Context::class.java)
+            mock(SyncRetryStore::class.java), mock(Context::class.java),
+            mock(TbLocalRepo::class.java), mock(TbPushRepo::class.java),
+            DeviceIntegrationRepo(preferenceDao, api, mock(Context::class.java)), BenIdLocks()
         )
     }
 

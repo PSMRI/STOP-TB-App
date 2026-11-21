@@ -34,7 +34,7 @@ private fun tbSuspectedVisitDateToUtcIso(dateLong: Long?): String? {
         onUpdate = ForeignKey.CASCADE,
         onDelete = ForeignKey.CASCADE
     )],
-    indices = [Index(name = "ind_tbs", value = ["benId"/* "hhId"*/])]
+    indices = [Index(name = "ind_tbs", value = ["benId"/* "hhId"*/]), Index(name = "ind_tbs_sync", value = ["syncState"])]
 )
 
 data class TBSuspectedCache(

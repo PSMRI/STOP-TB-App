@@ -1,11 +1,14 @@
 package org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.ncd_referred.list
 
+import org.piramalswasthya.stoptb.ui.debounceTyping
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
@@ -51,7 +54,7 @@ class NcdRefferedListViewModel @Inject constructor(
 
     val benList = combine(
         allBenList,
-        filter,
+        filter.debounceTyping(),
         selectedFilter
     ) { cacheList, searchText, selectedType ->
 
@@ -64,11 +67,10 @@ class NcdRefferedListViewModel @Inject constructor(
 
         val domainList = typeFiltered.map { it.asDomainModel() }
         val benList = domainList.map { it.ben }
-        val searchedBenList = filterBenList(benList, searchText)
-        domainList.filter { domain ->
-            searchedBenList.any { it.benId == domain.ben.benId }
-        }
-    }
+        // Set lookup: `any { }` per row was O(list x matches).
+        val searchedBenIds = filterBenList(benList, searchText).mapTo(HashSet()) { ben -> ben.benId }
+        domainList.filter { domain -> domain.ben.benId in searchedBenIds }
+    }.flowOn(Dispatchers.Default)
     var selectedPosition = 0
 
     private val clickedBenId = MutableStateFlow(0L)
