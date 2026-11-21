@@ -10,6 +10,7 @@ import dagger.hilt.android.scopes.ActivityRetainedScoped
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import org.piramalswasthya.stoptb.model.BenBasicCache
+import org.piramalswasthya.stoptb.database.room.BenSearchSql
 import org.piramalswasthya.stoptb.database.room.InAppDb
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.paging.NoCountPagingSource
@@ -94,15 +95,35 @@ class RecordsRepo @Inject constructor(
     val anthropometryFilledBenIds: Flow<List<Long>> get() =
         benDao.getAnthropometryFilledBenIds()
 
-    // vulnerabilityCode only applies to source 11 (Vulnerable Population list): "" = All, "TRIBAL", or a risk-factor code.
-    fun searchBen(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false, vulnerabilityCode: String = ""): Flow<List<BenBasicDomain>> =
-        benDao.searchBen(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query, vulnerabilityCode)
-            .map { list -> list.map { it.asBasicDomainModel() } }
-
-    /** Sources whose filter touches no TB table: 0 All, 1 ABHA, 2 RCH, 3 age 30+, 4 eligible couple. */
+    /** Sources whose list touches no TB table: 0 All, 1 ABHA, 2 RCH, 3 age 30+, 4 eligible couple. */
     private val sourcesWithoutTbPredicates = setOf(0, 1, 2, 3, 4)
 
-    // vulnerabilityCode only applies to source 11 (Vulnerable Population list): "" = All, "TRIBAL", or a risk-factor code.
+    /**
+     * One page of the beneficiary list for [source] (BenSearchQueries has a query per list).
+     * vulnerabilityCode only applies to source 11 (Vulnerable Population): "" = All, "TRIBAL",
+     * or a risk-factor code. A search that has no words to look for lists everyone.
+     */
+    private suspend fun benListPage(
+        source: Int, villageIds: List<Int>, filterType: Int, query: String, vulnerabilityCode: String, limit: Int, offset: Int
+    ): List<BenBasicCache> {
+        val fts = BenSearchSql.toFtsQuery(query)
+        val q = if (fts.isEmpty()) "" else query
+        return when (source) {
+            1 -> benDao.abhaBenPage(villageIds, filterType, q, fts, limit, offset)
+            2 -> benDao.rchBenPage(villageIds, filterType, q, fts, limit, offset)
+            3 -> benDao.age30PlusPage(villageIds, filterType, q, fts, limit, offset)
+            4 -> benDao.eligibleCouplePage(villageIds, filterType, q, fts, limit, offset)
+            5 -> benDao.hwcReferralPage(villageIds, filterType, q, fts, limit, offset)
+            6 -> benDao.xrayReferralPage(villageIds, filterType, q, fts, limit, offset)
+            7 -> benDao.trueNatReferralPage(villageIds, filterType, q, fts, limit, offset)
+            8 -> benDao.liquidCultureReferralPage(villageIds, filterType, q, fts, limit, offset)
+            9 -> benDao.tptPage(villageIds, filterType, q, fts, limit, offset)
+            10 -> benDao.clinicalAssessmentPage(villageIds, filterType, q, fts, limit, offset)
+            11 -> benDao.vulnerablePopulationPage(villageIds, filterType, q, fts, vulnerabilityCode, limit, offset)
+            else -> benDao.allBenPage(villageIds, filterType, q, fts, limit, offset)
+        }
+    }
+
     fun searchBenPagedSource(
         query: String,
         filterType: Int,
@@ -111,26 +132,28 @@ class RecordsRepo @Inject constructor(
         vulnerabilityCode: String = ""
     ): PagingSource<Int, BenBasicCache> {
         val villageIds = if (expandToBlock) allVillageIds else listOf(selectedVillage)
-        // Sources 0-4 have no TB predicate, so they use the statement that never names a TB table
-        // and therefore is not invalidated by the sync writing to one. See
-        // BenDao.searchBenPageWithoutTbTables.
-        return if (source in sourcesWithoutTbPredicates) {
-            noCountSource(BEN_VIEW) { limit, offset -> benDao.searchBenPageWithoutTbTables(villageIds, source, filterType, query, limit, offset) }
+        // Lists without a TB rule don't name a TB table, so TB writes during sync don't reload them.
+        val tables = if (source in sourcesWithoutTbPredicates) {
+            arrayOf(BEN_VIEW, BenSearchSql.TABLE)
         } else {
-            noCountSource(BEN_VIEW, "BENEFICIARY", "BEN_VITALS", "TB_SUSPECTED", "TB_DIAGNOSTICS", "TB_SCREENING", "TB_BEN_SUMMARY") { limit, offset ->
-                // X-ray / TrueNat: same rows and order as searchBenPage, read in index order.
-                when (source) {
-                    6 -> benDao.xrayReferralPage(villageIds, filterType, query, limit, offset)
-                    7 -> benDao.trueNatReferralPage(villageIds, filterType, query, limit, offset)
-                    else -> benDao.searchBenPage(villageIds, source, filterType, query, vulnerabilityCode, limit, offset)
-                }
-            }
+            arrayOf(BEN_VIEW, BenSearchSql.TABLE, "BENEFICIARY", "BEN_VITALS", "TB_SUSPECTED", "TB_DIAGNOSTICS", "TB_SCREENING", "TB_BEN_SUMMARY")
+        }
+        return noCountSource(*tables) { limit, offset ->
+            benListPage(source, villageIds, filterType, query, vulnerabilityCode, limit, offset)
         }
     }
 
-    suspend fun searchBenOnce(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false, vulnerabilityCode: String = ""): List<BenBasicDomain> =
-        benDao.searchBenOnce(if (expandToBlock) allVillageIds else listOf(selectedVillage), source, filterType, query, vulnerabilityCode)
-            .map { it.asBasicDomainModel() }
+    /** The whole list for [source] (CSV export), read through the same query and order as the screen. */
+    suspend fun searchBenOnce(query: String, filterType: Int, source: Int, expandToBlock: Boolean = false, vulnerabilityCode: String = ""): List<BenBasicDomain> {
+        val villageIds = if (expandToBlock) allVillageIds else listOf(selectedVillage)
+        val rows = mutableListOf<BenBasicCache>()
+        while (true) {
+            val page = benListPage(source, villageIds, filterType, query, vulnerabilityCode, CSV_PAGE, rows.size)
+            rows += page
+            if (page.size < CSV_PAGE) break
+        }
+        return rows.map { it.asBasicDomainModel() }
+    }
 
     // Home cards: one shared, throttled query for the village (VillageCountsRepo).
     // Tuberculosis / Referrals cards: one shared, cached query per screen (VillageCountsRepo).
@@ -283,6 +306,7 @@ class RecordsRepo @Inject constructor(
 
         private const val BEN_VIEW = "BEN_BASIC_CACHE"
         /** Read by the Presumptive / Confirmed rows and their @Relation children. */
+        private const val CSV_PAGE = 1_000
         private val TB_CASE_LIST_TABLES = arrayOf(BEN_VIEW, "TB_SUSPECTED", "TB_DIAGNOSTICS", "TB_CONFIRMED_TREATMENT", "COUNSELLING_FORM_RESPONSE")
     }
 }

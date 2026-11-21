@@ -113,7 +113,47 @@ class TbBenSummaryTriggerTest {
         sql.execSQL("DELETE FROM TB_SUSPECTED WHERE benId = ${b(3)}")
         assertMatchesRecompute("deletes")
 
+        // BENEFICIARY: list sort key and the HWC temperature rule
+        sql.execSQL("UPDATE BENEFICIARY SET createdDate = ${BASE + 99} WHERE beneficiaryId = ${b(0)}")
+        sql.execSQL("UPDATE BENEFICIARY SET temperature = 101.5 WHERE beneficiaryId = ${b(7)}")
+        sql.execSQL("UPDATE BENEFICIARY SET temperature = 98.0 WHERE beneficiaryId = ${b(7)}")
+        sql.execSQL("UPDATE BENEFICIARY SET temperature = 102.0 WHERE beneficiaryId = ${b(6)}")
+        assertMatchesRecompute("beneficiary date and temperature updates")
+
         assertTrue("summary is empty", summary().isNotEmpty())
+    }
+
+    /** Search index rows, as strings. */
+    private fun searchIndex(): List<List<String?>> =
+        QueryEquivalence.rows(db, "SELECT rowid, name, phone, phoneend, abha, head, spouse, father, benId, hhId, rch FROM BEN_SEARCH_FTS ORDER BY rowid")
+
+    private fun assertSearchIndexMatchesRebuild(step: String) {
+        val kept = searchIndex()
+        sql.beginTransaction()
+        try {
+            sql.execSQL("DELETE FROM BEN_SEARCH_FTS")
+            sql.execSQL(org.piramalswasthya.stoptb.database.room.BenSearchSql.FILL)
+            assertEquals("after $step", searchIndex(), kept)
+        } finally {
+            sql.endTransaction()
+        }
+    }
+
+    @Test
+    fun searchIndexFollowsBeneficiaryAndHouseholdChanges() {
+        assertSearchIndexMatchesRebuild("beneficiary inserts")
+        sql.execSQL("UPDATE BENEFICIARY SET firstName = 'Ramesh', lastName = 'Kumar', contactNumber = 9876500012 WHERE beneficiaryId = ${FIRST + 1}")
+        sql.execSQL("UPDATE BENEFICIARY SET gen_spouseName = 'Sunita', fatherName = 'Gopal', rchId = 'RCH77' WHERE beneficiaryId = ${FIRST + 2}")
+        sql.execSQL("UPDATE BENEFICIARY SET syncState = 0")
+        assertSearchIndexMatchesRebuild("beneficiary updates")
+        sql.execSQL("DELETE FROM BENEFICIARY WHERE beneficiaryId = ${FIRST + 3}")
+        assertSearchIndexMatchesRebuild("beneficiary delete")
+        val found = QueryEquivalence.rows(db, "SELECT rowid FROM BEN_SEARCH_FTS WHERE BEN_SEARCH_FTS MATCH ?",
+            arrayOf(org.piramalswasthya.stoptb.database.room.BenSearchSql.toFtsQuery("rame kum")))
+        assertEquals(listOf(listOf((FIRST + 1).toString())), found)
+        val byPhoneEnd = QueryEquivalence.rows(db, "SELECT rowid FROM BEN_SEARCH_FTS WHERE BEN_SEARCH_FTS MATCH ?",
+            arrayOf(org.piramalswasthya.stoptb.database.room.BenSearchSql.toFtsQuery("00012")))
+        assertEquals(listOf(listOf((FIRST + 1).toString())), byPhoneEnd)
     }
 
     private companion object {

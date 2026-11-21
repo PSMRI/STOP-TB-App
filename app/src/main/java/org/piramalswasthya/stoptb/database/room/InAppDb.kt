@@ -80,6 +80,7 @@ import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.DynamicForm
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.CounsellingFormResponseDao
 import org.piramalswasthya.stoptb.model.DataMissingBenInfo
 import org.piramalswasthya.stoptb.model.TbBenSummary
+import org.piramalswasthya.stoptb.model.BenSearchFts
 import org.piramalswasthya.stoptb.model.MissingDataInfoStatusConverter
 
 
@@ -125,7 +126,8 @@ import org.piramalswasthya.stoptb.model.MissingDataInfoStatusConverter
         SectionResponseEntity::class,
         QuestionResponseEntity::class,
         DataMissingBenInfo::class,
-        TbBenSummary::class
+        TbBenSummary::class,
+        BenSearchFts::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
     version = InAppDb.DB_VERSION, exportSchema = true
@@ -1816,15 +1818,35 @@ abstract class InAppDb : RoomDatabase() {
          * identity check matches.
          */
         /**
-         * v74: TB_BEN_SUMMARY, one row per beneficiary with their TB list flags and sort keys,
-         * kept up to date by triggers (TbBenSummarySql). Filled once here from existing data.
+         * v74: TB_BEN_SUMMARY, one row per beneficiary with their TB list flags and sort keys.
+         * Only the v74 table is created here; MIGRATION_74_75 rebuilds it, adds its triggers and
+         * fills it, so an upgrade from v71 fills it once.
          */
         val MIGRATION_73_74 = object : Migration(73, 74) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(TB_BEN_SUMMARY_CREATE)
                 TB_BEN_SUMMARY_INDEXES.forEach { database.execSQL(it) }
+            }
+        }
+
+        /**
+         * v75: TB_BEN_SUMMARY gets the list sort key (genKey), lastVisit and caCand, and the
+         * temperature rule moves into hwc; BEN_SEARCH_FTS indexes the search-box fields.
+         * The summary is derived data, so it is rebuilt. Triggers are dropped first:
+         * CREATE TRIGGER IF NOT EXISTS would keep a v74 trigger with the old column list.
+         */
+        val MIGRATION_74_75 = object : Migration(74, 75) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                TbBenSummarySql.dropTriggers(database)
+                BenSearchSql.dropTriggers(database)
+                database.execSQL("DROP TABLE IF EXISTS `TB_BEN_SUMMARY`")
+                database.execSQL(TB_BEN_SUMMARY_CREATE_V75)
+                TB_BEN_SUMMARY_INDEXES_V75.forEach { database.execSQL(it) }
+                database.execSQL("DROP TABLE IF EXISTS `BEN_SEARCH_FTS`")
+                database.execSQL(BEN_SEARCH_FTS_CREATE)
                 TbBenSummarySql.createTriggers(database)
                 database.execSQL(TbBenSummarySql.FILL)
+                database.execSQL(BenSearchSql.FILL)
             }
         }
 
@@ -1846,6 +1868,31 @@ abstract class InAppDb : RoomDatabase() {
             "CREATE INDEX IF NOT EXISTS `ind_tbsum_tpt` ON `TB_BEN_SUMMARY` (`tptIndex`)",
             "CREATE INDEX IF NOT EXISTS `ind_tbsum_known_tb` ON `TB_BEN_SUMMARY` (`knownTbCase`)",
         )
+
+        // Same SQL Room generates for TbBenSummary and BenSearchFts (schemas/75.json).
+        private const val TB_BEN_SUMMARY_CREATE_V75 = "CREATE TABLE IF NOT EXISTS `TB_BEN_SUMMARY` (`beneficiaryId` INTEGER NOT NULL," +
+            " `hasScreening` INTEGER NOT NULL, `pregVitals` INTEGER NOT NULL, `xrayList` INTEGER NOT NULL," +
+            " `xrayTier` INTEGER NOT NULL, `xrayKey` INTEGER NOT NULL, `tnOther` INTEGER NOT NULL," +
+            " `tnTier` INTEGER NOT NULL, `tnKey` INTEGER NOT NULL, `hwc` INTEGER NOT NULL," +
+            " `lc` INTEGER NOT NULL, `caFixed` INTEGER NOT NULL, `caD0` INTEGER NOT NULL," +
+            " `caSym` INTEGER NOT NULL, `caElig` INTEGER NOT NULL, `presumptive` INTEGER NOT NULL," +
+            " `tptIndex` INTEGER NOT NULL, `knownTbCase` INTEGER NOT NULL, `lastVisit` INTEGER NOT NULL," +
+            " `genKey` INTEGER NOT NULL, `caCand` INTEGER NOT NULL, PRIMARY KEY(`beneficiaryId`))"
+
+        private val TB_BEN_SUMMARY_INDEXES_V75 = listOf(
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_xray` ON `TB_BEN_SUMMARY` (`xrayTier` ASC, `xrayKey` DESC, `beneficiaryId` DESC)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_tn` ON `TB_BEN_SUMMARY` (`tnTier` ASC, `tnKey` DESC, `beneficiaryId` DESC)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_hwc` ON `TB_BEN_SUMMARY` (`hwc` ASC, `genKey` DESC, `beneficiaryId` DESC)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_lc` ON `TB_BEN_SUMMARY` (`lc` ASC, `genKey` DESC, `beneficiaryId` DESC)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_ca` ON `TB_BEN_SUMMARY` (`caCand` ASC, `genKey` DESC, `beneficiaryId` DESC)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_presumptive` ON `TB_BEN_SUMMARY` (`presumptive`)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_tpt` ON `TB_BEN_SUMMARY` (`tptIndex`)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_known_tb` ON `TB_BEN_SUMMARY` (`knownTbCase`)",
+        )
+
+        private const val BEN_SEARCH_FTS_CREATE = "CREATE VIRTUAL TABLE IF NOT EXISTS `BEN_SEARCH_FTS` USING FTS4(`name` TEXT, `phone` TEXT," +
+            " `phoneend` TEXT, `abha` TEXT, `head` TEXT, `spouse` TEXT, `father` TEXT, `benId` TEXT," +
+            " `hhId` TEXT, `rch` TEXT, tokenize=unicode61)"
 
         val MIGRATION_72_73 = object : Migration(72, 73) {
             override fun migrate(database: SupportSQLiteDatabase) {
@@ -2359,7 +2406,7 @@ abstract class InAppDb : RoomDatabase() {
 
 
         // Bump together with a new MIGRATION_x_y added to MIGRATIONS below.
-        const val DB_VERSION = 74
+        const val DB_VERSION = 75
 
         // Oldest schema version that can be migrated in place.
         const val OLDEST_MIGRATABLE_VERSION = 2
@@ -2438,7 +2485,8 @@ abstract class InAppDb : RoomDatabase() {
             MIGRATION_70_71,
             MIGRATION_71_72,
             MIGRATION_72_73,
-            MIGRATION_73_74
+            MIGRATION_73_74,
+            MIGRATION_74_75
         )
 
         fun getInstance(appContext: Context): InAppDb {

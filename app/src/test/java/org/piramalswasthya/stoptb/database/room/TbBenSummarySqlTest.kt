@@ -24,7 +24,7 @@ class TbBenSummarySqlTest {
 
     @Test
     fun everyColumnTheRulesReadExists() {
-        for (table in listOf("TB_SCREENING", "TB_SUSPECTED", "TB_DIAGNOSTICS", "BEN_VITALS", "TB_CONFIRMED_TREATMENT")) {
+        for (table in listOf("TB_SCREENING", "TB_SUSPECTED", "TB_DIAGNOSTICS", "BEN_VITALS", "TB_CONFIRMED_TREATMENT", "BENEFICIARY")) {
             val existing = columnsOf(table).map { it.lowercase() }.toSet()
             val missing = TbBenSummarySql.columnsRead(table).filter { it.lowercase() !in existing }
             assertEquals("$table columns read by TbBenSummarySql but not in the schema", emptyList<String>(), missing)
@@ -34,7 +34,7 @@ class TbBenSummarySqlTest {
     @Test
     fun summaryColumnsMatchTheEntity() {
         val entityColumns = TbBenSummary::class.java.declaredFields.map { it.name }.filter { it != "beneficiaryId" }.toSet()
-        assertEquals(entityColumns, TbBenSummarySql.COLUMNS.keys)
+        assertEquals(entityColumns, TbBenSummarySql.COLUMNS.keys + TbBenSummarySql.DERIVED.keys)
         assertEquals(columnsOf(TbBenSummarySql.TABLE), entityColumns + "beneficiaryId")
     }
 
@@ -49,9 +49,31 @@ class TbBenSummarySqlTest {
     }
 
     @Test
+    fun beneficiaryTriggerWatchesTheColumnsTheRulesRead() {
+        val trigger = TbBenSummarySql.TRIGGERS.single { it.contains("ON `BENEFICIARY`") && it.contains("AFTER UPDATE OF") }
+        TbBenSummarySql.columnsRead("BENEFICIARY").filter { it != "beneficiaryId" && it != "benId" }.forEach { col ->
+            assertTrue("BENEFICIARY.$col not watched", trigger.contains("`$col`"))
+        }
+    }
+
+    @Test
+    fun ftsQueryMatchesWordStarts() {
+        assertEquals("", BenSearchSql.toFtsQuery("  "))
+        assertEquals("ram*", BenSearchSql.toFtsQuery("Ram"))
+        assertEquals("sunita* devi*", BenSearchSql.toFtsQuery("sunita  devi"))
+        assertEquals("98765000* OR phoneend:98765000*", BenSearchSql.toFtsQuery("98765 000"))
+        assertEquals("912345* OR phoneend:912345*", BenSearchSql.toFtsQuery("91-2345"))
+        assertEquals("o* brien*", BenSearchSql.toFtsQuery("O'Brien"))
+        assertEquals("", BenSearchSql.toFtsQuery("*\"-"))
+    }
+
+    @Test
     fun writesSqlForDeviceChecks() {
         File("build/tb-ben-summary.sql").writeText(
             (TbBenSummarySql.TRIGGERS + TbBenSummarySql.FILL).joinToString(";\n", postfix = ";\n")
+        )
+        File("build/ben-search-fts.sql").writeText(
+            (BenSearchSql.CREATE_TRIGGERS + BenSearchSql.FILL).joinToString(";\n", postfix = ";\n")
         )
     }
 }

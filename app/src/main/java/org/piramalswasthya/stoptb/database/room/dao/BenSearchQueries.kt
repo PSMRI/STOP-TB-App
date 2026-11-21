@@ -12,491 +12,60 @@ import org.piramalswasthya.stoptb.model.*
  * Beneficiary search and paged list queries (All Beneficiaries, Non-Household, search box).
  *
  * Part of [BenDao] (which extends this interface); split out only to keep the DAO
- * readable. Room generates these queries as part of BenDao_Impl - SQL and callers unchanged.
+ * readable. Room generates these queries as part of BenDao_Impl.
  */
 interface BenSearchQueries {
 
+    // One page query per beneficiary list (RecordsRepo.benListPage picks it by source). The
+    // pieces are in [BenListSql]. :query is the typed text ('' = no search), :ftsQuery its FTS form.
 
-    @Query("""
-        SELECT * FROM BEN_BASIC_CACHE
-        WHERE villageId IN (:villageIds)
-        AND isDeactivate = 0
-        AND (:source = 0
-            OR (:source = 1 AND abhaId IS NOT NULL)
-            OR (:source = 2 AND rchId IS NOT NULL AND rchId != '')
-            OR (:source = 3 AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) >= 30 AND isDeath = 0)
-            OR (:source = 4 AND gender = 'Female' AND isDeath = 0
-                AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN 20 AND 49
-                AND (reproductiveStatusId = 1 OR reproductiveStatusId = 2))
-            OR (:source = 5 AND isDeath = 0 AND benId IN (
-                SELECT b2.beneficiaryId FROM BENEFICIARY b2
-                WHERE b2.temperature IS NOT NULL AND b2.temperature >= 100.0
-                UNION
-                SELECT v.benId FROM BEN_VITALS v
-                WHERE ${ABNORMAL_VITALS_CONDITION}
-                UNION
-                SELECT ts.benId FROM TB_SUSPECTED ts
-                WHERE UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
-                  AND UPPER(IFNULL(ts.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
-                UNION
-                SELECT td.benId FROM TB_DIAGNOSTICS td
-                WHERE UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
-                  AND UPPER(IFNULL(td.naatResult, '')) IN ('NEGATIVE', 'MTB NOT DETECTED', 'TB NEGATIVE')
-            ))
-            OR (:source = 6 AND isDeath = 0 AND reproductiveStatusId != 1 AND benId NOT IN (SELECT v.benId FROM BEN_VITALS v WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%') AND (
-                benId IN (
-                    SELECT ts.benId FROM TB_SUSPECTED ts
-                    WHERE ts.isChestXRayDone IS NOT NULL
-                )
-                OR benId IN (
-                    SELECT td.benId FROM TB_DIAGNOSTICS td
-                    WHERE td.isChestXRayDone IS NOT NULL
-                )
-                OR benId IN (
-                    SELECT tbs.benId FROM TB_SCREENING tbs
-                )
-            ))
-            OR (:source = 7 AND isDeath = 0 AND (
-                ((reproductiveStatusId = 1 OR benId IN (
-                    SELECT v.benId FROM BEN_VITALS v
-                    WHERE v.keyPopulationRiskFactors LIKE '%PREGNANCY%'
-                )) AND benId IN (
-                    SELECT tbs.benId FROM TB_SCREENING tbs
-                ))
-                OR benId IN (
-                    SELECT ts.benId FROM TB_SUSPECTED ts
-                    WHERE ts.isNaatConducted IS NOT NULL
-                       OR UPPER(IFNULL(ts.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
-                )
-                OR benId IN (
-                    SELECT td.benId FROM TB_DIAGNOSTICS td
-                    -- An order the backend already holds makes this beneficiary a member,
-                    -- with or without local clinical evidence. Every bucket
-                    -- getBeneficiariesByStatus reports - awaitingProviderResult, completed,
-                    -- awaitingManualEntry, failed, closed - means an order exists, yet a
-                    -- beneficiary awaiting a provider result has isNaatConducted still NULL and
-                    -- no result, so none of the clinical clauses match. One referred from
-                    -- another tab can reach this device with the order and no screening row of
-                    -- its own and was then missing from the list entirely.
-                    --
-                    -- Uncorrelated, so SQLite materialises it once per query, not once per row.
-                    WHERE td.trueNatOrderId IS NOT NULL
-                       OR td.trueNatOrderStatus IS NOT NULL
-                       OR td.isNaatConducted IS NOT NULL
-                       OR UPPER(IFNULL(td.chestXRayResult, '')) IN ('POSITIVE', 'TB PRESUMPTIVE', 'ABNORMAL BUT NOT TB PRESUMPTIVE')
-                )
-                OR benId IN (
-                    SELECT tbs.benId FROM TB_SCREENING tbs
-                    WHERE
-                        tbs.recommendedForTruenatTest = 1
-                        OR tbs.referredForSputumCollection = 1
-                        OR (
-                            tbs.bloodInSputum = 1
-                            OR tbs.coughMoreThan2Weeks = 1
-                            OR tbs.feverMoreThan2Weeks = 1
-                            OR tbs.riseOfFever = 1
-                            OR tbs.lossOfAppetite = 1
-                            OR tbs.lossOfWeight = 1
-                            OR tbs.nightSweats = 1
-                            OR tbs.historyOfTb = 1
-                            OR tbs.takingAntiTBDrugs = 1
-                            OR tbs.familySufferingFromTB = 1
-                            OR UPPER(IFNULL(tbs.asymptomatic, '')) = 'NO'
-                        )
-                )
-            ))
-            OR (:source = 8 AND isDeath = 0 AND (
-                ${LIQUID_CULTURE_REFERRAL_CONDITION}
-            ))
-            OR (:source = 9 AND isDeath = 0 AND hhId IS NOT NULL AND EXISTS (
-                SELECT 1
-                FROM BEN_BASIC_CACHE b2
-                LEFT JOIN TB_SUSPECTED ts ON b2.benId = ts.benId
-                LEFT JOIN TB_DIAGNOSTICS td ON b2.benId = td.benId
-                WHERE b2.hhId = BEN_BASIC_CACHE.hhId
-                  AND b2.isDeactivate = 0
-                  AND b2.isDeath = 0
-                  AND (
-                        ts.isTbConfirmed = 1
-                        OR td.isTbConfirmed = 1
-                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
-                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
-                  )
-            ) AND NOT EXISTS (
-                -- TPT is for household contacts only: exclude the confirmed TB patient(s) themselves
-                SELECT 1
-                FROM BEN_BASIC_CACHE b3
-                LEFT JOIN TB_SUSPECTED ts ON b3.benId = ts.benId
-                LEFT JOIN TB_DIAGNOSTICS td ON b3.benId = td.benId
-                WHERE b3.benId = BEN_BASIC_CACHE.benId
-                  AND (
-                        ts.isTbConfirmed = 1
-                        OR td.isTbConfirmed = 1
-                        OR UPPER(IFNULL(td.naatResult, '')) IN ('POSITIVE', 'MTB DETECTED', 'TB POSITIVE')
-                        OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE'
-                  )
-            ))
-            OR (:source = 10 AND isDeath = 0 AND benId IN (
-""" + ClinicalAssessmentSql.MATCHING_BEN_IDS + """
-            ))
-            -- Vulnerable Population / TPT-Eligible Groups (STOP-771).
-            -- :vulnerabilityCode '' = All, 'TRIBAL' = Tribal only, else a CommonConstants.RISK_FACTOR_CODES code.
-            -- Risk factors are stored by StringListConverter as "CODE_A|||CODE_B".
-            OR (:source = 11 AND isDeath = 0 AND benId IN (
-                SELECT vb.beneficiaryId FROM BENEFICIARY vb
-                WHERE :vulnerabilityCode IN ('', 'TRIBAL')
-                  AND (
-                    vb.residentialAreaId IN (1, 2)
-                    OR REPLACE(UPPER(TRIM(IFNULL(vb.residentialArea, ''))), '-', ' ') IN ('TRIBAL NPVTG', 'TRIBAL PVTG')
-                  )
-                UNION
-                SELECT vs.benId FROM TB_SCREENING vs
-                WHERE :vulnerabilityCode != 'TRIBAL'
-                  AND vs.id = (
-                    SELECT vs2.id FROM TB_SCREENING vs2
-                    WHERE vs2.benId = vs.benId
-                    ORDER BY vs2.visitDate DESC, vs2.id DESC
-                    LIMIT 1
-                  )
-                  AND (
-                    (:vulnerabilityCode = '' AND REPLACE(REPLACE(REPLACE(
-                        '|||' || IFNULL(vs.keyPopulationRiskFactors, '') || '|||',
-                        '|||OTHER|||', '|||'), '|||NOT_APPLICABLE|||', '|||'), '|||', '') != '')
-                    OR (:vulnerabilityCode != '' AND
-                        ('|||' || IFNULL(vs.keyPopulationRiskFactors, '') || '|||') LIKE '%|||' || :vulnerabilityCode || '|||%')
-                  )
-            ))
-        )
-        AND (:filterType = 0
-            OR (:filterType = 1 AND abhaId IS NOT NULL)
-            OR (:filterType = 2 AND abhaId IS NULL)
-            OR (:filterType = 3 AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) >= 30 AND isDeath = 0)
-            OR (:filterType = 4 AND gender = 'Female' AND isDeath = 0
-                AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN 20 AND 49
-                AND (reproductiveStatusId = 1 OR reproductiveStatusId = 2))
-        )
-        AND (:query = '' OR
-            benName LIKE '%' || :query || '%'
-            OR benSurname LIKE '%' || :query || '%'
-            OR (IFNULL(benName, '') || ' ' || IFNULL(benSurname, '')) LIKE '%' || :query || '%'
-            OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%'
-            OR REPLACE(IFNULL(abhaId, ''), '-', '') LIKE '%' || REPLACE(:query, ' ', '') || '%'
-            OR IFNULL(familyHeadName, '') LIKE '%' || :query || '%'
-            OR IFNULL(spouseName, '') LIKE '%' || :query || '%'
-            OR IFNULL(fatherName, '') LIKE '%' || :query || '%'
-            OR CAST(benId AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%'
-            OR CAST(hhId AS TEXT) LIKE '%' || :query || '%'
-            OR IFNULL(rchId, '') LIKE '%' || REPLACE(:query, ' ', '') || '%'
-        )
-        ORDER BY CASE
-            WHEN isDeath = 0 AND isDeactivate = 0 THEN 0
-            WHEN isDeath = 1 AND isDeactivate = 0 THEN 1
-            WHEN isDeactivate = 1 THEN 2
-            ELSE 3
-        END ASC,
-        CASE
-            WHEN :source = 6 OR :source = 7 THEN COALESCE(
-                (
-                    SELECT MAX(visitDate) FROM (
-                        SELECT visitDate FROM TB_SCREENING WHERE benId = BEN_BASIC_CACHE.benId
-                        UNION ALL
-                        SELECT visitDate FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId
-                        UNION ALL
-                        SELECT visitDate FROM TB_SUSPECTED WHERE benId = BEN_BASIC_CACHE.benId
-                    )
-                ),
-                0
-            )
-            ELSE COALESCE(createdDate, regDate, 0)
-        END DESC,
-        benId DESC
-    """)
-    fun searchBen(villageIds: List<Int>, source: Int, filterType: Int, query: String, vulnerabilityCode: String): Flow<List<BenBasicCache>>
+    /** Source 0: All Beneficiaries. */
+    @Query(BenListSql.FROM_VILLAGES + BenListSql.FILTERS + BenListSql.DEFAULT_ORDER + BenListSql.PAGE)
+    suspend fun allBenPage(villageIds: List<Int>, filterType: Int, query: String, ftsQuery: String, limit: Int, offset: Int): List<BenBasicCache>
 
-    @Query("""
-        SELECT * FROM BEN_BASIC_CACHE
-        WHERE villageId IN (:villageIds)
-        AND isDeactivate = 0
-        AND (:source = 0
-            OR (:source = 1 AND abhaId IS NOT NULL)
-            OR (:source = 2 AND rchId IS NOT NULL AND rchId != '')
-            OR (:source = 3 AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) >= 30 AND isDeath = 0)
-            OR (:source = 4 AND gender = 'Female' AND isDeath = 0
-                AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN 20 AND 49
-                AND (reproductiveStatusId = 1 OR reproductiveStatusId = 2))
-            OR (:source = 5 AND isDeath = 0 AND benId IN (${ReferralListSql.HWC_BEN_IDS}))
-            OR (:source = 6 AND isDeath = 0 AND ${ReferralListSql.XRAY})
-            OR (:source = 7 AND isDeath = 0 AND ${ReferralListSql.TRUENAT})
-            OR (:source = 8 AND isDeath = 0 AND (
-                ${LIQUID_CULTURE_REFERRAL_CONDITION}
-            ))
-            OR (:source = 9 AND isDeath = 0 AND ${ReferralListSql.TPT})
-            OR (:source = 10 AND isDeath = 0 AND benId IN (
-""" + ClinicalAssessmentSql.MATCHING_BEN_IDS + """
-            ))
-            -- Vulnerable Population / TPT-Eligible Groups (STOP-771).
-            -- :vulnerabilityCode '' = All, 'TRIBAL' = Tribal only, else a CommonConstants.RISK_FACTOR_CODES code.
-            -- Risk factors are stored by StringListConverter as "CODE_A|||CODE_B".
-            OR (:source = 11 AND isDeath = 0 AND benId IN (
-                SELECT vb.beneficiaryId FROM BENEFICIARY vb
-                WHERE :vulnerabilityCode IN ('', 'TRIBAL')
-                  AND (
-                    vb.residentialAreaId IN (1, 2)
-                    OR REPLACE(UPPER(TRIM(IFNULL(vb.residentialArea, ''))), '-', ' ') IN ('TRIBAL NPVTG', 'TRIBAL PVTG')
-                  )
-                UNION
-                SELECT vs.benId FROM TB_SCREENING vs
-                WHERE :vulnerabilityCode != 'TRIBAL'
-                  AND vs.id = (
-                    SELECT vs2.id FROM TB_SCREENING vs2
-                    WHERE vs2.benId = vs.benId
-                    ORDER BY vs2.visitDate DESC, vs2.id DESC
-                    LIMIT 1
-                  )
-                  AND (
-                    (:vulnerabilityCode = '' AND REPLACE(REPLACE(REPLACE(
-                        '|||' || IFNULL(vs.keyPopulationRiskFactors, '') || '|||',
-                        '|||OTHER|||', '|||'), '|||NOT_APPLICABLE|||', '|||'), '|||', '') != '')
-                    OR (:vulnerabilityCode != '' AND
-                        ('|||' || IFNULL(vs.keyPopulationRiskFactors, '') || '|||') LIKE '%|||' || :vulnerabilityCode || '|||%')
-                  )
-            ))
-        )
-        ${ReferralListSql.BEN_LIST_FILTERS}
-        ORDER BY CASE
-            WHEN isDeath = 0 AND isDeactivate = 0 THEN 0
-            WHEN isDeath = 1 AND isDeactivate = 0 THEN 1
-            WHEN isDeactivate = 1 THEN 2
-            ELSE 3
-        END ASC,
-        -- X-ray/TrueNat lists only (source 6/7): surface rows needing action (Failed/Manual
-        -- Entry) above merely-pending ones, which rank above resolved (Completed), which rank
-        -- above terminal (Closed) — instead of ordering purely by recency, which could bury a
-        -- beneficiary whose order genuinely needs a retry under one that's already resolved.
-        -- Every other source falls into the ELSE branch, unaffected, same as before.
-        --
-        -- An order that is placed and awaiting a result (tier 1) now ranks above a beneficiary
-        -- who has no order at all (tier 2). Both used to share one tier, so a live order sat
-        -- among everyone who merely qualifies for the test - on a full village that is most of
-        -- the list, and the one beneficiary actually waiting on a device was indistinguishable.
-        -- Completed and Closed keep their existing position below both.
-        --
-        -- IFNULL is what separates them: a bare CASE cannot match NULL (NULL = NULL is never
-        -- true), so "no order" and "order pending" both fell through to the same ELSE. Folding
-        -- NULL to '' costs nothing and keeps this a simple CASE, which evaluates its subject
-        -- expression exactly once - the subquery count per row is unchanged.
-        CASE
-            WHEN :source = 6 THEN ${ReferralListSql.XRAY_TIER}
-            WHEN :source = 7 THEN ${ReferralListSql.TN_TIER}
-            ELSE 1
-        END ASC,
-        CASE
-            -- Within the Failed/Manual Entry tier the oldest visit comes first (negative key).
-            WHEN :source = 6 THEN ${ReferralListSql.XRAY_KEY}
-            WHEN :source = 7 THEN ${ReferralListSql.TN_KEY}
-            ELSE COALESCE(createdDate, regDate, 0)
-        END DESC,
-        benId DESC
-        LIMIT :limit OFFSET :offset
-    """)
-    suspend fun searchBenPage(villageIds: List<Int>, source: Int, filterType: Int, query: String, vulnerabilityCode: String, limit: Int, offset: Int): List<BenBasicCache>
+    /** Source 1: with an ABHA number. */
+    @Query(BenListSql.FROM_VILLAGES + BenListSql.ABHA + BenListSql.FILTERS + BenListSql.DEFAULT_ORDER + BenListSql.PAGE)
+    suspend fun abhaBenPage(villageIds: List<Int>, filterType: Int, query: String, ftsQuery: String, limit: Int, offset: Int): List<BenBasicCache>
 
-    /**
-     * Digital Chest X-ray list (source 6) pages. Same rows and order as [searchBenPage] with
-     * source 6, but SQLite walks TB_BEN_SUMMARY's order index and stops after a page instead of
-     * sorting every member (1M device DB: 827K members).
-     */
-    @Query("""
-        SELECT BEN_BASIC_CACHE.* FROM TB_BEN_SUMMARY s INDEXED BY ind_tbsum_xray
-        CROSS JOIN BEN_BASIC_CACHE ON BEN_BASIC_CACHE.benId = s.beneficiaryId
-        WHERE villageId IN (:villageIds) AND isDeactivate = 0 AND isDeath = 0
-          AND s.xrayList = 1 AND s.pregVitals = 0 AND reproductiveStatusId != 1
-        ${ReferralListSql.BEN_LIST_FILTERS}
-        ORDER BY s.xrayTier ASC, s.xrayKey DESC, s.beneficiaryId DESC
-        LIMIT :limit OFFSET :offset
-    """)
-    suspend fun xrayReferralPage(villageIds: List<Int>, filterType: Int, query: String, limit: Int, offset: Int): List<BenBasicCache>
+    /** Source 2: with an RCH id. */
+    @Query(BenListSql.FROM_VILLAGES + BenListSql.RCH + BenListSql.FILTERS + BenListSql.DEFAULT_ORDER + BenListSql.PAGE)
+    suspend fun rchBenPage(villageIds: List<Int>, filterType: Int, query: String, ftsQuery: String, limit: Int, offset: Int): List<BenBasicCache>
 
-    /** TrueNat list (source 7) pages; see [xrayReferralPage]. */
-    @Query("""
-        SELECT BEN_BASIC_CACHE.* FROM TB_BEN_SUMMARY s INDEXED BY ind_tbsum_tn
-        CROSS JOIN BEN_BASIC_CACHE ON BEN_BASIC_CACHE.benId = s.beneficiaryId
-        WHERE villageId IN (:villageIds) AND isDeactivate = 0 AND isDeath = 0
-          AND (s.tnOther = 1 OR ((reproductiveStatusId = 1 OR s.pregVitals = 1) AND s.hasScreening = 1))
-        ${ReferralListSql.BEN_LIST_FILTERS}
-        ORDER BY s.tnTier ASC, s.tnKey DESC, s.beneficiaryId DESC
-        LIMIT :limit OFFSET :offset
-    """)
-    suspend fun trueNatReferralPage(villageIds: List<Int>, filterType: Int, query: String, limit: Int, offset: Int): List<BenBasicCache>
+    /** Source 3: aged 30 or more. */
+    @Query(BenListSql.FROM_VILLAGES + BenListSql.AGE_30_PLUS + BenListSql.FILTERS + BenListSql.DEFAULT_ORDER + BenListSql.PAGE)
+    suspend fun age30PlusPage(villageIds: List<Int>, filterType: Int, query: String, ftsQuery: String, limit: Int, offset: Int): List<BenBasicCache>
 
-    /**
-     * The beneficiary list query for the sources that have no TB predicate: 0 All, 1 ABHA,
-     * 2 RCH, 3 age 30+, 4 eligible couple.
-     *
-     * searchBenPaged() handles every source in one statement, and its :source = 5..10 branches
-     * name TB_SUSPECTED, TB_DIAGNOSTICS, TB_SCREENING and BEN_VITALS. Room derives a query's
-     * observed tables from the SQL text, not from which branch runs, so the All Beneficiaries list
-     * was invalidated by every TB write even though it can never take those branches - and with
-     * the sync writing every couple of seconds the list was cancelled and restarted faster than it
-     * could load, leaving a spinner that never resolved.
-     *
-     * This statement mentions only BEN_BASIC_CACHE, so it observes BENEFICIARY and HOUSEHOLD and
-     * nothing else. The WHERE/ORDER BY are otherwise identical to searchBenPaged's for these
-     * sources, with the 6/7-only ORDER BY branches dropped because they collapse to the ELSE arm.
-     */
-    @Query("""
-        SELECT * FROM BEN_BASIC_CACHE
-        WHERE villageId IN (:villageIds)
-        AND isDeactivate = 0
-        AND (:source = 0
-            OR (:source = 1 AND abhaId IS NOT NULL)
-            OR (:source = 2 AND rchId IS NOT NULL AND rchId != '')
-            OR (:source = 3 AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) >= 30 AND isDeath = 0)
-            OR (:source = 4 AND gender = 'Female' AND isDeath = 0
-                AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN 20 AND 49
-                AND (reproductiveStatusId = 1 OR reproductiveStatusId = 2))
-        )
-        AND (:filterType = 0
-            OR (:filterType = 1 AND abhaId IS NOT NULL)
-            OR (:filterType = 2 AND abhaId IS NULL)
-            OR (:filterType = 3 AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) >= 30 AND isDeath = 0)
-            OR (:filterType = 4 AND gender = 'Female' AND isDeath = 0
-                AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN 20 AND 49
-                AND (reproductiveStatusId = 1 OR reproductiveStatusId = 2))
-        )
-        AND (:query = '' OR
-            benName LIKE '%' || :query || '%'
-            OR benSurname LIKE '%' || :query || '%'
-            OR (IFNULL(benName, '') || ' ' || IFNULL(benSurname, '')) LIKE '%' || :query || '%'
-            OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%'
-            OR REPLACE(IFNULL(abhaId, ''), '-', '') LIKE '%' || REPLACE(:query, ' ', '') || '%'
-            OR IFNULL(familyHeadName, '') LIKE '%' || :query || '%'
-            OR IFNULL(spouseName, '') LIKE '%' || :query || '%'
-            OR IFNULL(fatherName, '') LIKE '%' || :query || '%'
-            OR CAST(benId AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%'
-            OR CAST(hhId AS TEXT) LIKE '%' || :query || '%'
-            OR IFNULL(rchId, '') LIKE '%' || REPLACE(:query, ' ', '') || '%'
-        )
-        ORDER BY CASE
-            WHEN isDeath = 0 AND isDeactivate = 0 THEN 0
-            WHEN isDeath = 1 AND isDeactivate = 0 THEN 1
-            WHEN isDeactivate = 1 THEN 2
-            ELSE 3
-        END ASC,
-        COALESCE(createdDate, regDate, 0) DESC,
-        benId DESC
-        LIMIT :limit OFFSET :offset
-    """)
-    suspend fun searchBenPageWithoutTbTables(villageIds: List<Int>, source: Int, filterType: Int, query: String, limit: Int, offset: Int): List<BenBasicCache>
+    /** Source 4: eligible couples. */
+    @Query(BenListSql.FROM_VILLAGES + BenListSql.ELIGIBLE_COUPLE + BenListSql.FILTERS + BenListSql.DEFAULT_ORDER + BenListSql.PAGE)
+    suspend fun eligibleCouplePage(villageIds: List<Int>, filterType: Int, query: String, ftsQuery: String, limit: Int, offset: Int): List<BenBasicCache>
 
+    /** Source 5: Health and Wellness Centre referral. */
+    @Query(BenListSql.HWC_PAGE)
+    suspend fun hwcReferralPage(villageIds: List<Int>, filterType: Int, query: String, ftsQuery: String, limit: Int, offset: Int): List<BenBasicCache>
 
+    /** Source 6: Digital Chest X-ray referral. */
+    @Query(BenListSql.XRAY_PAGE)
+    suspend fun xrayReferralPage(villageIds: List<Int>, filterType: Int, query: String, ftsQuery: String, limit: Int, offset: Int): List<BenBasicCache>
 
-    @Query("""
-        SELECT * FROM BEN_BASIC_CACHE
-        WHERE villageId IN (:villageIds)
-        AND isDeactivate = 0
-        AND (:source = 0
-            OR (:source = 1 AND abhaId IS NOT NULL)
-            OR (:source = 2 AND rchId IS NOT NULL AND rchId != '')
-            OR (:source = 3 AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) >= 30 AND isDeath = 0)
-            OR (:source = 4 AND gender = 'Female' AND isDeath = 0
-                AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN 20 AND 49
-                AND (reproductiveStatusId = 1 OR reproductiveStatusId = 2))
-            OR (:source = 5 AND isDeath = 0 AND benId IN (${ReferralListSql.HWC_BEN_IDS}))
-            OR (:source = 6 AND isDeath = 0 AND ${ReferralListSql.XRAY})
-            OR (:source = 7 AND isDeath = 0 AND ${ReferralListSql.TRUENAT})
-            OR (:source = 8 AND isDeath = 0 AND (
-                ${LIQUID_CULTURE_REFERRAL_CONDITION}
-            ))
-            OR (:source = 9 AND isDeath = 0 AND ${ReferralListSql.TPT})
-            OR (:source = 10 AND isDeath = 0 AND benId IN (
-""" + ClinicalAssessmentSql.MATCHING_BEN_IDS + """
-            ))
-            -- Vulnerable Population / TPT-Eligible Groups (STOP-771).
-            -- :vulnerabilityCode '' = All, 'TRIBAL' = Tribal only, else a CommonConstants.RISK_FACTOR_CODES code.
-            -- Risk factors are stored by StringListConverter as "CODE_A|||CODE_B".
-            OR (:source = 11 AND isDeath = 0 AND benId IN (
-                SELECT vb.beneficiaryId FROM BENEFICIARY vb
-                WHERE :vulnerabilityCode IN ('', 'TRIBAL')
-                  AND (
-                    vb.residentialAreaId IN (1, 2)
-                    OR REPLACE(UPPER(TRIM(IFNULL(vb.residentialArea, ''))), '-', ' ') IN ('TRIBAL NPVTG', 'TRIBAL PVTG')
-                  )
-                UNION
-                SELECT vs.benId FROM TB_SCREENING vs
-                WHERE :vulnerabilityCode != 'TRIBAL'
-                  AND vs.id = (
-                    SELECT vs2.id FROM TB_SCREENING vs2
-                    WHERE vs2.benId = vs.benId
-                    ORDER BY vs2.visitDate DESC, vs2.id DESC
-                    LIMIT 1
-                  )
-                  AND (
-                    (:vulnerabilityCode = '' AND REPLACE(REPLACE(REPLACE(
-                        '|||' || IFNULL(vs.keyPopulationRiskFactors, '') || '|||',
-                        '|||OTHER|||', '|||'), '|||NOT_APPLICABLE|||', '|||'), '|||', '') != '')
-                    OR (:vulnerabilityCode != '' AND
-                        ('|||' || IFNULL(vs.keyPopulationRiskFactors, '') || '|||') LIKE '%|||' || :vulnerabilityCode || '|||%')
-                  )
-            ))
-        )
-        AND (:filterType = 0
-            OR (:filterType = 1 AND abhaId IS NOT NULL)
-            OR (:filterType = 2 AND abhaId IS NULL)
-            OR (:filterType = 3 AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) >= 30 AND isDeath = 0)
-            OR (:filterType = 4 AND gender = 'Female' AND isDeath = 0
-                AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN 20 AND 49
-                AND (reproductiveStatusId = 1 OR reproductiveStatusId = 2))
-        )
-        AND (:query = '' OR
-            benName LIKE '%' || :query || '%'
-            OR benSurname LIKE '%' || :query || '%'
-            OR (IFNULL(benName, '') || ' ' || IFNULL(benSurname, '')) LIKE '%' || :query || '%'
-            OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%'
-            OR REPLACE(IFNULL(abhaId, ''), '-', '') LIKE '%' || REPLACE(:query, ' ', '') || '%'
-            OR IFNULL(familyHeadName, '') LIKE '%' || :query || '%'
-            OR IFNULL(spouseName, '') LIKE '%' || :query || '%'
-            OR IFNULL(fatherName, '') LIKE '%' || :query || '%'
-            OR CAST(benId AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%'
-            OR CAST(hhId AS TEXT) LIKE '%' || :query || '%'
-            OR IFNULL(rchId, '') LIKE '%' || REPLACE(:query, ' ', '') || '%'
-        )
-       ORDER BY CASE
-            WHEN isDeath = 0 AND isDeactivate = 0 THEN 0
-            WHEN isDeath = 1 AND isDeactivate = 0 THEN 1
-            WHEN isDeactivate = 1 THEN 2
-            ELSE 3
-        END ASC,
-        CASE
-            WHEN :source = 6 OR :source = 7 THEN COALESCE(
-                (
-                    SELECT MAX(visitDate) FROM (
-                        SELECT visitDate FROM TB_SCREENING WHERE benId = BEN_BASIC_CACHE.benId
-                        UNION ALL
-                        SELECT visitDate FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId
-                        UNION ALL
-                        SELECT visitDate FROM TB_SUSPECTED WHERE benId = BEN_BASIC_CACHE.benId
-                    )
-                ),
-                0
-            )
-            WHEN :source = 8 THEN COALESCE(
-                (
-                    SELECT MAX(visitDate) FROM (
-                        SELECT visitDate FROM TB_SCREENING WHERE benId = BEN_BASIC_CACHE.benId
-                        UNION ALL
-                        SELECT visitDate FROM TB_DIAGNOSTICS WHERE benId = BEN_BASIC_CACHE.benId
-                        UNION ALL
-                        SELECT visitDate FROM TB_SUSPECTED WHERE benId = BEN_BASIC_CACHE.benId
-                    )
-                ),
-                0
-            )
-            ELSE COALESCE(createdDate, regDate, 0)
-        END DESC,
-        benId DESC
-    """)
-    suspend fun searchBenOnce(villageIds: List<Int>, source: Int, filterType: Int, query: String, vulnerabilityCode: String): List<BenBasicCache>
+    /** Source 7: TrueNat referral. */
+    @Query(BenListSql.TRUENAT_PAGE)
+    suspend fun trueNatReferralPage(villageIds: List<Int>, filterType: Int, query: String, ftsQuery: String, limit: Int, offset: Int): List<BenBasicCache>
+
+    /** Source 8: Liquid Culture referral. */
+    @Query(BenListSql.LIQUID_CULTURE_PAGE)
+    suspend fun liquidCultureReferralPage(villageIds: List<Int>, filterType: Int, query: String, ftsQuery: String, limit: Int, offset: Int): List<BenBasicCache>
+
+    /** Source 9: TPT (household contacts of a confirmed case). */
+    @Query(BenListSql.FROM_VILLAGES + BenListSql.TPT + BenListSql.FILTERS + BenListSql.DEFAULT_ORDER + BenListSql.PAGE)
+    suspend fun tptPage(villageIds: List<Int>, filterType: Int, query: String, ftsQuery: String, limit: Int, offset: Int): List<BenBasicCache>
+
+    /** Source 10: Clinical Assessment & Diagnosis referral. */
+    @Query(BenListSql.CLINICAL_ASSESSMENT_PAGE)
+    suspend fun clinicalAssessmentPage(villageIds: List<Int>, filterType: Int, query: String, ftsQuery: String, limit: Int, offset: Int): List<BenBasicCache>
+
+    /** Source 11: Vulnerable Population. */
+    @Query(BenListSql.FROM_VILLAGES + BenListSql.VULNERABLE + BenListSql.FILTERS + BenListSql.DEFAULT_ORDER + BenListSql.PAGE)
+    suspend fun vulnerablePopulationPage(villageIds: List<Int>, filterType: Int, query: String, ftsQuery: String, vulnerabilityCode: String, limit: Int, offset: Int): List<BenBasicCache>
 
     @Query("SELECT * FROM BEN_BASIC_CACHE WHERE villageId = :selectedVillage AND isDeactivate = 0 AND isNonHH = 1 ORDER BY BEN_BASIC_CACHE.updatedDate DESC")
     fun getNonHHBeneficiaries(selectedVillage: Int): Flow<List<BenBasicCache>>

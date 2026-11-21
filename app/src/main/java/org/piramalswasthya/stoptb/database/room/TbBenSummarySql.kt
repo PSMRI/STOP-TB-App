@@ -33,6 +33,7 @@ object TbBenSummarySql {
         "td" to "TB_DIAGNOSTICS", "dx" to "TB_DIAGNOSTICS", "d2" to "TB_DIAGNOSTICS", "d" to "TB_DIAGNOSTICS",
         "v" to "BEN_VITALS",
         "tc" to "TB_CONFIRMED_TREATMENT",
+        "bt" to "BENEFICIARY",
     )
 
     private val SOURCE_TABLES = listOf("TB_SCREENING", "TB_SUSPECTED", "TB_DIAGNOSTICS", "BEN_VITALS", "TB_CONFIRMED_TREATMENT")
@@ -108,7 +109,8 @@ object TbBenSummarySql {
         // BenSearchQueries source 5, all but BENEFICIARY.temperature
         "hwc" to "(" + ex("BEN_VITALS", "v", ABNORMAL_VITALS) +
             " OR " + ex("TB_SUSPECTED", "ts", "UPPER(IFNULL(ts.chestXRayResult, '')) IN $PRESUMPTIVE_XRAY AND UPPER(IFNULL(ts.naatResult, '')) IN $NEGATIVE_NAAT") +
-            " OR " + ex("TB_DIAGNOSTICS", "td", "UPPER(IFNULL(td.chestXRayResult, '')) IN $PRESUMPTIVE_XRAY AND UPPER(IFNULL(td.naatResult, '')) IN $NEGATIVE_NAAT") + ")",
+            " OR " + ex("TB_DIAGNOSTICS", "td", "UPPER(IFNULL(td.chestXRayResult, '')) IN $PRESUMPTIVE_XRAY AND UPPER(IFNULL(td.naatResult, '')) IN $NEGATIVE_NAAT") +
+            " OR EXISTS (SELECT 1 FROM BENEFICIARY bt WHERE bt.beneficiaryId = x.benId AND bt.temperature IS NOT NULL AND bt.temperature >= 100.0))",
         // LIQUID_CULTURE_REFERRAL_CONDITION (source 8)
         "lc" to "(" + ex("TB_SUSPECTED", "ts", "ts.isLiquidCultureConducted IS NOT NULL") +
             " OR " + ex("TB_DIAGNOSTICS", "td", "td.isLiquidCultureConducted IS NOT NULL") +
@@ -188,28 +190,44 @@ object TbBenSummarySql {
                     " OR UPPER(IFNULL(td.naatResult, '')) IN $POSITIVE_NAAT OR UPPER(IFNULL(td.liquidCultureResult, '')) = 'POSITIVE')"
             ) +
             " OR " + any("TB_CONFIRMED_TREATMENT", "tc") + ")",
+        "lastVisit" to "COALESCE(x.lastVisit, 0)",
+        // Default list order (BEN_BASIC_CACHE createdDate / regDate are these BENEFICIARY columns).
+        "genKey" to "COALESCE((SELECT COALESCE(bt.createdDate, bt.regDate, 0) FROM BENEFICIARY bt WHERE bt.beneficiaryId = x.benId), 0)",
+    )
+
+    /** Columns computed from [COLUMNS] in an outer select. */
+    internal val DERIVED: LinkedHashMap<String, String> = linkedMapOf(
+        "caCand" to "(caFixed = 1 OR caD0 = 1)",
     )
 
     /** Summary rows for the beneficiary ids returned by [idsSql] (one column named benId). */
     private fun selectFor(idsSql: String) =
-        "SELECT x.benId, " + COLUMNS.values.joinToString(", ") +
+        "SELECT benId, " + COLUMNS.keys.joinToString(", ") + ", " + DERIVED.values.joinToString(", ") +
+            " FROM (SELECT x.benId AS benId, " + COLUMNS.entries.joinToString(", ") { (name, expr) -> "$expr AS $name" } +
             " FROM (SELECT i.benId, (SELECT MAX(m) FROM (" +
             "SELECT MAX(visitDate) m FROM TB_SCREENING WHERE benId = i.benId" +
             " UNION ALL SELECT MAX(visitDate) FROM TB_DIAGNOSTICS WHERE benId = i.benId" +
             " UNION ALL SELECT MAX(visitDate) FROM TB_SUSPECTED WHERE benId = i.benId)) AS lastVisit" +
             " FROM ($idsSql) i) x" +
-            " LEFT JOIN TB_DIAGNOSTICS d ON d.id = (SELECT id FROM TB_DIAGNOSTICS WHERE benId = x.benId ORDER BY id DESC LIMIT 1)"
+            " LEFT JOIN TB_DIAGNOSTICS d ON d.id = (SELECT id FROM TB_DIAGNOSTICS WHERE benId = x.benId ORDER BY id DESC LIMIT 1))"
 
-    private val INSERT_HEAD = "INSERT OR REPLACE INTO $TABLE (beneficiaryId, ${COLUMNS.keys.joinToString(", ")}) "
+    private val INSERT_HEAD =
+        "INSERT OR REPLACE INTO $TABLE (beneficiaryId, ${(COLUMNS.keys + DERIVED.keys).joinToString(", ")}) "
 
     private fun refresh(benExpr: String) = INSERT_HEAD + selectFor("SELECT $benExpr AS benId")
 
-    /** Fills the table for every beneficiary that has a row in a source table. */
-    val FILL: String = INSERT_HEAD + selectFor(SOURCE_TABLES.joinToString(" UNION ") { "SELECT benId FROM $it" })
+    /** Beneficiaries on the HWC list through BENEFICIARY.temperature alone. */
+    private const val HIGH_TEMPERATURE_IDS =
+        "SELECT beneficiaryId FROM BENEFICIARY WHERE temperature IS NOT NULL AND temperature >= 100.0"
+
+    /** Fills the table for every beneficiary that has a row in a source table or a high temperature. */
+    val FILL: String = INSERT_HEAD + selectFor(
+        (SOURCE_TABLES.map { "SELECT benId FROM $it" } + HIGH_TEMPERATURE_IDS).joinToString(" UNION ")
+    )
 
     /** Columns of [table] the rules read; an UPDATE touching none of them leaves the summary as is. */
     internal fun columnsRead(table: String): List<String> {
-        val cols = sortedSetOf("benId")
+        val cols = if (table == "BENEFICIARY") sortedSetOf("beneficiaryId") else sortedSetOf("benId")
         if (table in setOf("TB_SCREENING", "TB_SUSPECTED", "TB_DIAGNOSTICS")) cols += "visitDate"
         val text = COLUMNS.values.joinToString(" ")
         Regex("\\b([a-z0-9]+)\\.([A-Za-z0-9_]+)").findAll(text).forEach { m ->
@@ -220,20 +238,44 @@ object TbBenSummarySql {
 
     private fun triggerName(table: String, op: String) = "trg_tbsum_${table.lowercase()}_$op"
 
-    val TRIGGERS: List<String> = SOURCE_TABLES.flatMap { t ->
+    private val SOURCE_TRIGGERS: List<Pair<String, String>> = SOURCE_TABLES.flatMap { t ->
         val updateOf = columnsRead(t).joinToString(", ") { "`$it`" }
         listOf(
-            "CREATE TRIGGER IF NOT EXISTS ${triggerName(t, "ins")} AFTER INSERT ON `$t` BEGIN ${refresh("NEW.benId")}; END",
-            "CREATE TRIGGER IF NOT EXISTS ${triggerName(t, "upd")} AFTER UPDATE OF $updateOf ON `$t` BEGIN ${refresh("NEW.benId")}; END",
-            "CREATE TRIGGER IF NOT EXISTS ${triggerName(t, "upd_old")} AFTER UPDATE OF `benId` ON `$t`" +
-                " WHEN OLD.benId != NEW.benId BEGIN ${refresh("OLD.benId")}; END",
-            "CREATE TRIGGER IF NOT EXISTS ${triggerName(t, "del")} AFTER DELETE ON `$t` BEGIN ${refresh("OLD.benId")}; END",
+            triggerName(t, "ins") to "AFTER INSERT ON `$t` BEGIN ${refresh("NEW.benId")}; END",
+            triggerName(t, "upd") to "AFTER UPDATE OF $updateOf ON `$t` BEGIN ${refresh("NEW.benId")}; END",
+            triggerName(t, "upd_old") to "AFTER UPDATE OF `benId` ON `$t` WHEN OLD.benId != NEW.benId BEGIN ${refresh("OLD.benId")}; END",
+            triggerName(t, "del") to "AFTER DELETE ON `$t` BEGIN ${refresh("OLD.benId")}; END",
         )
+    }
+
+    // BENEFICIARY: the sort key and the temperature rule. Only real changes fire (an upsert
+    // rewrites every column), and only for beneficiaries that have a row or now need one.
+    private val BENEFICIARY_TRIGGERS: List<Pair<String, String>> = listOf(
+        triggerName("BENEFICIARY", "ins") to "AFTER INSERT ON `BENEFICIARY`" +
+            " WHEN NEW.temperature IS NOT NULL AND NEW.temperature >= 100.0" +
+            " BEGIN ${refresh("NEW.beneficiaryId")}; END",
+        triggerName("BENEFICIARY", "upd") to "AFTER UPDATE OF `temperature`, `createdDate`, `regDate` ON `BENEFICIARY`" +
+            " WHEN (OLD.temperature IS NOT NEW.temperature OR OLD.createdDate IS NOT NEW.createdDate OR OLD.regDate IS NOT NEW.regDate)" +
+            " AND ((NEW.temperature IS NOT NULL AND NEW.temperature >= 100.0)" +
+            " OR EXISTS (SELECT 1 FROM $TABLE WHERE beneficiaryId = NEW.beneficiaryId))" +
+            " BEGIN ${refresh("NEW.beneficiaryId")}; END",
+    )
+
+    val TRIGGERS: List<String> = (SOURCE_TRIGGERS + BENEFICIARY_TRIGGERS).map { (name, body) ->
+        "CREATE TRIGGER IF NOT EXISTS $name $body"
+    }
+
+    private val TRIGGER_NAMES: List<String> = (SOURCE_TRIGGERS + BENEFICIARY_TRIGGERS).map { it.first }
+
+    /** Drops the triggers so a migration can recreate them with new SQL (CREATE ... IF NOT EXISTS keeps old ones). */
+    fun dropTriggers(db: SupportSQLiteDatabase) {
+        TRIGGER_NAMES.forEach { db.execSQL("DROP TRIGGER IF EXISTS $it") }
     }
 
     /** Creates the triggers if missing. Idempotent; runs on every open so a fresh install gets them too. */
     fun createTriggers(db: SupportSQLiteDatabase) {
         TRIGGERS.forEach { db.execSQL(it) }
+        BenSearchSql.createTriggers(db)
     }
 
     /** Database callback that installs the triggers on open (app and tests). */

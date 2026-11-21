@@ -27,9 +27,23 @@ import androidx.room.PrimaryKey
             value = ["tnTier", "tnKey", "beneficiaryId"],
             orders = [Index.Order.ASC, Index.Order.DESC, Index.Order.DESC]
         ),
-        Index(name = "ind_tbsum_hwc", value = ["hwc"]),
-        Index(name = "ind_tbsum_lc", value = ["lc"]),
-        Index(name = "ind_tbsum_ca", value = ["caFixed", "caD0"]),
+        // HWC / Liquid Culture / Clinical Assessment pages read these in list order
+        // (registration date, newest first) and stop after a page.
+        Index(
+            name = "ind_tbsum_hwc",
+            value = ["hwc", "genKey", "beneficiaryId"],
+            orders = [Index.Order.ASC, Index.Order.DESC, Index.Order.DESC]
+        ),
+        Index(
+            name = "ind_tbsum_lc",
+            value = ["lc", "genKey", "beneficiaryId"],
+            orders = [Index.Order.ASC, Index.Order.DESC, Index.Order.DESC]
+        ),
+        Index(
+            name = "ind_tbsum_ca",
+            value = ["caCand", "genKey", "beneficiaryId"],
+            orders = [Index.Order.ASC, Index.Order.DESC, Index.Order.DESC]
+        ),
         Index(name = "ind_tbsum_presumptive", value = ["presumptive"]),
         Index(name = "ind_tbsum_tpt", value = ["tptIndex"]),
         Index(name = "ind_tbsum_known_tb", value = ["knownTbCase"]),
@@ -51,7 +65,7 @@ data class TbBenSummary(
     val tnOther: Int,
     val tnTier: Int,
     val tnKey: Long,
-    /** TB/vitals part of the HWC referral rule (source 5); temperature comes from BENEFICIARY. */
+    /** HWC referral rule (source 5): abnormal vitals, the TB results, or BENEFICIARY.temperature >= 100. */
     val hwc: Int,
     /** Liquid Culture referral rule (source 8). */
     val lc: Int,
@@ -67,4 +81,10 @@ data class TbBenSummary(
     val tptIndex: Int,
     /** Confirmed case for the "Contact of Known TB Patients" risk factor. */
     val knownTbCase: Int,
+    /** Latest TB visit date (0 when none). */
+    val lastVisit: Long,
+    /** COALESCE(createdDate, regDate, 0) of the beneficiary: the default list order. */
+    val genKey: Long,
+    /** caFixed or caD0: may be on the Clinical Assessment list (the rest is checked per row). */
+    val caCand: Int,
 )

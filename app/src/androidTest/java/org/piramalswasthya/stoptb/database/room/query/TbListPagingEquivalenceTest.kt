@@ -132,16 +132,16 @@ class TbListPagingEquivalenceTest {
         sql.execSQL("UPDATE BENEFICIARY SET gen_reproductiveStatusId = 1 WHERE beneficiaryId = $pregnantByStatus")
         sql.execSQL("UPDATE TB_SUSPECTED SET isChestXRayDone = 1 WHERE benId = $pregnantByStatus")
         for (villageId in VILLAGES) {
-            val xray = db.benDao.searchBenOnce(listOf(villageId), 6, 0, "", "").map { row -> row.benId }
-            val truenat = db.benDao.searchBenOnce(listOf(villageId), 7, 0, "", "").map { row -> row.benId }
+            val xray = db.benDao.xrayReferralPage(listOf(villageId), 0, "", "", ALL_ROWS, 0).map { row -> row.benId }
+            val truenat = db.benDao.trueNatReferralPage(listOf(villageId), 0, "", "", ALL_ROWS, 0).map { row -> row.benId }
             assertEquals("village $villageId X-ray count", xray.size, db.benDao.getDigitalChestXRayBenCount(villageId).first())
             assertEquals("village $villageId TrueNat count", truenat.size, db.benDao.getTrueNatBenCount(villageId).first())
         }
         val vitalsVillage = VILLAGES[2 % VILLAGES.size]
-        assertTrue("pregnant in vitals: TrueNat", pregnantInVitals in db.benDao.searchBenOnce(listOf(vitalsVillage), 7, 0, "", "").map { row -> row.benId })
-        assertTrue("pregnant in vitals: not X-ray", pregnantInVitals !in db.benDao.searchBenOnce(listOf(vitalsVillage), 6, 0, "", "").map { row -> row.benId })
+        assertTrue("pregnant in vitals: TrueNat", pregnantInVitals in db.benDao.trueNatReferralPage(listOf(vitalsVillage), 0, "", "", ALL_ROWS, 0).map { row -> row.benId })
+        assertTrue("pregnant in vitals: not X-ray", pregnantInVitals !in db.benDao.xrayReferralPage(listOf(vitalsVillage), 0, "", "", ALL_ROWS, 0).map { row -> row.benId })
         val statusVillage = VILLAGES[10 % VILLAGES.size]
-        assertTrue("pregnant by status: not X-ray", pregnantByStatus !in db.benDao.searchBenOnce(listOf(statusVillage), 6, 0, "", "").map { row -> row.benId })
+        assertTrue("pregnant by status: not X-ray", pregnantByStatus !in db.benDao.xrayReferralPage(listOf(statusVillage), 0, "", "", ALL_ROWS, 0).map { row -> row.benId })
     }
 
     /** A birth before 1970 is a negative dob; an age search must still find it (dob 0 = unknown). */

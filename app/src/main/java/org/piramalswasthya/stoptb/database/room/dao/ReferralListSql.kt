@@ -29,35 +29,4 @@ object ReferralListSql {
         " AND hhId IN (SELECT b2.hhId FROM TB_BEN_SUMMARY s2 CROSS JOIN BEN_BASIC_CACHE b2 ON b2.benId = s2.beneficiaryId" +
         " WHERE s2.tptIndex = 1 AND b2.isDeactivate = 0 AND b2.isDeath = 0)" +
         " AND benId NOT IN (SELECT beneficiaryId FROM TB_BEN_SUMMARY WHERE tptIndex = 1))"
-
-    /** X-ray / TrueNat list order keys (same values the old per-row subqueries computed). */
-    const val XRAY_TIER = "(SELECT xrayTier FROM TB_BEN_SUMMARY WHERE beneficiaryId = BEN_BASIC_CACHE.benId)"
-    const val XRAY_KEY = "(SELECT xrayKey FROM TB_BEN_SUMMARY WHERE beneficiaryId = BEN_BASIC_CACHE.benId)"
-    const val TN_TIER = "(SELECT tnTier FROM TB_BEN_SUMMARY WHERE beneficiaryId = BEN_BASIC_CACHE.benId)"
-    const val TN_KEY = "(SELECT tnKey FROM TB_BEN_SUMMARY WHERE beneficiaryId = BEN_BASIC_CACHE.benId)"
-
-    /** filterType chips and the search box of the beneficiary lists (BEN_BASIC_CACHE columns). */
-    const val BEN_LIST_FILTERS = """
-        AND (:filterType = 0
-            OR (:filterType = 1 AND abhaId IS NOT NULL)
-            OR (:filterType = 2 AND abhaId IS NULL)
-            OR (:filterType = 3 AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) >= 30 AND isDeath = 0)
-            OR (:filterType = 4 AND gender = 'Female' AND isDeath = 0
-                AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN 20 AND 49
-                AND (reproductiveStatusId = 1 OR reproductiveStatusId = 2))
-        )
-        AND (:query = '' OR
-            benName LIKE '%' || :query || '%'
-            OR benSurname LIKE '%' || :query || '%'
-            OR (IFNULL(benName, '') || ' ' || IFNULL(benSurname, '')) LIKE '%' || :query || '%'
-            OR CAST(mobileNo AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%'
-            OR REPLACE(IFNULL(abhaId, ''), '-', '') LIKE '%' || REPLACE(:query, ' ', '') || '%'
-            OR IFNULL(familyHeadName, '') LIKE '%' || :query || '%'
-            OR IFNULL(spouseName, '') LIKE '%' || :query || '%'
-            OR IFNULL(fatherName, '') LIKE '%' || :query || '%'
-            OR CAST(benId AS TEXT) LIKE '%' || REPLACE(:query, ' ', '') || '%'
-            OR CAST(hhId AS TEXT) LIKE '%' || :query || '%'
-            OR IFNULL(rchId, '') LIKE '%' || REPLACE(:query, ' ', '') || '%'
-        )
-    """
 }
