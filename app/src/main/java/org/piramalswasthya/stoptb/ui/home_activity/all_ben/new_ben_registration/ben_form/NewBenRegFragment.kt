@@ -1099,7 +1099,7 @@ class NewBenRegFragment : Fragment() {
                 } else {
                     lifecycleScope.launch {
                         val ben = viewModel.getBenFromId(benId) ?: return@launch
-                        if (!LinkHouseholdAgeRules.canBeHeadOfFamily(ben.dob)) {
+                        if (!LinkHouseholdAgeRules.canBeHeadOfFamily(LinkHouseholdAgeRules.knownDob(ben.dob))) {
                             MaterialAlertDialogBuilder(requireContext())
                                 .setMessage(R.string.link_hh_hof_min_age)
                                 .setPositiveButton(android.R.string.ok, null)
@@ -1237,7 +1237,7 @@ class NewBenRegFragment : Fragment() {
 
             val (hof, hofSpouse) = LinkHouseholdAgeRules.headAndSpouse(viewModel.getHouseholdMembers(hhId))
             // Relations the beneficiary's age doesn't fit are hidden; "Other" is always offered.
-            val relations = LinkHouseholdAgeRules.allowedRelations(isFemale, ben.dob, hof, hofSpouse)
+            val relations = LinkHouseholdAgeRules.allowedRelations(isFemale, LinkHouseholdAgeRules.knownDob(ben.dob), hof, hofSpouse)
 
             MaterialAlertDialogBuilder(requireContext())
                 .setTitle("Select Relationship to HOF")

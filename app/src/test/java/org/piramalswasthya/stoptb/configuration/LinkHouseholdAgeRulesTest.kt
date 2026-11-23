@@ -89,4 +89,32 @@ class LinkHouseholdAgeRulesTest {
             assertEquals(it.label, expected[it.label], it.relationPos)
         }
     }
+
+    private fun dobOn(year: Int): Long =
+        Calendar.getInstance().apply { clear(); set(year, Calendar.JANUARY, 1) }.timeInMillis
+
+    @Test
+    fun `pre-1970 head of family DOB still blocks a younger mother`() {
+        val hof = Member(dobOn(1960))
+        assertTrue(hof.dob!! < 0L)
+        assertFalse("Mother" in labels(isFemale = true, dob = dobOn(1985), hof = hof))
+        assertTrue("Mother" in labels(isFemale = true, dob = dobOn(1940), hof = hof))
+    }
+
+    @Test
+    fun `pre-1970 spouse DOB is used for the son rule`() {
+        // HoF born 1950, spouse 1965 married at 20: earliest child DOB is Aug 1985.
+        val hof = Member(dobOn(1950), ageAtMarriage = 25)
+        val spouse = Member(dobOn(1965), ageAtMarriage = 20)
+        assertFalse("Son" in labels(false, dobOn(1980), hof, spouse))
+        assertTrue("Son" in labels(false, dobOn(1990), hof, spouse))
+    }
+
+    @Test
+    fun `only the stored default 0 counts as a missing DOB`() {
+        assertEquals(null, LinkHouseholdAgeRules.knownDob(0L))
+        assertEquals(dobOn(1960), LinkHouseholdAgeRules.knownDob(dobOn(1960)))
+        assertTrue(LinkHouseholdAgeRules.canBeHeadOfFamily(null, now))
+        assertTrue(LinkHouseholdAgeRules.canBeHeadOfFamily(dobOn(1955), now))
+    }
 }

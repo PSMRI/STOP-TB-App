@@ -11,7 +11,8 @@ import java.util.Calendar
  */
 object LinkHouseholdAgeRules {
 
-    data class Member(val dob: Long, val ageAtMarriage: Int? = null)
+    /** [dob] is null when unknown; pre-1970 DOBs are negative and valid. */
+    data class Member(val dob: Long?, val ageAtMarriage: Int? = null)
 
     data class LinkRelation(val label: String, val relationId: Int) {
         val relationPos: Int get() = relationId + 1
@@ -60,27 +61,30 @@ object LinkHouseholdAgeRules {
         LinkRelation("Other", 20),
     )
 
-    fun canBeHeadOfFamily(benDob: Long, now: Long = System.currentTimeMillis()): Boolean =
-        benDob <= 0L || benDob <= yearsBefore(now, Konstants.minAgeForHoF)
+    /** BenRegCache.dob defaults to 0 when not set; every other value, negative included, is a real DOB. */
+    fun knownDob(storedDob: Long): Long? = storedDob.takeIf { it != 0L }
+
+    fun canBeHeadOfFamily(benDob: Long?, now: Long = System.currentTimeMillis()): Boolean =
+        benDob == null || benDob <= yearsBefore(now, Konstants.minAgeForHoF)
 
     fun isRelationAllowed(
         relationId: Int,
-        benDob: Long,
+        benDob: Long?,
         hof: Member?,
         hofSpouse: Member?,
         now: Long = System.currentTimeMillis()
     ): Boolean {
         // No DOB to check against: keep the old behaviour.
-        if (benDob <= 0L) return true
+        if (benDob == null) return true
         val minAdultDob = yearsBefore(now, Konstants.minAgeForGenBen)
-        val hofDob = hof?.dob?.takeIf { it > 0L }
+        val hofDob = hof?.dob
         return when (relationId) {
             MOTHER, FATHER ->
                 if (hofDob != null) benDob <= yearsBefore(hofDob, Konstants.minAgeForGenBen)
                 else benDob <= minAdultDob
             SON, DAUGHTER -> {
                 if (hofDob == null) return true
-                val spouseDob = hofSpouse?.dob?.takeIf { it > 0L }
+                val spouseDob = hofSpouse?.dob
                 val youngerParentDob = spouseDob?.let { maxOf(hofDob, it) } ?: hofDob
                 val hofAge = hof.ageAtMarriage?.takeIf { it > 0 }
                 val spouseAge = hofSpouse?.ageAtMarriage?.takeIf { it > 0 }
@@ -102,7 +106,7 @@ object LinkHouseholdAgeRules {
 
     fun allowedRelations(
         isFemale: Boolean,
-        benDob: Long,
+        benDob: Long?,
         hof: Member?,
         hofSpouse: Member?,
         now: Long = System.currentTimeMillis()
@@ -120,7 +124,7 @@ object LinkHouseholdAgeRules {
         return hof?.toMember() to spouse?.toMember()
     }
 
-    private fun BenRegCache.toMember() = Member(dob, genDetails?.ageAtMarriage)
+    private fun BenRegCache.toMember() = Member(knownDob(dob), genDetails?.ageAtMarriage)
 
     private fun yearsBefore(millis: Long, years: Int): Long =
         Calendar.getInstance().apply {
