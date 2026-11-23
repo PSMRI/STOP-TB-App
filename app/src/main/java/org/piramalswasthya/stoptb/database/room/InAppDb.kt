@@ -2538,6 +2538,14 @@ abstract class InAppDb : RoomDatabase() {
                         // TB_BEN_SUMMARY triggers: also on a fresh install, where no migration runs.
                         .addCallback(TbBenSummarySql.CALLBACK)
                         .build()
+                    val built = instance
+                    queryExecutor.execute {
+                        try {
+                            TrackerPin.pinAllTables(built)
+                        } catch (e: Exception) {
+                            Log.w("InAppDb", "could not pin tracked tables", e)
+                        }
+                    }
 
                     INSTANCE = instance
                 }
