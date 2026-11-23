@@ -19,7 +19,7 @@ import org.piramalswasthya.stoptb.network.TBConfirmedTreatmentDTO
         onUpdate = ForeignKey.CASCADE,
         onDelete = ForeignKey.CASCADE
     )],
-    indices = [Index(name = "ind_tb_confirmed", value = ["benId"])]
+    indices = [Index(name = "ind_tb_confirmed", value = ["benId"]), Index(name = "ind_tb_confirmed_sync", value = ["syncState"])]
 )
 data class TBConfirmedTreatmentCache(
     @PrimaryKey(autoGenerate = true)

@@ -3,6 +3,7 @@ package org.piramalswasthya.stoptb.model
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
@@ -65,7 +66,11 @@ data class HouseholdAmenities(
     var otherMotorizedVehicle: String? = null,
 )
 
-@Entity(tableName = "HOUSEHOLD")
+@Entity(
+    tableName = "HOUSEHOLD",
+    // Household lists are per village (v62).
+    indices = [Index(name = "ind_hh_village", value = ["loc_village_id"])]
+)
 data class HouseholdCache(
 
     @PrimaryKey var householdId: Long,

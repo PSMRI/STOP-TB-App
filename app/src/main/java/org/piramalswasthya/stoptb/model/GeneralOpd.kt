@@ -17,7 +17,7 @@ import org.piramalswasthya.stoptb.network.GeneralOpdDTO
         onUpdate = ForeignKey.CASCADE,
         onDelete = ForeignKey.CASCADE
     )],
-    indices = [Index(name = "ind_general_opd_ben", value = ["benId"]),
+    indices = [Index(name = "ind_general_opd_ben", value = ["benId"]), Index(name = "ind_general_opd_sync", value = ["syncState"]),
         Index(value = ["submissionId"], unique = true)]
 )
 data class GeneralOpdCache(

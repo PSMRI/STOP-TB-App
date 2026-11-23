@@ -7,10 +7,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.HouseholdDao
-import org.piramalswasthya.stoptb.database.room.dao.TBDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.repositories.VillageCountsRepo
 import javax.inject.Inject
 
 data class HomeGlance(
@@ -23,9 +22,8 @@ data class HomeGlance(
 @HiltViewModel
 class VolunteerHomeGlanceViewModel @Inject constructor(
     householdDao: HouseholdDao,
-    benDao: BenDao,
-    tbDao: TBDao,
     preferenceDao: PreferenceDao,
+    villageCountsRepo: VillageCountsRepo,
 ) : ViewModel() {
 
     // Login (or the home village switch) stores one village on the location record.
@@ -39,16 +37,10 @@ class VolunteerHomeGlanceViewModel @Inject constructor(
     private val selectedVillageIds: List<Int> = listOf(selectedVillageId, selectedVillageId)
 
     val glance: StateFlow<HomeGlance> = combine(
-        tbDao.getDashboardPresumptiveTbCount(
-            selectedVillageIds,
-            "",
-            0L,
-            0L,
-            "",
-            0
-        ),
+        villageCountsRepo.presumptive(selectedVillageIds),
         householdDao.getAllHouseholdsCount(selectedVillageId),
-        benDao.getVillageHeadcount(selectedVillageIds),
+        // Same shared query as the home cards' All Beneficiaries / Non-Household counts.
+        villageCountsRepo.counts(selectedVillageId),
     ) { presumptive, households, headcount ->
         HomeGlance(
             presumptiveReferral = presumptive,

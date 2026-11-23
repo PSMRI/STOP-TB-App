@@ -79,6 +79,8 @@ import org.piramalswasthya.stoptb.model.dynamicEntity.QuestionResponseEntity
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.DynamicFormMetadataDao
 import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.CounsellingFormResponseDao
 import org.piramalswasthya.stoptb.model.DataMissingBenInfo
+import org.piramalswasthya.stoptb.model.TbBenSummary
+import org.piramalswasthya.stoptb.model.BenSearchFts
 import org.piramalswasthya.stoptb.model.MissingDataInfoStatusConverter
 
 
@@ -123,7 +125,9 @@ import org.piramalswasthya.stoptb.model.MissingDataInfoStatusConverter
         FormResponseEntity::class,
         SectionResponseEntity::class,
         QuestionResponseEntity::class,
-        DataMissingBenInfo::class
+        DataMissingBenInfo::class,
+        TbBenSummary::class,
+        BenSearchFts::class
     ],
     views = [BenBasicCache::class, CounsellingFormResponseView::class],
     version = InAppDb.DB_VERSION, exportSchema = true
@@ -1806,6 +1810,136 @@ abstract class InAppDb : RoomDatabase() {
          * Costs ~18ms on a 10k COUNT (the view's ORDER BY forces a sort for Paging's count
          * query); the correct list order is worth it.
          */
+        /**
+         * v73: BEN_BASIC_CACHE without its ORDER BY (every COUNT and query on the view sorted
+         * all non-draft beneficiaries), plus an updatedDate column so the list queries that
+         * relied on the view's order now order explicitly. Keeps v69's villageName column and
+         * v70's door-lock filter. View SQL copied from the generated schema (73.json) so Room's
+         * identity check matches.
+         */
+        /**
+         * v74: TB_BEN_SUMMARY, one row per beneficiary with their TB list flags and sort keys.
+         * Only the v74 table is created here; MIGRATION_74_75 rebuilds it, adds its triggers and
+         * fills it, so an upgrade from v71 fills it once.
+         */
+        val MIGRATION_73_74 = object : Migration(73, 74) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(TB_BEN_SUMMARY_CREATE)
+                TB_BEN_SUMMARY_INDEXES.forEach { database.execSQL(it) }
+            }
+        }
+
+        /**
+         * v75: TB_BEN_SUMMARY gets the list sort key (genKey), lastVisit and caCand, and the
+         * temperature rule moves into hwc; BEN_SEARCH_FTS indexes the search-box fields.
+         * The summary is derived data, so it is rebuilt. Triggers are dropped first:
+         * CREATE TRIGGER IF NOT EXISTS would keep a v74 trigger with the old column list.
+         */
+        val MIGRATION_74_75 = object : Migration(74, 75) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                TbBenSummarySql.dropTriggers(database)
+                BenSearchSql.dropTriggers(database)
+                database.execSQL("DROP TABLE IF EXISTS `TB_BEN_SUMMARY`")
+                database.execSQL(TB_BEN_SUMMARY_CREATE_V75)
+                TB_BEN_SUMMARY_INDEXES_V75.forEach { database.execSQL(it) }
+                database.execSQL("DROP TABLE IF EXISTS `BEN_SEARCH_FTS`")
+                database.execSQL(BEN_SEARCH_FTS_CREATE)
+                TbBenSummarySql.createTriggers(database)
+                database.execSQL(TbBenSummarySql.FILL)
+                database.execSQL(BenSearchSql.FILL)
+            }
+        }
+
+        // Same SQL Room generates for TbBenSummary (schemas/74.json).
+        private const val TB_BEN_SUMMARY_CREATE = "CREATE TABLE IF NOT EXISTS `TB_BEN_SUMMARY` (`beneficiaryId` INTEGER NOT NULL," +
+            " `hasScreening` INTEGER NOT NULL, `pregVitals` INTEGER NOT NULL, `xrayList` INTEGER NOT NULL," +
+            " `xrayTier` INTEGER NOT NULL, `xrayKey` INTEGER NOT NULL, `tnOther` INTEGER NOT NULL, `tnTier` INTEGER NOT NULL," +
+            " `tnKey` INTEGER NOT NULL, `hwc` INTEGER NOT NULL, `lc` INTEGER NOT NULL, `caFixed` INTEGER NOT NULL," +
+            " `caD0` INTEGER NOT NULL, `caSym` INTEGER NOT NULL, `caElig` INTEGER NOT NULL, `presumptive` INTEGER NOT NULL," +
+            " `tptIndex` INTEGER NOT NULL, `knownTbCase` INTEGER NOT NULL, PRIMARY KEY(`beneficiaryId`))"
+
+        private val TB_BEN_SUMMARY_INDEXES = listOf(
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_xray` ON `TB_BEN_SUMMARY` (`xrayTier` ASC, `xrayKey` DESC, `beneficiaryId` DESC)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_tn` ON `TB_BEN_SUMMARY` (`tnTier` ASC, `tnKey` DESC, `beneficiaryId` DESC)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_hwc` ON `TB_BEN_SUMMARY` (`hwc`)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_lc` ON `TB_BEN_SUMMARY` (`lc`)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_ca` ON `TB_BEN_SUMMARY` (`caFixed`, `caD0`)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_presumptive` ON `TB_BEN_SUMMARY` (`presumptive`)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_tpt` ON `TB_BEN_SUMMARY` (`tptIndex`)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_known_tb` ON `TB_BEN_SUMMARY` (`knownTbCase`)",
+        )
+
+        // Same SQL Room generates for TbBenSummary and BenSearchFts (schemas/75.json).
+        private const val TB_BEN_SUMMARY_CREATE_V75 = "CREATE TABLE IF NOT EXISTS `TB_BEN_SUMMARY` (`beneficiaryId` INTEGER NOT NULL," +
+            " `hasScreening` INTEGER NOT NULL, `pregVitals` INTEGER NOT NULL, `xrayList` INTEGER NOT NULL," +
+            " `xrayTier` INTEGER NOT NULL, `xrayKey` INTEGER NOT NULL, `tnOther` INTEGER NOT NULL," +
+            " `tnTier` INTEGER NOT NULL, `tnKey` INTEGER NOT NULL, `hwc` INTEGER NOT NULL," +
+            " `lc` INTEGER NOT NULL, `caFixed` INTEGER NOT NULL, `caD0` INTEGER NOT NULL," +
+            " `caSym` INTEGER NOT NULL, `caElig` INTEGER NOT NULL, `presumptive` INTEGER NOT NULL," +
+            " `tptIndex` INTEGER NOT NULL, `knownTbCase` INTEGER NOT NULL, `lastVisit` INTEGER NOT NULL," +
+            " `genKey` INTEGER NOT NULL, `caCand` INTEGER NOT NULL, PRIMARY KEY(`beneficiaryId`))"
+
+        private val TB_BEN_SUMMARY_INDEXES_V75 = listOf(
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_xray` ON `TB_BEN_SUMMARY` (`xrayTier` ASC, `xrayKey` DESC, `beneficiaryId` DESC)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_tn` ON `TB_BEN_SUMMARY` (`tnTier` ASC, `tnKey` DESC, `beneficiaryId` DESC)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_hwc` ON `TB_BEN_SUMMARY` (`hwc` ASC, `genKey` DESC, `beneficiaryId` DESC)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_lc` ON `TB_BEN_SUMMARY` (`lc` ASC, `genKey` DESC, `beneficiaryId` DESC)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_ca` ON `TB_BEN_SUMMARY` (`caCand` ASC, `genKey` DESC, `beneficiaryId` DESC)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_presumptive` ON `TB_BEN_SUMMARY` (`presumptive`)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_tpt` ON `TB_BEN_SUMMARY` (`tptIndex`)",
+            "CREATE INDEX IF NOT EXISTS `ind_tbsum_known_tb` ON `TB_BEN_SUMMARY` (`knownTbCase`)",
+        )
+
+        private const val BEN_SEARCH_FTS_CREATE = "CREATE VIRTUAL TABLE IF NOT EXISTS `BEN_SEARCH_FTS` USING FTS4(`name` TEXT, `phone` TEXT," +
+            " `phoneend` TEXT, `abha` TEXT, `head` TEXT, `spouse` TEXT, `father` TEXT, `benId` TEXT," +
+            " `hhId` TEXT, `rch` TEXT, tokenize=unicode61)"
+
+        val MIGRATION_72_73 = object : Migration(72, 73) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
+                database.execSQL(
+                    "CREATE VIEW `BEN_BASIC_CACHE` AS SELECT b.beneficiaryId as benId,b.isMarried,b.noOfAliveChildren, b.noOfChildren, b.doYouHavechildren ,b.isConsent as isConsent, b.motherName as motherName, b.householdId as hhId, b.regDate, b.createdDate, b.updatedDate, b.firstName as benName, b.lastName as benSurname, b.gender, b.dob as dob,b.isDeactivate, b.isDeath,b.isDeathValue,b.dateOfDeath,b.timeOfDeath,b.reasonOfDeath,b.reasonOfDeathId,b.placeOfDeath,b.placeOfDeathId,b.otherPlaceOfDeath,b.isSpouseAdded,b.isChildrenAdded, b.familyHeadRelationPosition as relToHeadId, b.contactNumber as mobileNo, b.fatherName,IFNULL(h.fam_familyHeadName,'') as familyHeadName, b.gen_spouseName as spouseName, b.rchId, b.nikshayId, b.gen_lastMenstrualPeriod as lastMenstrualPeriod, b.isHrpStatus as hrpStatus, b.syncState, b.gen_reproductiveStatusId as reproductiveStatusId, b.isKid, b.immunizationStatus, b.loc_village_id as villageId, b.loc_village_name as villageName, b.abha_healthIdNumber as abhaId, b.isNewAbha, 0 as cbacFilled, NULL as cbacSyncState, 0 as cdrFilled, NULL as cdrSyncState, 0 as mdsrFilled, NULL as mdsrSyncState, NULL as pmsmaSyncState, 0 as pmsmaFilled, 0 as hbncFilled, 0 as hbycFilled, 0 as pwrFilled, NULL as pwrSyncState, NULL as doSyncState, NULL as irSyncState, NULL as crSyncState, 0 as ecrFilled, 0 as ectFilled, 0 as isMdsr, 0 as tbsnFilled, NULL as tbsnSyncState, 0 as tbspFilled, NULL as tbspSyncState, 0 as hrppaFilled, 0 as hrpnpaFilled, 0 as hrpmbpFilled, 0 as hrptFilled, 0 as hrptrackingDone, 0 as hrnptrackingDone, 0 as hrnptFilled, NULL as hrppaSyncState, NULL as hrpnpaSyncState, NULL as hrpmbpSyncState, NULL as hrptSyncState, NULL as hrnptSyncState, 0 as isDelivered, 0 as pwHrp, 0 as irFilled, 0 as crFilled, 0 as doFilled, b.isNonHH, b.isAvailableForCamp, b.reasonForNotAttendingCamp, b.otherReasonForNotAttendingCamp, b.screeningStatus, b.symptomsScreenedDate, b.chestXrayDoneDate, b.trunatTestDoneDate, b.placeOfCurrentLiving, b.otherPlaceOfCurrentLiving, b.institutionName FROM BENEFICIARY b LEFT JOIN HOUSEHOLD h ON b.householdId = h.householdId WHERE b.isDraft = 0 AND IFNULL(h.isDoorLocked, 0) = 0"
+                )
+            }
+        }
+
+        /**
+         * v72: indexes for the push/sync-state lookups, village lists and household lists, and
+         * drops of indexes that duplicated a primary key (ind_ben, ind_vitals_ben) or are covered
+         * by a new composite (ind_ben_sync). Idempotent (IF [NOT] EXISTS) so the same SQL can be
+         * appended to another release line's migration chain.
+         */
+        val MIGRATION_71_72 = object : Migration(71, 72) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Same table as MIGRATION_67_68. A UAT tablet on an earlier build of these
+                // changes (v68/v69 under release-2.4's numbering) skips that step, so create it
+                // here too; IF NOT EXISTS makes it a no-op everywhere else.
+                database.execSQL(
+                    """
+            CREATE TABLE IF NOT EXISTS DATA_MISSING_BEN_INFO (
+                beneficiaryId INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                PRIMARY KEY(beneficiaryId)
+            )
+            """.trimIndent()
+                )
+                database.execSQL("DROP INDEX IF EXISTS `ind_ben`")
+                database.execSQL("DROP INDEX IF EXISTS `ind_ben_sync`")
+                database.execSQL("DROP INDEX IF EXISTS `ind_vitals_ben`")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_ben_sync_processed` ON `BENEFICIARY` (`syncState`, `processed`, `isDraft`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_ben_village_updated` ON `BENEFICIARY` (`loc_village_id`, `isDeactivate`, `updatedDate`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_hh_village` ON `HOUSEHOLD` (`loc_village_id`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_tbsn_sync` ON `TB_SCREENING` (`syncState`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_tbs_sync` ON `TB_SUSPECTED` (`syncState`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_tb_diagnostics_sync` ON `TB_DIAGNOSTICS` (`syncState`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_tb_confirmed_sync` ON `TB_CONFIRMED_TREATMENT` (`syncState`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_vitals_sync` ON `BEN_VITALS` (`syncState`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_general_opd_sync` ON `GENERAL_OPD` (`syncState`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `ind_cbac_sync` ON `CBAC` (`syncState`)")
+            }
+        }
+
         val MIGRATION_60_61 = object : Migration(60, 61) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("DROP VIEW IF EXISTS `BEN_BASIC_CACHE`")
@@ -2272,7 +2406,7 @@ abstract class InAppDb : RoomDatabase() {
 
 
         // Bump together with a new MIGRATION_x_y added to MIGRATIONS below.
-        const val DB_VERSION = 71
+        const val DB_VERSION = 75
 
         // Oldest schema version that can be migrated in place.
         const val OLDEST_MIGRATABLE_VERSION = 2
@@ -2348,7 +2482,11 @@ abstract class InAppDb : RoomDatabase() {
             MIGRATION_67_68,
             MIGRATION_68_69,
             MIGRATION_69_70,
-            MIGRATION_70_71
+            MIGRATION_70_71,
+            MIGRATION_71_72,
+            MIGRATION_72_73,
+            MIGRATION_73_74,
+            MIGRATION_74_75
         )
 
         fun getInstance(appContext: Context): InAppDb {
@@ -2397,6 +2535,8 @@ abstract class InAppDb : RoomDatabase() {
                         // InAppDbMigrationsTest) instead of silently deleting field data. Only
                         // version 1, which has no migration and is not in the field, may be reset.
                         .fallbackToDestructiveMigrationFrom(1)
+                        // TB_BEN_SUMMARY triggers: also on a fresh install, where no migration runs.
+                        .addCallback(TbBenSummarySql.CALLBACK)
                         .build()
 
                     INSTANCE = instance

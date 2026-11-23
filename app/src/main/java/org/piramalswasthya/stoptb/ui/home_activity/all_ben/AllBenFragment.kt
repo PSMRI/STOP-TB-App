@@ -14,6 +14,8 @@ import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import androidx.paging.LoadState
@@ -28,6 +30,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import org.piramalswasthya.stoptb.ui.loadedIds
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.configuration.HouseholdSpouseRelations
 import org.piramalswasthya.stoptb.helpers.RoleManager
@@ -190,7 +193,15 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // lifecycleScope they would NOT be cancelled, and a fragment returning from the back
         // stack would accumulate another 17 Room Flow subscriptions per view creation.
         rowDecorationsStarted = false
+        // The add-member dialog is built per view (buildAddMemberDialog in onViewCreated) and
+        // holds that view's inflated layout: release it with the view, not the fragment.
+        addMemberAlert?.dismiss()
+        addMemberAlert = null
+        addMemberAlertBinding = null
         super.onDestroyView()
+        // A new adapter and binding are created per view; don't keep the old view tree alive
+        // while the fragment sits on the back stack.
+        _binding = null
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -571,7 +582,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         var firstPagingDataSeen = false
         var firstRefreshSettled = false
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.benList.collectLatest {
                 if (!firstPagingDataSeen) {
                     firstPagingDataSeen = true
@@ -583,7 +594,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
 
         // TEMPORARY PERF INSTRUMENTATION - how long Paging's refresh (COUNT + page 0) takes,
         // and how many times it restarts before it settles.
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             benAdapter.loadStateFlow.collect { loadStates ->
                 if (loadStates.refresh is LoadState.NotLoading && !firstRefreshSettled) {
                     firstRefreshSettled = true
@@ -610,7 +621,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             viewModel.expandSearchToBlock()
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             // Settles only once the expanded search's PagingData is submitted and its refresh has completed,
             // so page updates from the previous search can't end the loading state early.
             benAdapter.onPagesUpdatedFlow.collect {
@@ -627,7 +638,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             // A failed refresh never produces a page update, so settle the expanded search's error here
             // instead of leaving the loader up; Retry re-runs the same refresh via benAdapter.retry().
             benAdapter.loadStateFlow.collect { loadStates ->
@@ -650,7 +661,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             combine(
                 benAdapter.loadStateFlow.map { it.refresh is LoadState.Loading },
                 benAdapter.loadStateFlow.map { loadStates ->
@@ -734,7 +745,7 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // page data either way; the decorations land a frame later.
 
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.orderActionState.collectLatest { state ->
                 when (state) {
                     is AllBenViewModel.OrderActionResult.Idle -> {}
@@ -970,129 +981,143 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         // destroyed view would stop the next, legitimate call from ever starting them.
         if (_binding == null || rowDecorationsStarted) return
         rowDecorationsStarted = true
+        // Only while the view is STARTED: behind a dialog or with the app in the background these
+        // badge queries stopped being needed but kept running (LoadedRowBadges shares them
+        // WhileSubscribed, which never ended). One block, so they stop and restart together.
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.childCounts.collectLatest { countMap ->
-                benAdapter.submitChildCounts(countMap)
-            }
-        }
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // The badges below are read only for the rows the list has loaded (PR 6).
+                launch {
+                    benAdapter.loadedIds { item -> item.benId }.collect { benIds -> viewModel.onRowsLoaded(benIds) }
+                }
+                launch {
+                    viewModel.childCounts.collectLatest { countMap ->
+                        benAdapter.submitChildCounts(countMap)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.householdMemberCounts.collectLatest { countMap ->
-                benAdapter.submitHouseholdMemberCounts(countMap)
-            }
-        }
+                launch {
+                    viewModel.householdMemberCounts.collectLatest { countMap ->
+                        benAdapter.submitHouseholdMemberCounts(countMap)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.householdHeadNames.collectLatest { nameMap ->
-                benAdapter.submitHouseholdHeadNames(nameMap)
-            }
-        }
+                launch {
+                    viewModel.householdHeadNames.collectLatest { nameMap ->
+                        benAdapter.submitHouseholdHeadNames(nameMap)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.vitalBenIds.collectLatest { benIds ->
-                benAdapter.submitBenIds(benIds)
-            }
-        }
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.unsyncedVitalBenIds.collectLatest { benIds ->
-                benAdapter.submitUnsyncedVitalBenIds(benIds)
-            }
-        }
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.syncingVitalBenIds.collectLatest { benIds ->
-                benAdapter.submitSyncingVitalBenIds(benIds)
-            }
-        }
+                launch {
+                    viewModel.vitalBenIds.collectLatest { benIds ->
+                        benAdapter.submitBenIds(benIds)
+                    }
+                }
+                launch {
+                    viewModel.unsyncedVitalBenIds.collectLatest { benIds ->
+                        benAdapter.submitUnsyncedVitalBenIds(benIds)
+                    }
+                }
+                launch {
+                    viewModel.syncingVitalBenIds.collectLatest { benIds ->
+                        benAdapter.submitSyncingVitalBenIds(benIds)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.tbScreeningBenIds.collectLatest { benIds ->
-                benAdapter.submitTbScreeningBenIds(benIds)
-            }
-        }
+                launch {
+                    viewModel.tbScreeningBenIds.collectLatest { benIds ->
+                        benAdapter.submitTbScreeningBenIds(benIds)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.unsyncedTbScreeningBenIds.collectLatest { benIds ->
-                benAdapter.submitUnsyncedTbScreeningBenIds(benIds)
-            }
-        }
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.syncingTbScreeningBenIds.collectLatest { benIds ->
-                benAdapter.submitSyncingTbScreeningBenIds(benIds)
-            }
-        }
+                launch {
+                    viewModel.unsyncedTbScreeningBenIds.collectLatest { benIds ->
+                        benAdapter.submitUnsyncedTbScreeningBenIds(benIds)
+                    }
+                }
+                launch {
+                    viewModel.syncingTbScreeningBenIds.collectLatest { benIds ->
+                        benAdapter.submitSyncingTbScreeningBenIds(benIds)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.generalOpdBenIds.collectLatest { benIds ->
-                benAdapter.submitGeneralOpdBenIds(benIds)
-            }
-        }
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.unsyncedGeneralOpdBenIds.collectLatest { benIds ->
-                benAdapter.submitUnsyncedGeneralOpdBenIds(benIds)
-            }
-        }
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.syncingGeneralOpdBenIds.collectLatest { benIds ->
-                benAdapter.submitSyncingGeneralOpdBenIds(benIds)
-            }
-        }
+                launch {
+                    viewModel.generalOpdBenIds.collectLatest { benIds ->
+                        benAdapter.submitGeneralOpdBenIds(benIds)
+                    }
+                }
+                launch {
+                    viewModel.unsyncedGeneralOpdBenIds.collectLatest { benIds ->
+                        benAdapter.submitUnsyncedGeneralOpdBenIds(benIds)
+                    }
+                }
+                launch {
+                    viewModel.syncingGeneralOpdBenIds.collectLatest { benIds ->
+                        benAdapter.submitSyncingGeneralOpdBenIds(benIds)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.anthropometryFilledBenIds.collectLatest { benIds ->
-                benAdapter.submitAnthropometryBenIds(benIds)
-            }
-        }
+                launch {
+                    viewModel.anthropometryFilledBenIds.collectLatest { benIds ->
+                        benAdapter.submitAnthropometryBenIds(benIds)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.diagnosisBenIds.collectLatest { benIds ->
-                benAdapter.submitDiagnosisBenIds(benIds)
-            }
-        }
+                launch {
+                    viewModel.diagnosisBenIds.collectLatest { benIds ->
+                        benAdapter.submitDiagnosisBenIds(benIds)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.contactFollowUpDoneBenIds.collectLatest { benIds ->
-                benAdapter.submitContactFollowUpDoneBenIds(benIds)
-            }
-        }
+                launch {
+                    viewModel.contactFollowUpDoneBenIds.collectLatest { benIds ->
+                        benAdapter.submitContactFollowUpDoneBenIds(benIds)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.tptFollowUpDoneBenIds.collectLatest { benIds ->
-                benAdapter.submitTptFollowUpDoneBenIds(benIds)
-            }
-        }
+                launch {
+                    viewModel.tptFollowUpDoneBenIds.collectLatest { benIds ->
+                        benAdapter.submitTptFollowUpDoneBenIds(benIds)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.tptRegistrationDoneBenIds.collectLatest { benIds ->
-                benAdapter.submitTptRegistrationDoneBenIds(benIds)
-            }
-        }
+                launch {
+                    viewModel.tptRegistrationDoneBenIds.collectLatest { benIds ->
+                        benAdapter.submitTptRegistrationDoneBenIds(benIds)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.tptEligibleBenIds.collectLatest { benIds ->
-                benAdapter.submitTptEligibleBenIds(benIds)
-            }
-        }
+                launch {
+                    viewModel.tptEligibleBenIds.collectLatest { benIds ->
+                        benAdapter.submitTptEligibleBenIds(benIds)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.allTbDiagnostics.collectLatest { diagnosticsList ->
-                benAdapter.submitTBDiagnostics(diagnosticsList)
-            }
-        }
+                launch {
+                    viewModel.allTbDiagnostics.collectLatest { diagnosticsList ->
+                        benAdapter.submitTBDiagnostics(diagnosticsList)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.allTbScreening.collectLatest { screeningList ->
-                benAdapter.submitTbScreeningList(screeningList)
-            }
-        }
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.allTbSuspected.collectLatest { suspectedList ->
-                benAdapter.submitTbSuspected(suspectedList)
-            }
-        }
+                launch {
+                    viewModel.allTbScreening.collectLatest { screeningList ->
+                        benAdapter.submitTbScreeningList(screeningList)
+                    }
+                }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.retryingBenIds.collectLatest { benIds ->
-                benAdapter.submitRetryingBenIds(benIds)
+                // Only the Clinical Assessment list (source 10) shows TB_SUSPECTED on the card;
+                // the other lists skip the whole-table read.
+                if (args.source == 10) launch {
+                    viewModel.allTbSuspected.collectLatest { suspectedList ->
+                        benAdapter.submitTbSuspected(suspectedList)
+                    }
+                }
+
+                launch {
+                    viewModel.retryingBenIds.collectLatest { benIds ->
+                        benAdapter.submitRetryingBenIds(benIds)
+                    }
+                }
             }
         }
     }
@@ -1373,6 +1398,5 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         addMemberAlert?.dismiss()
         addMemberAlert = null
         addMemberAlertBinding = null
-        _binding = null
     }
 }

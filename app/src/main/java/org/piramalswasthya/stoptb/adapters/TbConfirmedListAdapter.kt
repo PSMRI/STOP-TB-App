@@ -6,7 +6,7 @@ import android.view.ViewGroup
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.ListAdapter
+import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.RecyclerView
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -27,7 +27,7 @@ class TbConfirmedListAdapter(
     private val roleManager: RoleManager? = null,
     private val restrictToAction: Action? = null
 ) :
-ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
+PagingDataAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
 (BenDiffUtilCallBack) {
 
     enum class Action { COUNSELLING, CONTACT_TRACING, FOLLOW_UP, VIEW_ONLY }
@@ -280,7 +280,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
         holder: BenViewHolder,
         position: Int
     ) {
-        holder.bind(getItem(position), clickListener, pref, benIdList, totalSectionsFallback, localFilledCounts, roleManager,restrictToAction)
+        holder.bind(getItem(position) ?: return, clickListener, pref, benIdList, totalSectionsFallback, localFilledCounts, roleManager,restrictToAction)
     }
 
     /*override fun onCreateViewHolder(
@@ -290,7 +290,7 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
         BenViewHolder.from(parent)
 
     override fun onBindViewHolder(holder: BenViewHolder, position: Int) {
-        holder.bind(getItem(position), clickListener, pref)
+        holder.bind(getItem(position) ?: return, clickListener, pref)
     }*/
 
 
@@ -312,8 +312,11 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
         fun onClickContactTracing(item: BenWithTbSuspectedDomain) =
             clickedContactTracing?.let { it(item) }
     }
+    // Each of these is submitted on every emission of its source Flow; rebinding the whole list
+    // is only needed when the value actually changed.
     fun submitBenIds(list: List<Long>?) {
         if (list != null) {
+            if (benIdList == list) return
             if (benIdList == null) benIdList = mutableListOf()
             benIdList!!.clear()
             benIdList!!.addAll(list)
@@ -322,11 +325,13 @@ ListAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder>
     }
 
     fun submitTotalSectionsFallback(totalSections: Int) {
+        if (totalSectionsFallback == totalSections) return
         totalSectionsFallback = totalSections
         notifyDataSetChanged()
     }
 
     fun submitLocalFilledCounts(counts: Map<Long, Int>) {
+        if (localFilledCounts == counts) return
         localFilledCounts = counts
         notifyDataSetChanged()
     }
