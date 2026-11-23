@@ -26,8 +26,9 @@ fun <T> RoomDatabase.throttledQuery(tables: Array<String>, periodMs: Long, query
             changes.trySend(Unit)
         }
     }
-    withContext(Dispatchers.IO) { invalidationTracker.addObserver(observer) }
     try {
+        // Inside try: withContext can throw on return if cancelled after the observer was added.
+        withContext(Dispatchers.IO) { invalidationTracker.addObserver(observer) }
         emit(query())
         while (true) {
             changes.receive()
