@@ -67,6 +67,18 @@ class TbBenSummarySqlTest {
         assertEquals("", BenSearchSql.toFtsQuery("*\"-"))
     }
 
+    // The firing statement's conflict policy overrides the trigger's (Room's UPDATE OR ABORT made
+    // INSERT OR REPLACE fail), so each refresh must delete the row and then insert it plainly.
+    @Test
+    fun triggersRefreshWithDeleteThenInsert() {
+        TbBenSummarySql.TRIGGERS.forEach { trigger ->
+            assertTrue(trigger, !trigger.contains("OR REPLACE INTO TB_BEN_SUMMARY"))
+            val delete = trigger.indexOf("DELETE FROM TB_BEN_SUMMARY WHERE beneficiaryId = ")
+            val insert = trigger.indexOf("INSERT INTO TB_BEN_SUMMARY")
+            assertTrue(trigger, delete >= 0 && insert > delete)
+        }
+    }
+
     @Test
     fun writesSqlForDeviceChecks() {
         File("build/tb-ben-summary.sql").writeText(

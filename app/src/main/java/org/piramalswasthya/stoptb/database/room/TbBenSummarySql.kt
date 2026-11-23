@@ -211,10 +211,15 @@ object TbBenSummarySql {
             " FROM ($idsSql) i) x" +
             " LEFT JOIN TB_DIAGNOSTICS d ON d.id = (SELECT id FROM TB_DIAGNOSTICS WHERE benId = x.benId ORDER BY id DESC LIMIT 1))"
 
-    private val INSERT_HEAD =
-        "INSERT OR REPLACE INTO $TABLE (beneficiaryId, ${(COLUMNS.keys + DERIVED.keys).joinToString(", ")}) "
+    private val INSERT_COLUMNS = "$TABLE (beneficiaryId, ${(COLUMNS.keys + DERIVED.keys).joinToString(", ")}) "
 
-    private fun refresh(benExpr: String) = INSERT_HEAD + selectFor("SELECT $benExpr AS benId")
+    private val INSERT_HEAD = "INSERT OR REPLACE INTO $INSERT_COLUMNS"
+
+    // Not INSERT OR REPLACE: the firing statement's conflict policy overrides a trigger's, so
+    // Room's UPDATE OR ABORT / @Upsert made it fail for anyone who already had a summary row.
+    private fun refresh(benExpr: String) =
+        "DELETE FROM $TABLE WHERE beneficiaryId = $benExpr; INSERT INTO $INSERT_COLUMNS" +
+            selectFor("SELECT $benExpr AS benId")
 
     /** Beneficiaries on the HWC list through BENEFICIARY.temperature alone. */
     private const val HIGH_TEMPERATURE_IDS =
@@ -265,6 +270,12 @@ object TbBenSummarySql {
         "CREATE TRIGGER IF NOT EXISTS $name $body"
     }
 
+    // sqlite_master keeps "CREATE TRIGGER <name> <body>" (IF NOT EXISTS is dropped), so a stored
+    // trigger matches the current code exactly when its text equals this.
+    private val STORED_SQL: Map<String, String> = (SOURCE_TRIGGERS + BENEFICIARY_TRIGGERS).associate { (name, body) ->
+        name to "CREATE TRIGGER $name $body"
+    }
+
     private val TRIGGER_NAMES: List<String> = (SOURCE_TRIGGERS + BENEFICIARY_TRIGGERS).map { it.first }
 
     /** Drops the triggers so a migration can recreate them with new SQL (CREATE ... IF NOT EXISTS keeps old ones). */
@@ -272,9 +283,21 @@ object TbBenSummarySql {
         TRIGGER_NAMES.forEach { db.execSQL("DROP TRIGGER IF EXISTS $it") }
     }
 
-    /** Creates the triggers if missing. Idempotent; runs on every open so a fresh install gets them too. */
+    /**
+     * Creates missing triggers and replaces any whose SQL differs from the current code (a device
+     * may hold an older version). Runs on every open, so a fresh install gets them too.
+     */
     fun createTriggers(db: SupportSQLiteDatabase) {
-        TRIGGERS.forEach { db.execSQL(it) }
+        val stored = HashMap<String, String?>()
+        db.query("SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_tbsum_%'").use { cursor ->
+            while (cursor.moveToNext()) stored[cursor.getString(0)] = cursor.getString(1)
+        }
+        STORED_SQL.forEach { (name, sql) ->
+            if (stored[name] != sql) {
+                db.execSQL("DROP TRIGGER IF EXISTS $name")
+                db.execSQL(sql)
+            }
+        }
         BenSearchSql.createTriggers(db)
     }
 
