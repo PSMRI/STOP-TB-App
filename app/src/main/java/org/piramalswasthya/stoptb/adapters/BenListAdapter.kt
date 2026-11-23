@@ -41,6 +41,7 @@ import org.piramalswasthya.stoptb.model.RifResult
 import org.piramalswasthya.stoptb.model.TbDiagnosticsCardFields
 import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
 import org.piramalswasthya.stoptb.ui.setSyncStateForBen
+import org.piramalswasthya.stoptb.ui.TbDiagnosticsSnapshot
 import timber.log.Timber
 import org.piramalswasthya.stoptb.model.DiagnosticOrderType
 import org.piramalswasthya.stoptb.model.OrderAction
@@ -339,7 +340,7 @@ class BenListAdapter(
             tbDiag: TbDiagnosticsCardFields?,
             canActOnReferral: Boolean,
             pref: PreferenceDao?,
-            retryingBenIds: List<Long>,
+            retryingBenIds: Collection<Long>,
             clickListener: BenClickListener?
         ) {
             val ctx = binding.root.context
@@ -460,7 +461,7 @@ class BenListAdapter(
             tbDiag: TbDiagnosticsCardFields?,
             canActOnReferral: Boolean,
             pref: PreferenceDao?,
-            retryingBenIds: List<Long>,
+            retryingBenIds: Collection<Long>,
             clickListener: BenClickListener?
         ) {
             val ctx = binding.root.context
@@ -544,22 +545,22 @@ class BenListAdapter(
             isSoftDeleteEnabled: Boolean,
             pref: PreferenceDao?,
             context: FragmentActivity,
-            benIdList: List<Long>,
-            tbScreeningBenIds: List<Long> = emptyList(),
-            generalOpdBenIds: List<Long> = emptyList(),
-            anthropometryBenIds: List<Long> = emptyList(),
-            unsyncedVitalBenIds: List<Long> = emptyList(),
-            unsyncedTbScreeningBenIds: List<Long> = emptyList(),
-            unsyncedGeneralOpdBenIds: List<Long> = emptyList(),
-            syncingVitalBenIds: List<Long> = emptyList(),
-            syncingTbScreeningBenIds: List<Long> = emptyList(),
-            syncingGeneralOpdBenIds: List<Long> = emptyList(),
-            tbSuspectedBenIds: List<Long> = emptyList(),
-            contactFollowUpDoneBenIds: List<Long> = emptyList(),
-            tptFollowUpDoneBenIds: List<Long> = emptyList(),
-            tptEligibleBenIds: List<Long> = emptyList(),
+            benIdList: Collection<Long>,
+            tbScreeningBenIds: Collection<Long> = emptyList(),
+            generalOpdBenIds: Collection<Long> = emptyList(),
+            anthropometryBenIds: Collection<Long> = emptyList(),
+            unsyncedVitalBenIds: Collection<Long> = emptyList(),
+            unsyncedTbScreeningBenIds: Collection<Long> = emptyList(),
+            unsyncedGeneralOpdBenIds: Collection<Long> = emptyList(),
+            syncingVitalBenIds: Collection<Long> = emptyList(),
+            syncingTbScreeningBenIds: Collection<Long> = emptyList(),
+            syncingGeneralOpdBenIds: Collection<Long> = emptyList(),
+            tbSuspectedBenIds: Collection<Long> = emptyList(),
+            contactFollowUpDoneBenIds: Collection<Long> = emptyList(),
+            tptFollowUpDoneBenIds: Collection<Long> = emptyList(),
+            tptEligibleBenIds: Collection<Long> = emptyList(),
             childCountMap: Map<Long, Int> = emptyMap(),
-            tptRegistrationDoneBenIds: List<Long> = emptyList(),
+            tptRegistrationDoneBenIds: Collection<Long> = emptyList(),
             showActionButtons: Boolean = true,
             showResultButton: Boolean = false,
             showAnthropometryButton: Boolean = false,
@@ -572,7 +573,7 @@ class BenListAdapter(
             tbDiagnosticsLoaded: Boolean = false,
             tbScreeningMap: Map<Long, TbScreeningSymptoms> = emptyMap(),
             source: Int = 0,
-            retryingBenIds: List<Long> = emptyList(),
+            retryingBenIds: Collection<Long> = emptyList(),
             showContactTracingForms: Boolean = false,
             roleManager: RoleManager? = null,
             showRedesignedCard: Boolean = false,
@@ -1508,6 +1509,27 @@ class BenListAdapter(
     /** Set by [submitTBDiagnostics]; until then a missing row means "not loaded yet". */
     private var tbDiagnosticsLoaded = false
 
+    /**
+     * The benIds the latest diagnostics snapshot was read for, when the screen reads them per
+     * loaded row ([LoadedRowBadges]); null for a whole-table list. A row outside it is "not
+     * loaded yet" even after the first snapshot - see [isTbDiagnosticsLoadedFor].
+     */
+    private var tbDiagnosticsCoveredBenIds: Set<Long>? = null
+
+    private fun isTbDiagnosticsLoadedFor(benId: Long): Boolean =
+        tbDiagnosticsLoaded && (tbDiagnosticsCoveredBenIds?.contains(benId) ?: true)
+
+    /**
+     * Per-row snapshot from [LoadedRowBadges]: rows whose benId the snapshot just started
+     * covering are rebound, so they leave the "Checking" placeholder even when they have no
+     * diagnostics row at all.
+     */
+    fun submitTBDiagnostics(snapshot: TbDiagnosticsSnapshot) {
+        val previouslyCovered = tbDiagnosticsCoveredBenIds.orEmpty()
+        tbDiagnosticsCoveredBenIds = snapshot.coveredBenIds
+        submitTBDiagnostics(snapshot.rows, newlyCovered = snapshot.coveredBenIds - previouslyCovered)
+    }
+
     private val tbScreeningMap = mutableMapOf<Long, TbScreeningSymptoms>()
     private val householdMemberCountMap = mutableMapOf<Long, Int>()
     private val householdHeadNameMap = mutableMapOf<Long, String>()
@@ -1547,7 +1569,7 @@ class BenListAdapter(
             showAnthropometryButton = showAnthropometryButton,
             showScreeningStatus = showScreeningStatus,
             tbDiagnosticsByBenId = tbDiagnosticsByBenId,
-            tbDiagnosticsLoaded = tbDiagnosticsLoaded,
+            tbDiagnosticsLoaded = isTbDiagnosticsLoadedFor(item.benId),
             tbScreeningMap = tbScreeningMap,
             showRedesignedCard = showRedesignedCard,
             householdMemberCountMap = householdMemberCountMap,
@@ -1576,7 +1598,7 @@ class BenListAdapter(
         }
     }
 
-    fun submitTBDiagnostics(list: List<TbDiagnosticsCardFields>) {
+    fun submitTBDiagnostics(list: List<TbDiagnosticsCardFields>, newlyCovered: Set<Long> = emptySet()) {
         // Diff instead of notifyDataSetChanged() — a blanket refresh here rebinds every visible
         // row (including its click listeners) on every emission, which was the root cause of
         // cards needing multiple taps to register.
@@ -1598,6 +1620,7 @@ class BenListAdapter(
         }
         val changedBenIds = (oldByBenId.keys + newByBenId.keys)
             .filterTo(mutableSetOf()) { benId -> oldByBenId[benId] != newByBenId[benId] }
+        changedBenIds += newlyCovered
         if (changedBenIds.isNotEmpty() || firstLoad) {
             currentList.forEachIndexed { index, item ->
                 if (item.benId in changedBenIds || (firstLoad && item.benId !in newByBenId)) {

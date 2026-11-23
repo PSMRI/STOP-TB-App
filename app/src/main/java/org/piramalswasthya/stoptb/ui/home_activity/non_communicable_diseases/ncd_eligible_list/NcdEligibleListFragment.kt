@@ -12,6 +12,8 @@ import android.widget.EditText
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import dagger.hilt.android.AndroidEntryPoint
@@ -31,9 +33,11 @@ class NcdEligibleListFragment : Fragment() , NCDCategoryAdapter.ClickListener {
 
 
 
-    private val binding: FragmentNcdEligibleListBinding by lazy {
-        FragmentNcdEligibleListBinding.inflate(layoutInflater)
-    }
+    // One binding per view, released in onDestroyView: the fragment stays on the back stack and
+    // a lazily created binding kept the old view alive.
+    private var _binding: FragmentNcdEligibleListBinding? = null
+    private val binding: FragmentNcdEligibleListBinding
+        get() = _binding!!
 
     private val viewModel: NcdEligibleListViewModel by viewModels()
 
@@ -41,8 +45,11 @@ class NcdEligibleListFragment : Fragment() , NCDCategoryAdapter.ClickListener {
 
     private val sttContract = registerForActivityResult(SpeechToTextContract()) { value ->
         val lowerValue = value.lowercase()
-        binding.searchView.setText(lowerValue)
-        binding.searchView.setSelection(lowerValue.length)
+        // A result can arrive with no view (fragment on the back stack): ignore the text then.
+        _binding?.searchView?.let { searchView ->
+            searchView.setText(lowerValue)
+            searchView.setSelection(lowerValue.length)
+        }
         viewModel.filterText(lowerValue)
     }
 
@@ -50,6 +57,7 @@ class NcdEligibleListFragment : Fragment() , NCDCategoryAdapter.ClickListener {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        _binding = FragmentNcdEligibleListBinding.inflate(inflater, container, false)
         return binding.root
     }
 
@@ -96,8 +104,13 @@ class NcdEligibleListFragment : Fragment() , NCDCategoryAdapter.ClickListener {
             )
         binding.rvAny.adapter = benAdapter
 
-        lifecycleScope.launch {
-            viewModel.benList.collect {
+        // Loader until the first emission; "No records found" only once the list is known empty.
+        binding.flLoading.visibility = View.VISIBLE
+        binding.flEmpty.visibility = View.GONE
+        // View-scoped: stops with the view instead of piling up a collector per view.
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.benList.flowWithLifecycle(viewLifecycleOwner.lifecycle, Lifecycle.State.STARTED).collect {
+                binding.flLoading.visibility = View.GONE
                 if (it.isEmpty())
                     binding.flEmpty.visibility = View.VISIBLE
                 else
@@ -105,8 +118,9 @@ class NcdEligibleListFragment : Fragment() , NCDCategoryAdapter.ClickListener {
                 benAdapter.submitList(it)
             }
         }
-        lifecycleScope.launch {
-            viewModel.ncdDetails.collect {
+        // View-scoped: stops with the view instead of piling up a collector per view.
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.ncdDetails.flowWithLifecycle(viewLifecycleOwner.lifecycle, Lifecycle.State.STARTED).collect {
                 Timber.d("Collecting Ncd Details : $it")
             }
         }
@@ -146,6 +160,11 @@ class NcdEligibleListFragment : Fragment() , NCDCategoryAdapter.ClickListener {
         }
     }
 
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
 
     override fun onStart() {
         super.onStart()

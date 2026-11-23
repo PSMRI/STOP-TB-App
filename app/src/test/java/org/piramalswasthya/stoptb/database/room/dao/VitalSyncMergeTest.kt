@@ -16,8 +16,10 @@ class VitalSyncMergeTest {
         override suspend fun getVitals(syncState: SyncState) = listOfNotNull(row?.takeIf { it.syncState == syncState })
         override suspend fun saveVitals(vitalCache: VitalCache) { row = vitalCache; writes++ }
         override fun getAllVitalBenIds(): Flow<List<Long>> = flowOf(emptyList())
+        override fun hasVitals(benId: Long): Flow<Boolean> = flowOf(row?.benId == benId)
         override fun getVitalBenIdSyncStates(): Flow<List<BenIdSyncState>> = flowOf(emptyList())
         override fun getVitalBenIdsBySyncState(syncState: SyncState): Flow<List<Long>> = flowOf(emptyList())
+        override fun getVitalBenIdSyncStatesIn(benIds: Collection<Long>): Flow<List<BenIdSyncState>> = flowOf(emptyList())
     }
 
     @Test fun unchangedRecordReportsActualSyncAndWritesOnce() = runBlocking {

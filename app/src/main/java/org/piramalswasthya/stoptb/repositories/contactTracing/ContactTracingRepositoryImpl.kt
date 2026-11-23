@@ -1,8 +1,11 @@
 package org.piramalswasthya.stoptb.repositories.contactTracing
 
+import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.BeneficiaryFollowUpCount
+import org.piramalswasthya.stoptb.database.room.dao.dynamicSchemaDao.BeneficiaryRegimenAnswer
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.room.withTransaction
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -467,8 +470,22 @@ class ContactTracingRepositoryImpl @Inject constructor(
         )
     }
 
-    override suspend fun submitResponseBulk(responseId: Long, phaseFilter: String?): Boolean {
+    // The form calls this directly; the background sweep calls the unlocked body below while
+    // holding syncMutex. Both under the one lock, so a user submit and a sweep can't POST the
+    // same response at the same time.
+    override suspend fun submitResponseBulk(responseId: Long, phaseFilter: String?): Boolean =
+        syncMutex.withLock { submitResponseBulkLocked(responseId, phaseFilter) }
+
+    private suspend fun submitResponseBulkLocked(responseId: Long, phaseFilter: String?): Boolean {
         val resp = responseDao.getFormResponseById(responseId) ?: return true
+        // Already sent with its current content: by the sweep while this call waited for the
+        // lock. Every edit, and submitResponse, sets the row UNSYNCED with a new updatedAt, and
+        // markSyncedIfUnchanged only marks the content it sent. The sweep's payload (no phase
+        // filter) holds every answered section, so it covers any single phase too.
+        if (resp.formResponse.syncStatus == "SYNCED") {
+            Timber.d("submitResponseBulk: responseId=$responseId already synced, not sent again")
+            return true
+        }
         if (resp.formResponse.beneficiaryId <= 0L) {
             // Saved before the beneficiary was registered; sent once registration
             // re-points it to the real ID. Stays UNSYNCED until then.
@@ -951,7 +968,13 @@ class ContactTracingRepositoryImpl @Inject constructor(
         )
     }
 
-    override suspend fun syncUnsyncedResponses(): Boolean {
+    // PR 7.4: PushContactTracingWorker and ContactTracingSyncWorker both call this; overlapping
+    // runs submitted the same responses twice. Serialized like CounsellingRepositoryImpl's sync.
+    private val syncMutex = kotlinx.coroutines.sync.Mutex()
+
+    override suspend fun syncUnsyncedResponses(): Boolean = syncMutex.withLock { syncUnsyncedResponsesLocked() }
+
+    private suspend fun syncUnsyncedResponsesLocked(): Boolean {
         val unsynced = responseDao.getUnsyncedFormResponsesForTypes(
             listOf(
                 FormType.COMMUNITY_CONTACT_TRACING.name,
@@ -963,7 +986,7 @@ class ContactTracingRepositoryImpl @Inject constructor(
         Timber.d("syncUnsyncedResponses: ${unsynced.size} contact tracing record(s) pending sync")
         var allSuccess = true
         for (resp in unsynced) {
-            if (!submitResponseBulk(resp.formResponse.responseId)) {
+            if (!submitResponseBulkLocked(resp.formResponse.responseId, null)) {
                 allSuccess = false
             }
         }
@@ -981,23 +1004,45 @@ class ContactTracingRepositoryImpl @Inject constructor(
         combine(
             responseDao.getAllSubmittedFollowUpCounts(),
             responseDao.getAllRegimenAnswers(QUESTION_UUID_REGIMEN_ADVISED)
-        ) { counts, regimens ->
-            val regimenByKey = regimens.associateBy { it.beneficiaryId to it.formVersionId }
-            counts.mapNotNull { c ->
-                val required = RegimenAdvised.fromValue(regimenByKey[c.beneficiaryId to c.formVersionId]?.optionValue)
-                    ?.requiredFollowUpCount
-                c.beneficiaryId.takeIf { required != null && c.submittedCount >= required }
-            }.distinct()
-        }
+        ) { counts, regimens -> followUpTargetReached(counts, regimens) }
+
+    private fun followUpTargetReached(
+        counts: List<BeneficiaryFollowUpCount>,
+        regimens: List<BeneficiaryRegimenAnswer>,
+    ): List<Long> {
+        val regimenByKey = regimens.associateBy { it.beneficiaryId to it.formVersionId }
+        return counts.mapNotNull { c ->
+            val required = RegimenAdvised.fromValue(regimenByKey[c.beneficiaryId to c.formVersionId]?.optionValue)
+                ?.requiredFollowUpCount
+            c.beneficiaryId.takeIf { required != null && c.submittedCount >= required }
+        }.distinct()
+    }
 
     override fun observeTptEligibleBenIds(): Flow<List<Long>> =
         responseDao.getAllClinicalScreeningStatusAnswers(QUESTION_UUID_CLINICAL_SCREENING_STATUS)
-            .map { answers ->
-                answers
-                    .filter { ClinicalScreeningStatus.fromValue(it.optionValue) == ClinicalScreeningStatus.TPT_ELIGIBLE }
-                    .map { it.beneficiaryId }
-                    .distinct()
-            }
+            .map { answers -> tptEligible(answers) }
+
+    private fun tptEligible(answers: List<BeneficiaryRegimenAnswer>): List<Long> =
+        answers
+            .filter { ClinicalScreeningStatus.fromValue(it.optionValue) == ClinicalScreeningStatus.TPT_ELIGIBLE }
+            .map { it.beneficiaryId }
+            .distinct()
+
+    override fun observeContactFollowUpDoneBenIds(benIds: Collection<Long>): Flow<List<Long>> =
+        responseDao.getFormDoneBenIdsFor(FormType.CONTACT_FOLLOW_UP.name, benIds.toList())
+
+    override fun observeTptRegistrationDoneBenIds(benIds: Collection<Long>): Flow<List<Long>> =
+        responseDao.getPreSubmitDoneBenIdsFor(FormType.TPT_FOLLOW_UP.name, benIds.toList())
+
+    override fun observeTptFollowUpTargetReachedBenIds(benIds: Collection<Long>): Flow<List<Long>> =
+        combine(
+            responseDao.getSubmittedFollowUpCountsFor(benIds.toList()),
+            responseDao.getRegimenAnswersFor(QUESTION_UUID_REGIMEN_ADVISED, benIds.toList())
+        ) { counts, regimens -> followUpTargetReached(counts, regimens) }
+
+    override fun observeTptEligibleBenIds(benIds: Collection<Long>): Flow<List<Long>> =
+        responseDao.getClinicalScreeningStatusAnswersFor(QUESTION_UUID_CLINICAL_SCREENING_STATUS, benIds.toList())
+            .map { answers -> tptEligible(answers) }
 
     @RequiresApi(Build.VERSION_CODES.O)
     override suspend fun fetchAndStoreVillageContactResponses(

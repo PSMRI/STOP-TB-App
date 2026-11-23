@@ -17,7 +17,7 @@ import org.piramalswasthya.stoptb.network.TBDiagnosticsDTO
         onUpdate = ForeignKey.CASCADE,
         onDelete = ForeignKey.CASCADE
     )],
-    indices = [Index(name = "ind_tb_diagnostics_ben", value = ["benId"])]
+    indices = [Index(name = "ind_tb_diagnostics_ben", value = ["benId"]), Index(name = "ind_tb_diagnostics_sync", value = ["syncState"])]
 )
 data class TBDiagnosticsCache(
     @PrimaryKey(autoGenerate = true)

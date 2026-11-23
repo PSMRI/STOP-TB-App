@@ -1,5 +1,6 @@
 package org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.ncd_eligible_list
 
+import org.piramalswasthya.stoptb.ui.debounceTyping
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -37,7 +38,7 @@ class NcdEligibleListViewModel @Inject constructor(
     private val filter = MutableStateFlow("")
     private val selectedBenId = MutableStateFlow(0L)
 
-    val benList = combine(allBenList, filter, selectedCategory) { cacheList, filterText, selectedCat ->
+    val benList = combine(allBenList, filter.debounceTyping(), selectedCategory) { cacheList, filterText, selectedCat ->
         val list = cacheList.map { it.asDomainModel() }
         val benBasicDomainList = list.map { it.ben }
         val filteredBenBasicDomainList = filterBenList(benBasicDomainList, filterText)

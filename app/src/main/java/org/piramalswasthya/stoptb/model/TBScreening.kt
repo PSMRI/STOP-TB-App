@@ -19,7 +19,7 @@ import org.piramalswasthya.stoptb.network.TBScreeningDTO
         onUpdate = ForeignKey.CASCADE,
         onDelete = ForeignKey.CASCADE
     )],
-    indices = [Index(name = "ind_tbsn", value = ["benId"/* "hhId"*/])]
+    indices = [Index(name = "ind_tbsn", value = ["benId"/* "hhId"*/]), Index(name = "ind_tbsn_sync", value = ["syncState"])]
 )
 
 data class TBScreeningCache(

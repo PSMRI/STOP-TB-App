@@ -794,11 +794,7 @@ class ContactTracingFormViewModel @Inject constructor(
         }*/
         // Only flag the beneficiary as a confirmed TB case. The treatment record (regimen,
         // start date, expected completion) is created through the validated TB Confirmed form.
-        val tbSuspected = tbRepo.getTBSuspected(benId) ?: TBSuspectedCache(benId = benId)
-        tbSuspected.isConfirmed = true
-        tbSuspected.isTBConfirmed = true
-        tbSuspected.syncState = SyncState.UNSYNCED
-        tbRepo.saveTBSuspected(tbSuspected)
+        tbRepo.markTbSuspectedConfirmed(benId, createIfMissing = true)
 
         // Auto-Sync TB rows on SAVE_SUCCESS
         WorkerUtils.triggerAmritPushWorker(context)

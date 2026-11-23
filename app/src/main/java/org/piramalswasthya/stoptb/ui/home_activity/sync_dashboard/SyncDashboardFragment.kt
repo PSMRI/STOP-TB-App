@@ -42,7 +42,7 @@ class SyncDashboardFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.viewPager.adapter = SyncDashboardPagerAdapter(this)
+        binding.viewPager.adapter = SyncDashboardPagerAdapter(childFragmentManager, viewLifecycleOwner.lifecycle)
         // Logs has Summary as its neighbour, so its default snapshot is prepared for sharing.
         binding.viewPager.offscreenPageLimit = 1
 
