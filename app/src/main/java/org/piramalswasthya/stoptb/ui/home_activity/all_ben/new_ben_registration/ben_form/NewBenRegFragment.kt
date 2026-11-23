@@ -44,6 +44,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import org.piramalswasthya.stoptb.R
+import org.piramalswasthya.stoptb.configuration.LinkHouseholdAgeRules
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
@@ -1096,13 +1097,23 @@ class NewBenRegFragment : Fragment() {
                 if (which == 0) {
                     showExistingHouseholdSelectionDialog(benId)
                 } else {
-                    findNavController().navigate(
-                        NewBenRegFragmentDirections.actionNewBenRegFragmentToNewHouseholdFragment(
-                            hhId = 0L,
-                            isAshaFamily = "No",
-                            linkBenId = benId
+                    lifecycleScope.launch {
+                        val ben = viewModel.getBenFromId(benId) ?: return@launch
+                        if (!LinkHouseholdAgeRules.canBeHeadOfFamily(LinkHouseholdAgeRules.knownDob(ben.dob))) {
+                            MaterialAlertDialogBuilder(requireContext())
+                                .setMessage(R.string.link_hh_hof_min_age)
+                                .setPositiveButton(android.R.string.ok, null)
+                                .show()
+                            return@launch
+                        }
+                        findNavController().navigate(
+                            NewBenRegFragmentDirections.actionNewBenRegFragmentToNewHouseholdFragment(
+                                hhId = 0L,
+                                isAshaFamily = "No",
+                                linkBenId = benId
+                            )
                         )
-                    )
+                    }
                 }
             }
             .show()
@@ -1224,62 +1235,17 @@ class NewBenRegFragment : Fragment() {
             val ben = viewModel.getBenFromId(benId) ?: return@launch
             val isFemale = ben.genderId == 2 || ben.gender?.name?.equals("FEMALE", ignoreCase = true) == true
 
-            val relations = if (isFemale) {
-                arrayOf(
-                    "Mother",
-                    "Sister",
-                    "Wife",
-                    "Niece",
-                    "Daughter",
-                    "Grand Mother",
-                    "Mother in Law",
-                    "Grand Daughter",
-                    "Daughter in Law",
-                    "Sister in Law",
-                    "Other"
-                )
-            } else {
-                arrayOf(
-                    "Father",
-                    "Brother",
-                    "Husband",
-                    "Nephew",
-                    "Son",
-                    "Grand Father",
-                    "Father in Law",
-                    "Grand Son",
-                    "Son in Law",
-                    "Other"
-                )
-            }
+            val (hof, hofSpouse) = LinkHouseholdAgeRules.headAndSpouse(viewModel.getHouseholdMembers(hhId))
+            // Relations the beneficiary's age doesn't fit are hidden; "Other" is always offered.
+            val relations = LinkHouseholdAgeRules.allowedRelations(isFemale, LinkHouseholdAgeRules.knownDob(ben.dob), hof, hofSpouse)
 
             MaterialAlertDialogBuilder(requireContext())
                 .setTitle("Select Relationship to HOF")
-                .setItems(relations, android.content.DialogInterface.OnClickListener { dialog, index ->
+                .setItems(relations.map { it.label }.toTypedArray(), android.content.DialogInterface.OnClickListener { dialog, index ->
                     dialog.dismiss()
-                    val selectedRelation = relations[index]
-                    val (relationPos, relationName) = when (selectedRelation) {
-                        "Mother" -> Pair(1, "Mother")
-                        "Father" -> Pair(2, "Father")
-                        "Brother" -> Pair(3, "Brother")
-                        "Sister" -> Pair(4, "Sister")
-                        "Wife" -> Pair(5, "Wife")
-                        "Husband" -> Pair(6, "Husband")
-                        "Nephew" -> Pair(7, "Nephew")
-                        "Niece" -> Pair(8, "Niece")
-                        "Son" -> Pair(9, "Son")
-                        "Daughter" -> Pair(10, "Daughter")
-                        "Grand Father" -> Pair(11, "Grand Father")
-                        "Grand Mother" -> Pair(12, "Grand Mother")
-                        "Father in Law" -> Pair(13, "Father in Law")
-                        "Mother in Law" -> Pair(14, "Mother in Law")
-                        "Grand Son" -> Pair(15, "Grand Son")
-                        "Grand Daughter" -> Pair(16, "Grand Daughter")
-                        "Son in Law" -> Pair(17, "Son in Law")
-                        "Daughter in Law" -> Pair(18, "Daughter in Law")
-                        "Sister in Law" -> Pair(20, "Sister in Law")
-                        else -> Pair(21, "Other")
-                    }
+                    val selected = relations[index]
+                    val relationPos = selected.relationPos
+                    val relationName = selected.label
                     viewModel.linkBenToHousehold(hhId, relationPos, relationName)
                     Toast.makeText(requireContext(), "Linked to household successfully", Toast.LENGTH_SHORT).show()
                     org.piramalswasthya.stoptb.work.WorkerUtils.triggerAmritPushWorker(requireContext(), "DIRECT_SAVE")
