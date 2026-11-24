@@ -29,7 +29,6 @@ import org.piramalswasthya.stoptb.ui.contact_tracing.ContactTracingTypeBottomShe
 import org.piramalswasthya.stoptb.ui.counselling_activity.CounsellingActivity
 import org.piramalswasthya.stoptb.ui.counselling_activity.CounsellingViewModel
 import org.piramalswasthya.stoptb.model.BenWithTbSuspectedDomain
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.model.AppRole
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.helpers.RoleManager
@@ -202,7 +201,6 @@ class TBConfirmedListFragment : Fragment() {
         }
         activity?.let {
             when (it) {
-                is HomeActivity -> it.updateActionBar(R.drawable.ic__ncd, title)
                 is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ncd, title)
             }
         }

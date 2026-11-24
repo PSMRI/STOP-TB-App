@@ -17,7 +17,6 @@ import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentGeneralOpdFormBinding
 import org.piramalswasthya.stoptb.helpers.applyManagedFlowBackPolicyOnResume
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.work.WorkerUtils
@@ -209,7 +208,6 @@ class GeneralOpdFormFragment : Fragment() {
 //                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow)
 //                }
 
-                is HomeActivity -> it.updateActionBar(R.drawable.ic__ben, getString(R.string.general_opd))
                 is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ben, getString(R.string.general_opd))
             }
         }

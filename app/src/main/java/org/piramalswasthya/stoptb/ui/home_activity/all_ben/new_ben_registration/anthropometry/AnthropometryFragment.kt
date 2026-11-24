@@ -30,7 +30,6 @@ import org.piramalswasthya.stoptb.model.AgeUnit
 import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.getAgeGenderDisplayString
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.work.WorkerUtils
@@ -411,10 +410,6 @@ class AnthropometryFragment : Fragment() {
         super.onStart()
         activity?.let {
             when (it) {
-                is HomeActivity -> it.updateActionBar(
-                    R.drawable.ic__ncd,
-                    getString(R.string.anthropometry_screen)
-                )
                 is VolunteerActivity -> it.updateActionBar(
                     R.drawable.ic__ncd,
                     getString(R.string.anthropometry_screen)
@@ -426,7 +421,6 @@ class AnthropometryFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         if (viewModel.autoFlow) {
-            (activity as? HomeActivity)?.setToolbarNavigationVisible(true)
             (activity as? VolunteerActivity)?.setToolbarNavigationVisible(true)
         }
         _binding = null

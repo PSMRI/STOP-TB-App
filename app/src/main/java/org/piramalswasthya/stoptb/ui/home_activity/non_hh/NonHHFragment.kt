@@ -34,7 +34,6 @@ import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import androidx.core.os.bundleOf
 import javax.inject.Inject
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 
 @AndroidEntryPoint
@@ -75,7 +74,6 @@ class NonHHFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
         val title = getString(R.string.all_non_household_beneficiaries)
         activity?.let {
             when (it) {
-                is HomeActivity -> it.updateActionBar(R.drawable.ic__ben, title)
                 is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ben, title)
             }
         }

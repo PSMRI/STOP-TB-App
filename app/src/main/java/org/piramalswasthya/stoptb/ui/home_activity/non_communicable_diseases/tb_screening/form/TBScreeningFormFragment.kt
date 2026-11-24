@@ -32,7 +32,6 @@ import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
 import org.piramalswasthya.stoptb.helpers.applyAutoFlowBackPolicyOnResume
 import org.piramalswasthya.stoptb.helpers.blockBackNavigationInAutoFlow
 import org.piramalswasthya.stoptb.helpers.setAutoFlowBackNavigationBlocked
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.work.WorkerUtils
@@ -272,10 +271,6 @@ class TBScreeningFormFragment : Fragment() {
 //                    getString(R.string.tb_screening_form)
 //                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
 
-                is HomeActivity -> it.updateActionBar(
-                    R.drawable.ic__ncd,
-                    getString(R.string.tb_screening_form)
-                )
                 is VolunteerActivity -> it.updateActionBar(
                     R.drawable.ic__ncd,
                     getString(R.string.tb_screening_form)

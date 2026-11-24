@@ -15,7 +15,6 @@ import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.FormInputAdapter
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import timber.log.Timber
 import kotlin.getValue
@@ -116,10 +115,6 @@ class NCDReferalFormFragment : Fragment() {
         super.onStart()
         activity?.let {
             when (it) {
-                is HomeActivity -> it.updateActionBar(
-                    R.drawable.ic__ncd_list,
-                    getActionBarTitle()
-                )
                 is VolunteerActivity -> it.updateActionBar(
                     R.drawable.ic__ncd_list,
                     getActionBarTitle()

@@ -3,35 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/mobile_navigation"
-    app:startDestination="@+id/homeFragment">
-
-    <fragment
-        android:id="@+id/homeFragment"
-        android:name="org.piramalswasthya.stoptb.ui.home_activity.home.HomeFragment"
-        android:label="@string/menu_home"
-        tools:layout="@layout/fragment_home">
-        <action
-            android:id="@+id/action_nav_home_to_allBenFragment"
-            app:destination="@id/allBenFragment" />
-        <action
-            android:id="@+id/action_homeFragment_to_allHouseholdFragment"
-            app:destination="@id/allHouseholdFragment" />
-        <action
-            android:id="@+id/action_nav_home_to_abhaBenFragment"
-            app:destination="@id/abhaBenFragment" />
-        <action
-            android:id="@+id/action_nav_home_to_ncdFragment"
-            app:destination="@id/ncdFragment" />
-        <action
-            android:id="@+id/action_homeFragment_to_cdFragment"
-            app:destination="@id/cdFragment" />
-        <action
-            android:id="@+id/action_homeFragment_to_referralIconsFragment"
-            app:destination="@id/referralIconsFragment" />
-        <action
-            android:id="@+id/action_homeFragment_to_nonHHFragment"
-            app:destination="@id/nonHHFragment" />
-    </fragment>
+    app:startDestination="@+id/allBenFragment">
 
     <fragment
         android:id="@+id/referralIconsFragment"
@@ -209,38 +181,6 @@
     </fragment>
 
     <fragment
-        android:id="@+id/newBenRegTypeFragment"
-        android:name="org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.NewBenRegTypeFragment"
-        android:label="@string/frag_new_ben_reg_type_title"
-        tools:layout="@layout/fragment_new_ben_reg_type">
-        <argument
-            android:name="hhId"
-            app:argType="long" />
-        <action
-            android:id="@+id/action_newBenRegTypeFragment_to_newBenRegG15Fragment"
-            app:destination="@id/newBenRegG15Fragment"
-            app:popUpTo="@id/homeFragment" />
-    </fragment>
-
-    <fragment
-        android:id="@+id/newBenRegG15Fragment"
-        android:name="org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_age_more_15.NewBenRegG15Fragment"
-        android:label="@string/adult_registration">
-        <argument
-            android:name="hhId"
-            app:argType="long" />
-        <argument
-            android:name="benId"
-            android:defaultValue="0L"
-            app:argType="long" />
-        <action
-            android:id="@+id/action_newBenRegG15Fragment_to_homeFragment"
-            app:destination="@id/homeFragment"
-            app:popUpTo="@id/homeFragment"
-            app:popUpToInclusive="true" />
-    </fragment>
-
-    <fragment
         android:id="@+id/newBenRegFragment"
         android:name="org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegFragment"
         android:label="NewBenRegFragment">
@@ -360,9 +300,6 @@
             android:id="@+id/action_ncdFragment_to_ncdEligibleListFragment"
             app:destination="@id/ncdEligibleListFragment" />
         <action
-            android:id="@+id/action_ncdFragment_to_ncdListFragment"
-            app:destination="@id/ncdListFragment" />
-        <action
             android:id="@+id/action_ncdFragment_to_ncdNonEligibleListFragment"
             app:destination="@id/ncdNonEligibleListFragment" />
         <action
@@ -382,12 +319,6 @@
             android:id="@+id/action_ncdEligibleListFragment_to_cbacFragment"
             app:destination="@id/cbacFragment" />
     </fragment>
-
-    <fragment
-        android:id="@+id/ncdListFragment"
-        android:name="org.piramalswasthya.stoptb.ui.home_activity.non_communicable_diseases.ncd_list.NcdListFragment"
-        android:label="@string/ncd_list"
-        tools:layout="@layout/fragment_ncd_list" />
 
     <fragment
         android:id="@+id/ncdNonEligibleListFragment"
