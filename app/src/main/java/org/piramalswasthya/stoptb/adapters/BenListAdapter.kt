@@ -831,7 +831,6 @@ class BenListAdapter(
 //                    val isCounsellingOfficer = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
 //                    val canActOnReferral = isNurse || isCounsellingOfficer
                     val canActOnReferral = roleManager?.privilegesUnion()?.canActOnReferral == true
-                    Timber.d("RoleManager: canActOnReferral=$canActOnReferral")
                     val hubOrderWait = hubOrderWindowRemaining(tbDiag, pref)
                     val config = when (source) {
                         6 -> {
@@ -1317,7 +1316,6 @@ class BenListAdapter(
                     Pair(filled, 4)
                 }
             }
-            Timber.d("RoleManager: denominatorRule=$examineDenominatorRule, filled=$examineFilledCount/$examineTotal")
 
             binding.btnExamine.text = binding.root.context.getString(
                 R.string.btn_examine_count_ben,
@@ -1349,7 +1347,6 @@ class BenListAdapter(
                 roleManager?.privilegesForActiveRole()?.showRegisterSpouseButtons == true &&
                 !showContactTracingForms &&
                 source !in 5..8
-            Timber.d("RoleManager: showRegisterSpouseButtons=$showRegisterSpouseButtons")
             when {
 //                !isNurseRole && !isCounsellingOfficer && !item.isNonHH && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
 //                        && !item.isDeath && !item.isDeactivate -> {
