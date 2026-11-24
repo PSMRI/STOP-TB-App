@@ -76,6 +76,7 @@ class DeviceIntegrationRepo @Inject constructor(
 
     @Volatile private var lastRefreshAt = 0L
     @Volatile private var lastRefreshHubUrl: String? = null
+    @Volatile private var lastRefreshBothIntegrated = false
 
     /**
      * Refreshes the X-ray / TrueNat integration flags (2 vendor/health calls; the server pings the
@@ -90,7 +91,10 @@ class DeviceIntegrationRepo @Inject constructor(
         }
         val hubUrl = preferenceDao.getCampHubUrl()
         val now = android.os.SystemClock.elapsedRealtime()
-        if (maxAgeMs > 0L && lastRefreshAt != 0L && hubUrl == lastRefreshHubUrl && now - lastRefreshAt < maxAgeMs) {
+        // A "not integrated" answer is kept only briefly, so a device that reconnects is seen
+        // within a couple of minutes.
+        val keepFor = if (lastRefreshBothIntegrated) maxAgeMs else minOf(maxAgeMs, NOT_INTEGRATED_MAX_AGE_MS)
+        if (maxAgeMs > 0L && lastRefreshAt != 0L && hubUrl == lastRefreshHubUrl && now - lastRefreshAt < keepFor) {
             return
         }
         val xrayHealth = getVendorHealth("XRAY_CHEST")
@@ -99,22 +103,23 @@ class DeviceIntegrationRepo @Inject constructor(
         // poll treat every order as not pending and stop rescheduling until something re-triggered it.
         if (xrayHealth is NetworkResponse.Success) preferenceDao.setXrayIntegrated(isIntegrated(xrayHealth))
         if (truenatHealth is NetworkResponse.Success) preferenceDao.setTruenatIntegrated(isIntegrated(truenatHealth))
-        // Cache only a real answer from the hub that both devices are integrated. A timeout or
-        // HTTP error, or a device reported disconnected, is checked again on the next poll cycle:
-        // caching "not integrated" for the whole window let a triggered poll stop at once on a
-        // stale answer, after the device had reconnected.
-        if (xrayHealth is NetworkResponse.Success && truenatHealth is NetworkResponse.Success &&
-            isIntegrated(xrayHealth) && isIntegrated(truenatHealth)
-        ) {
+        // Cache a real answer from both checks: "both integrated" for [maxAgeMs], anything else
+        // for NOT_INTEGRATED_MAX_AGE_MS (see the check above). Caching only "both integrated" meant
+        // a hub with one device never cached, so every poll cycle and every order re-asked. A
+        // timeout or HTTP error is not cached and is checked again next time.
+        if (xrayHealth is NetworkResponse.Success && truenatHealth is NetworkResponse.Success) {
             lastRefreshAt = now
             lastRefreshHubUrl = hubUrl
+            lastRefreshBothIntegrated = isIntegrated(xrayHealth) && isIntegrated(truenatHealth)
         } else {
-            // Drop an earlier "both integrated" entry: a forced refresh (maxAgeMs = 0) that now
-            // finds a device disconnected must not leave the next poll skipping its check and
-            // acting on the flag it just stored.
             lastRefreshAt = 0L
             lastRefreshHubUrl = null
+            lastRefreshBothIntegrated = false
         }
+    }
+
+    private companion object {
+        const val NOT_INTEGRATED_MAX_AGE_MS = 2 * 60_000L
     }
 
     fun isXrayIntegrated(): Boolean {
