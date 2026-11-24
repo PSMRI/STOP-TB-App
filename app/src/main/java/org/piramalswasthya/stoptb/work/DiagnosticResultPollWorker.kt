@@ -83,6 +83,12 @@ class DiagnosticResultPollWorker @AssistedInject constructor(
         return try {
             withContext(Dispatchers.IO) {
                 Timber.d("DiagnosticResultPollWorker starting work")
+                // Logged out (e.g. switching role): every hub call would get 401. The next login
+                // starts a new cycle.
+                if (!WorkerUtils.hasLoggedInUser(appContext)) {
+                    Timber.d("Skipping DiagnosticResultPollWorker: no user logged in")
+                    return@withContext Result.success()
+                }
                 if (!preferenceDao.isCampModeEnabled()) {
                     Timber.d("Skipping DiagnosticResultPollWorker: Camp Mode is disabled")
                     return@withContext Result.success()

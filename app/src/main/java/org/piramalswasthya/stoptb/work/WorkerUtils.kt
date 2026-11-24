@@ -105,7 +105,7 @@ object WorkerUtils {
         OneTimeWorkRequestBuilder<W>()
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
 
-    private fun hasLoggedInUser(context: Context): Boolean {
+    internal fun hasLoggedInUser(context: Context): Boolean {
         val prefs = PreferenceManager.getInstance(context)
         val userKey = context.getString(R.string.PREF_user_entry)
         return !prefs.getString(userKey, null).isNullOrBlank()
