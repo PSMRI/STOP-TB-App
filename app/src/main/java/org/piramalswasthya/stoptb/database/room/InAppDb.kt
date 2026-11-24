@@ -2311,6 +2311,14 @@ abstract class InAppDb : RoomDatabase() {
                         // version 1, which has no migration and is not in the field, may be reset.
                         .fallbackToDestructiveMigrationFrom(1)
                         .build()
+                    val built = instance
+                    queryExecutor.execute {
+                        try {
+                            TrackerPin.pinAllTables(built)
+                        } catch (e: Exception) {
+                            Log.w("InAppDb", "could not pin tracked tables", e)
+                        }
+                    }
 
                     INSTANCE = instance
                 }
