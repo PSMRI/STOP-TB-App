@@ -3,6 +3,7 @@ package org.piramalswasthya.stoptb.helpers
 import android.app.AlertDialog
 import android.app.DatePickerDialog
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.text.Editable
 import android.text.InputFilter
@@ -10,6 +11,7 @@ import android.text.Spannable
 import android.text.SpannableString
 import android.text.TextWatcher
 import android.text.style.ForegroundColorSpan
+import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -26,6 +28,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import com.google.android.flexbox.FlexboxLayout
 import com.google.android.material.textfield.TextInputLayout
 import org.piramalswasthya.stoptb.databinding.ItemCounsellingDateBinding
@@ -968,19 +971,35 @@ object QuestionRenderer {
      * The app theme styles dialog buttons as filled/outlined 52dp Material buttons with no gap,
      * so Cancel and OK overlap in the date picker. Render them as text buttons with spacing,
      * the same way FormInputAdapter's dialogs do. Call after show().
+     *
+     * The filled background is swapped for the theme's selectableItemBackground (not removed),
+     * so the buttons keep a visible focused/pressed state, and the label uses a colour state
+     * list so the disabled state still dims it.
      */
     private fun DatePickerDialog.spaceOutActionButtons() {
         val buttonPadding = (16 * context.resources.displayMetrics.density).toInt()
-        val actionTextColor = ContextCompat.getColor(
+        val primary = ContextCompat.getColor(
             context,
             org.piramalswasthya.stoptb.R.color.md_theme_light_primary
         )
+        val actionTextColors = ColorStateList(
+            arrayOf(intArrayOf(-android.R.attr.state_enabled), intArrayOf()),
+            intArrayOf(ColorUtils.setAlphaComponent(primary, DISABLED_TEXT_ALPHA), primary)
+        )
+        val selectableBackgroundRes = TypedValue().let { value ->
+            if (context.theme.resolveAttribute(android.R.attr.selectableItemBackground, value, true)) {
+                value.resourceId
+            } else 0
+        }
         listOf(DatePickerDialog.BUTTON_NEGATIVE, DatePickerDialog.BUTTON_POSITIVE).forEach { which ->
             getButton(which)?.apply {
-                background = null
+                // Each button needs its own drawable instance for independent state.
+                background = if (selectableBackgroundRes != 0) {
+                    ContextCompat.getDrawable(context, selectableBackgroundRes)
+                } else null
                 minWidth = 0
                 minimumWidth = 0
-                setTextColor(actionTextColor)
+                setTextColor(actionTextColors)
                 setPadding(buttonPadding, 0, buttonPadding, 0)
             }
         }
@@ -991,4 +1010,7 @@ object QuestionRenderer {
             }
         }
     }
+
+    /** Material disabled-content alpha (38%). */
+    private const val DISABLED_TEXT_ALPHA = 97
 }
