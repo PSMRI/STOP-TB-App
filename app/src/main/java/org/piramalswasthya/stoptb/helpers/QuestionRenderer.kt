@@ -12,6 +12,7 @@ import android.text.TextWatcher
 import android.text.style.ForegroundColorSpan
 import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import com.google.android.material.R
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
@@ -535,6 +536,7 @@ object QuestionRenderer {
             }
 
             dpd.show()
+            dpd.spaceOutActionButtons()
             }
         }
         binding.tvError.visibility = View.GONE
@@ -959,6 +961,34 @@ object QuestionRenderer {
             val regex = runCatching { pattern.toRegex() }.getOrNull() ?: return@getOrPut 0 to 100
             val matches = (0..NUMBER_PICKER_PROBE_MAX).filter { regex.matches(it.toString()) }
             if (matches.isEmpty()) 0 to 100 else matches.first() to matches.last()
+        }
+    }
+
+    /**
+     * The app theme styles dialog buttons as filled/outlined 52dp Material buttons with no gap,
+     * so Cancel and OK overlap in the date picker. Render them as text buttons with spacing,
+     * the same way FormInputAdapter's dialogs do. Call after show().
+     */
+    private fun DatePickerDialog.spaceOutActionButtons() {
+        val buttonPadding = (16 * context.resources.displayMetrics.density).toInt()
+        val actionTextColor = ContextCompat.getColor(
+            context,
+            org.piramalswasthya.stoptb.R.color.md_theme_light_primary
+        )
+        listOf(DatePickerDialog.BUTTON_NEGATIVE, DatePickerDialog.BUTTON_POSITIVE).forEach { which ->
+            getButton(which)?.apply {
+                background = null
+                minWidth = 0
+                minimumWidth = 0
+                setTextColor(actionTextColor)
+                setPadding(buttonPadding, 0, buttonPadding, 0)
+            }
+        }
+        getButton(DatePickerDialog.BUTTON_NEGATIVE)?.let { negative ->
+            (negative.layoutParams as? ViewGroup.MarginLayoutParams)?.let { params ->
+                params.marginEnd = buttonPadding
+                negative.layoutParams = params
+            }
         }
     }
 }

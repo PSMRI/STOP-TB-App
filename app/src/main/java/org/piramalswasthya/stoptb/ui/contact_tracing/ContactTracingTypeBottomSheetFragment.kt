@@ -7,6 +7,8 @@ import android.view.ViewGroup
 import androidx.core.os.bundleOf
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
+import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import dagger.hilt.android.AndroidEntryPoint
 import org.piramalswasthya.stoptb.R
@@ -77,6 +79,18 @@ class ContactTracingTypeBottomSheetFragment : BottomSheetDialogFragment() {
         binding.btnTypeHousehold.visibility = if (hhId > 0L) View.VISIBLE else View.GONE
 
         viewModel.status.observe(viewLifecycleOwner) { status -> updateStatusIcons(status) }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // In landscape the default peek height cuts the sheet off, so open it fully expanded.
+        val bottomSheet = (dialog as? BottomSheetDialog)
+            ?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+        bottomSheet?.let {
+            val behavior = BottomSheetBehavior.from(it)
+            behavior.state = BottomSheetBehavior.STATE_EXPANDED
+            behavior.skipCollapsed = true
+        }
     }
 
     override fun onResume() {
