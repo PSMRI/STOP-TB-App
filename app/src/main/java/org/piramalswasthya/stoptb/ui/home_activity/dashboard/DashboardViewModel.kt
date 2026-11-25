@@ -50,7 +50,6 @@ data class CoverageStats(
 data class DashboardFilterState(
     val districtId: Int = 0,
     val blockId: Int = 0,
-    val villageId: Int = 0,
     val periodKey: String = DashboardViewModel.PERIOD_ALL,
 )
 
@@ -200,6 +199,14 @@ class DashboardViewModel @Inject constructor(
         dashboardVisible.value = visible
     }
 
+    private var loadedVillageId: Int? = null
+
+    fun refreshCurrentVillage() {
+        if (loadedVillageId != preferenceDao.getLocationRecord()?.village?.id) {
+            loadDashboardData()
+        }
+    }
+
     init {
         loadDashboardData()
     }
@@ -207,37 +214,6 @@ class DashboardViewModel @Inject constructor(
     fun applyFilters(state: DashboardFilterState) {
         _filters.value = state
         loadDashboardData()
-    }
-
-    private fun getAssignedVillageIds(villages: List<LocationEntity>): List<Int> =
-        villages.flatMap { idsForVillage(it) }.distinct().ifEmpty { listOf(-1) }
-
-    /** Same village ids and living-beneficiary rules as the home Total Population card. */
-    private fun populationVillageIds(
-        villages: List<LocationEntity>,
-        selectedVillageId: Int,
-        selectedVillage: LocationEntity?
-    ): List<Int> {
-        val ids = if (selectedVillageId == 0 || selectedVillage == null) {
-            villages.map { it.id }.filter { it != 0 }.distinct()
-        } else {
-            listOf(selectedVillage.id)
-        }.ifEmpty { listOf(-1) }
-        return if (ids.size == 1) listOf(ids.first(), ids.first()) else ids
-    }
-
-    private fun idsForVillageFilter(
-        villages: List<LocationEntity>,
-        selectedVillageId: Int,
-        selectedVillage: LocationEntity?
-    ): List<Int> {
-        val ids = if (selectedVillageId == 0 || selectedVillage == null) {
-            getAssignedVillageIds(villages)
-        } else {
-            idsForVillage(selectedVillage)
-        }
-        val base = ids.ifEmpty { listOf(-1) }
-        return if (base.size == 1) listOf(base.first(), base.first()) else base
     }
 
     private fun idsForVillage(village: LocationEntity): List<Int> {
@@ -318,18 +294,20 @@ class DashboardViewModel @Inject constructor(
         collectJobs.clear()
 
         val (startTime, endTime) = getTimeRange()
-        val selectedVillageId = _filters.value?.villageId ?: 0
-        // villageList decrypts and parses the logged-in user from prefs on every access: read once.
-        val villages = villageList
-        val selectedVillage = villages.firstOrNull { it.id == selectedVillageId }
-        val villageName = if (selectedVillageId == 0) {
-            ""
+        val selectedVillage = preferenceDao.getLocationRecord()?.village
+        loadedVillageId = selectedVillage?.id
+        val selectedVillageId = selectedVillage?.id ?: -1
+        val villageName = selectedVillage?.name?.substringBefore("(")?.trim().orEmpty()
+        val villageIds = selectedVillage?.let(::idsForVillage).orEmpty()
+            .filter { it != 0 }.ifEmpty { listOf(-1) }
+        val assignedVillageIds = if (villageIds.size == 1) {
+            listOf(villageIds.first(), villageIds.first())
         } else {
-            selectedVillage?.name?.substringBefore("(")?.trim().orEmpty()
+            villageIds
         }
-        val assignedVillageIds = idsForVillageFilter(villages, selectedVillageId, selectedVillage)
-
-        val populationIds = populationVillageIds(villages, selectedVillageId, selectedVillage)
+        // Match the home Total Population card, which uses the service village ID.
+        val populationVillageId = selectedVillageId.takeIf { it != 0 } ?: -1
+        val populationIds = listOf(populationVillageId, populationVillageId)
         val filterKey = "$startTime:$endTime:$selectedVillageId"
 
         // One query per tile, run one after another (coverage first) instead of ~25 at once: at
