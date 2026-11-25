@@ -595,6 +595,7 @@
         <item>OPD</item>
         <item>Diagnosis</item>
         <item>Counselling</item>
+        <item>TB Confirmed</item>
     </string-array>
 
     <string-array name="place_array">
@@ -1669,6 +1670,9 @@
     <string name="sync_tb_screening">TB Screening</string>
     <string name="sync_tb_confirmed">TB Confirmed</string>
     <string name="sync_counselling">Counselling</string>
+    <string name="sync_header_synced">Synced</string>
+    <string name="sync_header_unsynced">Un-Synced</string>
+    <string name="sync_header_syncing">Syncing</string>
 
 
 

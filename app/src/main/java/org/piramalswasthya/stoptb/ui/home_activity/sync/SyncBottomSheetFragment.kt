@@ -81,6 +81,8 @@ class SyncBottomSheetFragment : BottomSheetDialogFragment() {
 
         val localNames = viewModel.getLocalNames(requireContext())
         val englishNames = viewModel.getEnglishNames(requireContext())
+        val counsellingIndex = englishNames.indexOf("Counselling")
+        val counsellingName = localNames.getOrNull(counsellingIndex) ?: "Counselling"
         // Legacy, kept for reference:
 //        val isRegistrar = prefDao.getLoggedInUser()?.role.isRegistrationOfficerRole()
 //        val isCounsellingOfficer = prefDao.getLoggedInUser()?.role.isCounsellingOfficerRole()
@@ -123,7 +125,7 @@ class SyncBottomSheetFragment : BottomSheetDialogFragment() {
                         }
                     }
                     SyncRowFilter.ALL_EXCEPT_COUNSELLING -> {
-                        list = list.filter { item -> item.name != "Counselling" }
+                        list = list.filter { item -> item.name != counsellingName }
                     }
                     SyncRowFilter.SHOW_ALL -> {
                         // Multiple roles disagree on which rows to show (e.g. Registrar's

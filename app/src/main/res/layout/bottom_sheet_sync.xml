@@ -75,7 +75,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:gravity="center"
-            android:text="Synced"
+            android:text="@string/sync_header_synced"
             android:textAppearance="@style/TextAppearance.MaterialComponents.Badge"
             android:textColor="?attr/colorOnPrimary" />
 
@@ -84,7 +84,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:gravity="center"
-            android:text="Un-Synced"
+            android:text="@string/sync_header_unsynced"
             android:textAppearance="@style/TextAppearance.MaterialComponents.Badge"
             android:textColor="?attr/colorOnPrimary" />
         <TextView
@@ -92,7 +92,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:gravity="center"
-            android:text="Syncing"
+            android:text="@string/sync_header_syncing"
             android:textAppearance="@style/TextAppearance.MaterialComponents.Badge"
             android:textColor="?attr/colorOnPrimary" />
 
