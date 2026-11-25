@@ -295,10 +295,15 @@ class DashboardViewModel @Inject constructor(
 
         val (startTime, endTime) = getTimeRange()
         val selectedVillage = preferenceDao.getLocationRecord()?.village
+        val previousVillageId = loadedVillageId
         loadedVillageId = selectedVillage?.id
-        val selectedVillageId = selectedVillage?.id ?: -1
-        val villageName = selectedVillage?.name?.substringBefore("(")?.trim().orEmpty()
-        val villageIds = selectedVillage?.let(::idsForVillage).orEmpty()
+        if (selectedVillage == null) {
+            clearDashboardCounts()
+            return
+        }
+        val selectedVillageId = selectedVillage.id
+        val villageName = selectedVillage.name.substringBefore("(").trim()
+        val villageIds = idsForVillage(selectedVillage)
             .filter { it != 0 }.ifEmpty { listOf(-1) }
         val assignedVillageIds = if (villageIds.size == 1) {
             listOf(villageIds.first(), villageIds.first())
@@ -309,6 +314,8 @@ class DashboardViewModel @Inject constructor(
         val populationVillageId = selectedVillageId.takeIf { it != 0 } ?: -1
         val populationIds = listOf(populationVillageId, populationVillageId)
         val filterKey = "$startTime:$endTime:$selectedVillageId"
+
+        if (previousVillageId != selectedVillageId) clearUncachedVillageCounts(filterKey)
 
         // One query per tile, run one after another (coverage first) instead of ~25 at once: at
         // 1M every tile scans all TB records, and together they held every query thread for
@@ -346,6 +353,35 @@ class DashboardViewModel @Inject constructor(
             _coverage.value = coverageOf(headcount.population, headcount.unscreened)
             save(key, listOf(headcount.population, headcount.unscreened))
         }
+    }
+
+    private fun clearUncachedVillageCounts(filterKey: String) {
+        if (cached("$filterKey:coverage", 2) == null) _coverage.value = CoverageStats()
+        listOf(
+            "screening" to _tbScreening,
+            "presumptive" to _presumptiveTb,
+            "confirmed" to _tbConfirmed,
+            "pastHistory" to _pastHistoryTb,
+            "antiTb" to _antiTbDrugs,
+            "xray" to _digitalChestXray,
+            "sputum" to _sputumCollection,
+            "trueNat" to _trueNat,
+            "liquidCulture" to _liquidCulture,
+            "hwc" to _hwcReferral,
+            "nikshay" to _nikshayCount,
+            "abha" to _abhaCount,
+        ).forEach { (name, target) ->
+            if (cached("$filterKey:$name", 7) == null) target.value = TbGenderBreakdown()
+        }
+    }
+
+    private fun clearDashboardCounts() {
+        _coverage.value = CoverageStats()
+        listOf(
+            _tbScreening, _presumptiveTb, _tbConfirmed, _pastHistoryTb, _antiTbDrugs,
+            _digitalChestXray, _sputumCollection, _trueNat, _liquidCulture, _hwcReferral,
+            _nikshayCount, _abhaCount,
+        ).forEach { it.value = TbGenderBreakdown() }
     }
 
     private fun coverageOf(population: Int, unscreened: Int) = CoverageStats(
