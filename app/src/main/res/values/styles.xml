@@ -98,6 +98,13 @@
         <item name="android:elevation">0dp</item>
     </style>
 
+    <!-- Matches the Home toolbar title (tv_toolbar in activity_home.xml). -->
+    <style name="TextAppearance.Sakhi.ContactTracingToolbarTitle" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:fontFamily">@font/opensans_semibold</item>
+        <item name="fontFamily">@font/opensans_semibold</item>
+        <item name="android:textColor">@color/md_theme_light_onPrimary</item>
+    </style>
+
     <style name="Widget.Sakhi.MaterialCardView" parent="Widget.Material3.CardView.Elevated">
         <item name="cardBackgroundColor">@color/sakhi_surface_soft</item>
         <item name="cardCornerRadius">20dp</item>
