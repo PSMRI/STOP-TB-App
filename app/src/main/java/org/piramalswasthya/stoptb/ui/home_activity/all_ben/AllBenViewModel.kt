@@ -19,15 +19,18 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.model.BenBasicDomain
@@ -35,6 +38,8 @@ import org.piramalswasthya.stoptb.repositories.ABHAGenratedRepo
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.HouseholdRepo
 import org.piramalswasthya.stoptb.repositories.RecordsRepo
+import org.piramalswasthya.stoptb.repositories.RowBadgeRepo
+import org.piramalswasthya.stoptb.ui.LoadedRowBadges
 import org.piramalswasthya.stoptb.repositories.TBRepo
 import org.piramalswasthya.stoptb.repositories.VitalRepo
 import org.piramalswasthya.stoptb.repositories.contactTracing.IContactTracingRepository
@@ -62,7 +67,8 @@ class AllBenViewModel @Inject constructor(
     private val householdRepo: HouseholdRepo,
     private val vitalRepo: VitalRepo,
     val tbRepo: TBRepo,
-    private val contactTracingRepo: IContactTracingRepository
+    private val contactTracingRepo: IContactTracingRepository,
+    private val rowBadgeRepo: RowBadgeRepo
 ) : ViewModel() {
 
     suspend fun isHouseholdMemberLimitReached(hhId: Long) = householdRepo.isMemberLimitReached(hhId)
@@ -91,18 +97,6 @@ class AllBenViewModel @Inject constructor(
     }
 
     private companion object {
-        /** An unfiltered status refresh re-runs at most this often. */
-        const val statusRefreshDebounceMs = 30_000L
-
-        /**
-         * Last time an unfiltered status refresh actually ran. On the companion, not the
-         * instance: a fresh ViewModel is built on every entry to this screen, so an instance
-         * field would only suppress repeat onResume within a single visit and the full sweep
-         * would still run on every navigation back. Same reasoning as
-         * [lastDeviceIntegrationRefreshAt].
-         */
-        private var lastStatusRefreshAt = 0L
-
         /** Device-integration config re-checks at most this often. */
         const val deviceIntegrationRefreshIntervalMs = 5 * 60_000L
 
@@ -156,7 +150,8 @@ class AllBenViewModel @Inject constructor(
     }.flatMapLatest { (text, kind, expanded) ->
         _searchGeneration.update { it + 1 }
         Pager(
-            config = PagingConfig(pageSize = 30, prefetchDistance = 10)
+            // maxSize bounds memory and keeps the loaded-row id list (badge queries) small.
+            config = PagingConfig(pageSize = 30, prefetchDistance = 10, maxSize = 300, enablePlaceholders = false)
         ) {
             recordsRepo.searchBenPagedSource(text, kind, sourceFromArgs, expanded)
         }.flow.map { pagingData ->
@@ -164,40 +159,43 @@ class AllBenViewModel @Inject constructor(
         }
     }.cachedIn(viewModelScope)
 
-    val childCounts: Flow<Map<Long, Int>> = recordsRepo.childCountsByBen
-    val householdMemberCounts: Flow<Map<Long, Int>> = recordsRepo.householdMemberCounts
-    val householdHeadNames: Flow<Map<Long, String>> = recordsRepo.householdHeadNames
-    val vitalBenIds: Flow<List<Long>> = vitalRepo.vitalBenIds
-    val unsyncedVitalBenIds: Flow<List<Long>> = vitalRepo.unsyncedVitalBenIds
-    val syncingVitalBenIds: Flow<List<Long>> = vitalRepo.syncingVitalBenIds
-    val tbScreeningBenIds: Flow<List<Long>> = tbRepo.tbScreeningBenIds
-    val unsyncedTbScreeningBenIds: Flow<List<Long>> = tbRepo.unsyncedTbScreeningBenIds
-    val syncingTbScreeningBenIds: Flow<List<Long>> = tbRepo.syncingTbScreeningBenIds
-    val generalOpdBenIds: Flow<List<Long>> = tbRepo.generalOpdBenIds
-    val unsyncedGeneralOpdBenIds: Flow<List<Long>> = tbRepo.unsyncedGeneralOpdBenIds
-    val syncingGeneralOpdBenIds: Flow<List<Long>> = tbRepo.syncingGeneralOpdBenIds
-    val anthropometryFilledBenIds: Flow<List<Long>> = recordsRepo.anthropometryFilledBenIds
-    val contactFollowUpDoneBenIds: Flow<List<Long>> = contactTracingRepo.observeContactFollowUpDoneBenIds()
-    val tptFollowUpDoneBenIds: Flow<List<Long>> = contactTracingRepo.observeTptFollowUpTargetReachedBenIds()
-    val tptEligibleBenIds: Flow<List<Long>> = contactTracingRepo.observeTptEligibleBenIds()
-    val tptRegistrationDoneBenIds: Flow<List<Long>> = contactTracingRepo.observeTptRegistrationDoneBenIds()
+    // PR 6 (6.3): row badges for the rows the list has loaded, not whole tables (RowBadgeRepo).
+    private val rowBadges = LoadedRowBadges(viewModelScope, rowBadgeRepo)
 
-    /**
-     * Diagnosis = TB_DIAGNOSTICS (new saves) OR TB_SUSPECTED (legacy saves)
-     *
-     * combine() emits once per emission of *either* source, so a single logical change that
-     * touches both tables delivers the same merged list twice. Each delivery rebuilds ~12.5k
-     * boxed Longs and re-runs the adapter diff on the main thread; on a camp device that was 93
-     * emissions carrying 929k Longs in under three minutes. distinctUntilChanged() drops the
-     * duplicate half - the list only reaches the UI when its contents actually differ.
-     */
-    val diagnosisBenIds: Flow<List<Long>> = combine(
-        // Derived from allTbDiagnostics, which this screen already collects, instead of a
-        // second "SELECT benId FROM TB_DIAGNOSTICS" scan of the same 10k rows per invalidation.
-        tbRepo.tbDiagnosticsBenIdsFromCards,
-        tbRepo.tbSuspectedBenIds
-    ) { diagnostics, suspected -> (diagnostics + suspected).distinct() }
-        .distinctUntilChanged()
+    // Household details for the loaded rows only: the village-wide maps took seconds per run at
+    // 1M (child counts 8-27 s on a tablet) and re-ran on every beneficiary write.
+    private fun <T> forLoadedRows(query: (Set<Long>) -> Flow<Map<Long, T>>): Flow<Map<Long, T>> =
+        rowBadges.loadedIds.flatMapLatest { ids -> if (ids.isEmpty()) flowOf(emptyMap()) else query(ids) }
+
+    val childCounts: Flow<Map<Long, Int>> = forLoadedRows(recordsRepo::childCountsFor)
+    val householdMemberCounts: Flow<Map<Long, Int>> = forLoadedRows(recordsRepo::householdMemberCountsFor)
+    val householdHeadNames: Flow<Map<Long, String>> = forLoadedRows(recordsRepo::householdHeadNamesFor)
+
+    fun onRowsLoaded(benIds: Set<Long>) = rowBadges.onRowsLoaded(benIds)
+
+    val vitalBenIds: Flow<List<Long>> = rowBadges.vitalBenIds
+    val unsyncedVitalBenIds: Flow<List<Long>> = rowBadges.unsyncedVitalBenIds
+    val syncingVitalBenIds: Flow<List<Long>> = rowBadges.syncingVitalBenIds
+    val tbScreeningBenIds: Flow<List<Long>> = rowBadges.tbScreeningBenIds
+    val unsyncedTbScreeningBenIds: Flow<List<Long>> = rowBadges.unsyncedTbScreeningBenIds
+    val syncingTbScreeningBenIds: Flow<List<Long>> = rowBadges.syncingTbScreeningBenIds
+    val generalOpdBenIds: Flow<List<Long>> = rowBadges.generalOpdBenIds
+    val unsyncedGeneralOpdBenIds: Flow<List<Long>> = rowBadges.unsyncedGeneralOpdBenIds
+    val syncingGeneralOpdBenIds: Flow<List<Long>> = rowBadges.syncingGeneralOpdBenIds
+    val anthropometryFilledBenIds: Flow<List<Long>> = rowBadges.anthropometryBenIds
+    // Contact tracing / TPT badges for the loaded rows only (the whole response tables are
+    // read otherwise), built into sets off Main so the adapter doesn't convert on every emission.
+    private fun loadedSet(query: (Set<Long>) -> Flow<List<Long>>): Flow<Set<Long>> =
+        rowBadges.loadedIds.flatMapLatest { ids -> if (ids.isEmpty()) flowOf(emptyList()) else query(ids) }
+            .map { benIds -> benIds.toHashSet() }.flowOn(Dispatchers.Default)
+
+    val contactFollowUpDoneBenIds: Flow<Set<Long>> = loadedSet { contactTracingRepo.observeContactFollowUpDoneBenIds(it) }
+    val tptFollowUpDoneBenIds: Flow<Set<Long>> = loadedSet { contactTracingRepo.observeTptFollowUpTargetReachedBenIds(it) }
+    val tptEligibleBenIds: Flow<Set<Long>> = loadedSet { contactTracingRepo.observeTptEligibleBenIds(it) }
+    val tptRegistrationDoneBenIds: Flow<Set<Long>> = loadedSet { contactTracingRepo.observeTptRegistrationDoneBenIds(it) }
+
+    /** Diagnosis = TB_DIAGNOSTICS (new saves) OR TB_SUSPECTED (legacy saves), for the loaded rows. */
+    val diagnosisBenIds: Flow<List<Long>> = rowBadges.diagnosisBenIds
 
     private val _abha = MutableLiveData<String?>()
     val abha: LiveData<String?>
@@ -291,10 +289,11 @@ class AllBenViewModel @Inject constructor(
         }
     }
 
-    val allTbDiagnostics: Flow<List<org.piramalswasthya.stoptb.model.TbDiagnosticsCardFields>> =
-        tbRepo.allTbDiagnostics
+    val allTbDiagnostics: Flow<org.piramalswasthya.stoptb.ui.TbDiagnosticsSnapshot> =
+        rowBadges.tbDiagnostics
 
-    val allTbScreening: Flow<List<TbScreeningSymptoms>> = tbRepo.allTbScreening
+    val allTbScreening: Flow<List<TbScreeningSymptoms>> =
+        rowBadges.tbScreeningSymptoms
 
     sealed class OrderActionResult {
         object Idle : OrderActionResult()

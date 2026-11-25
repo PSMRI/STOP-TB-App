@@ -30,6 +30,7 @@ class DiagnosticOrderPushWorker @AssistedInject constructor(
         const val name = "DiagnosticOrderPushWorker"
         const val KEY_BEN_ID = "ben_id"
         const val KEY_TEST_TYPE = "test_type"
+        private const val DEVICE_CONFIG_MAX_AGE_MS = 10 * 60_000L
     }
 
     override suspend fun doWork(): Result {
@@ -41,8 +42,10 @@ class DiagnosticOrderPushWorker @AssistedInject constructor(
         }
         return try {
             withContext(Dispatchers.IO) {
-                tbRepo.refreshDeviceIntegrationConfig()
+                // The order first: the integration flags only decide whether to start the result
+                // poll afterwards, so the user doesn't wait on two vendor/health calls.
                 val response = tbRepo.createOrder(benId, testType)
+                tbRepo.refreshDeviceIntegrationConfig(maxAgeMs = DEVICE_CONFIG_MAX_AGE_MS)
                 val isIntegrated = when (testType) {
                     "XRAY_CHEST" -> tbRepo.isXrayIntegrated()
                     "SPUTUM_TRUENAT", "MDR_RIF" -> tbRepo.isTruenatIntegrated()

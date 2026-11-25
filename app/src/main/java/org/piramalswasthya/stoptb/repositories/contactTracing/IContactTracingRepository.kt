@@ -158,4 +158,10 @@ interface IContactTracingRepository {
     // whether the Counselling Officer's Examine badge total is x/3 (Anthropometry, TB Screening,
     // Contact Follow Up) or x/5 (Start TPT and TPT Follow Up also required).
     fun observeTptEligibleBenIds(): Flow<List<Long>>
+
+    // The same four sets limited to [benIds], for lists that only need their loaded rows.
+    fun observeContactFollowUpDoneBenIds(benIds: Collection<Long>): Flow<List<Long>>
+    fun observeTptRegistrationDoneBenIds(benIds: Collection<Long>): Flow<List<Long>>
+    fun observeTptFollowUpTargetReachedBenIds(benIds: Collection<Long>): Flow<List<Long>>
+    fun observeTptEligibleBenIds(benIds: Collection<Long>): Flow<List<Long>>
 }

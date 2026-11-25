@@ -6,16 +6,23 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.database.room.dao.BenDao
 import org.piramalswasthya.stoptb.database.room.dao.TBDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.helpers.Languages
+import org.piramalswasthya.stoptb.model.DashboardBreakdownCounts
 import org.piramalswasthya.stoptb.model.LocationEntity
 import java.util.Calendar
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
+import org.piramalswasthya.stoptb.database.room.InAppDb
+import org.piramalswasthya.stoptb.database.room.dao.VillageHeadcount
+import org.piramalswasthya.stoptb.utils.throttledQuery
 import javax.inject.Inject
 
 data class TbGenderBreakdown(
@@ -75,7 +82,12 @@ class DashboardViewModel @Inject constructor(
     private val benDao: BenDao,
     private val tbDao: TBDao,
     private val preferenceDao: PreferenceDao,
+    private val database: InAppDb,
+    @ApplicationContext context: Context,
 ) : ViewModel() {
+
+    // Last numbers per filter, shown at once while they are recomputed. Aggregates only.
+    private val lastCounts = context.getSharedPreferences("dashboard_counts", Context.MODE_PRIVATE)
 
     companion object {
         const val PERIOD_TODAY = "today"
@@ -86,10 +98,14 @@ class DashboardViewModel @Inject constructor(
         const val PERIOD_MONTH_PREFIX = "month_"
 
         fun monthPeriodKey(month: Int): String = "$PERIOD_MONTH_PREFIX$month"
-    }
 
-    private val _unscreened = MutableLiveData(TbGenderBreakdown())
-    val unscreened: LiveData<TbGenderBreakdown> get() = _unscreened
+        // A full pass over all tiles is minutes of work at 1M; refresh at most once a minute.
+        private const val REFRESH_MS = 60_000L
+        private val DASHBOARD_TABLES = arrayOf(
+            "BENEFICIARY", "HOUSEHOLD", "TB_SCREENING", "TB_SUSPECTED", "TB_DIAGNOSTICS",
+            "TB_CONFIRMED_TREATMENT", "BEN_VITALS"
+        )
+    }
 
     private val _filters = MutableLiveData(DashboardFilterState())
     val filters: LiveData<DashboardFilterState> get() = _filters
@@ -171,6 +187,19 @@ class DashboardViewModel @Inject constructor(
 
     private var collectJobs = mutableListOf<Job>()
 
+    /**
+     * True only while the dashboard page is RESUMED (the visible ViewPager2 page).
+     * ViewPager2 keeps the off-screen page STARTED, so LiveData observers alone would keep
+     * ~70 Room COUNT queries re-running on every write while the user is elsewhere. When the
+     * page is hidden the queries are cancelled; the last values stay on screen and are
+     * refreshed as soon as the page becomes visible again.
+     */
+    private val dashboardVisible = MutableStateFlow(false)
+
+    fun setDashboardVisible(visible: Boolean) {
+        dashboardVisible.value = visible
+    }
+
     init {
         loadDashboardData()
     }
@@ -180,22 +209,30 @@ class DashboardViewModel @Inject constructor(
         loadDashboardData()
     }
 
-    private fun getAssignedVillageIds(): List<Int> =
-        villageList.flatMap { idsForVillage(it) }.distinct().ifEmpty { listOf(-1) }
+    private fun getAssignedVillageIds(villages: List<LocationEntity>): List<Int> =
+        villages.flatMap { idsForVillage(it) }.distinct().ifEmpty { listOf(-1) }
 
     /** Same village ids and living-beneficiary rules as the home Total Population card. */
-    private fun populationVillageIds(selectedVillageId: Int, selectedVillage: LocationEntity?): List<Int> {
+    private fun populationVillageIds(
+        villages: List<LocationEntity>,
+        selectedVillageId: Int,
+        selectedVillage: LocationEntity?
+    ): List<Int> {
         val ids = if (selectedVillageId == 0 || selectedVillage == null) {
-            villageList.map { it.id }.filter { it != 0 }.distinct()
+            villages.map { it.id }.filter { it != 0 }.distinct()
         } else {
             listOf(selectedVillage.id)
         }.ifEmpty { listOf(-1) }
         return if (ids.size == 1) listOf(ids.first(), ids.first()) else ids
     }
 
-    private fun idsForVillageFilter(selectedVillageId: Int, selectedVillage: LocationEntity?): List<Int> {
+    private fun idsForVillageFilter(
+        villages: List<LocationEntity>,
+        selectedVillageId: Int,
+        selectedVillage: LocationEntity?
+    ): List<Int> {
         val ids = if (selectedVillageId == 0 || selectedVillage == null) {
-            getAssignedVillageIds()
+            getAssignedVillageIds(villages)
         } else {
             idsForVillage(selectedVillage)
         }
@@ -282,213 +319,89 @@ class DashboardViewModel @Inject constructor(
 
         val (startTime, endTime) = getTimeRange()
         val selectedVillageId = _filters.value?.villageId ?: 0
-        val selectedVillage = villageList.firstOrNull { it.id == selectedVillageId }
+        // villageList decrypts and parses the logged-in user from prefs on every access: read once.
+        val villages = villageList
+        val selectedVillage = villages.firstOrNull { it.id == selectedVillageId }
         val villageName = if (selectedVillageId == 0) {
             ""
         } else {
             selectedVillage?.name?.substringBefore("(")?.trim().orEmpty()
         }
-        val assignedVillageIds = idsForVillageFilter(selectedVillageId, selectedVillage)
+        val assignedVillageIds = idsForVillageFilter(villages, selectedVillageId, selectedVillage)
 
-        // Keep previous values on screen until new filtered results arrive (avoid flashing/sticking at 0).
+        val populationIds = populationVillageIds(villages, selectedVillageId, selectedVillage)
+        val filterKey = "$startTime:$endTime:$selectedVillageId"
 
-        collectBreakdown(
-            target = _tbScreening,
-            totalQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "", 0, 0) },
-            maleQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0, 0) },
-            femaleQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0, 0) },
-            pregnantQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0, 0, 1) },
-            childrenQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "", 1, 0) },
-            othersQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0, 0) },
-            seniorCitizenQuery = { tbDao.getDashboardTbScreeningCount(assignedVillageIds, villageName, startTime, endTime, "", 0, 1) },
+        // One query per tile, run one after another (coverage first) instead of ~25 at once: at
+        // 1M every tile scans all TB records, and together they held every query thread for
+        // minutes. Each number is posted and cached as soon as it is ready.
+        val steps = listOf(
+            coverageStep(filterKey) { benDao.getVillageHeadcount(populationIds).first() },
+            sectionStep(filterKey, "screening", _tbScreening) { tbDao.getDashboardTbScreeningBreakdown(assignedVillageIds, villageName, startTime, endTime).first() },
+            sectionStep(filterKey, "presumptive", _presumptiveTb) { tbDao.getDashboardPresumptiveTbBreakdown(assignedVillageIds, villageName, startTime, endTime).first() },
+            sectionStep(filterKey, "confirmed", _tbConfirmed) { benDao.getDashboardTbConfirmedBreakdown(assignedVillageIds, startTime, endTime).first() },
+            sectionStep(filterKey, "pastHistory", _pastHistoryTb) { tbDao.getDashboardPastHistoryTbBreakdown(assignedVillageIds, villageName, startTime, endTime).first() },
+            sectionStep(filterKey, "antiTb", _antiTbDrugs) { tbDao.getDashboardAntiTbDrugsBreakdown(assignedVillageIds, villageName, startTime, endTime).first() },
+            sectionStep(filterKey, "xray", _digitalChestXray) { tbDao.getDashboardDigitalChestXRayBreakdown(assignedVillageIds, villageName, startTime, endTime).first() },
+            sectionStep(filterKey, "sputum", _sputumCollection) { tbDao.getDashboardSputumCollectionBreakdown(assignedVillageIds, villageName, startTime, endTime).first() },
+            sectionStep(filterKey, "trueNat", _trueNat) { tbDao.getDashboardTrueNatBreakdown(assignedVillageIds, villageName, startTime, endTime).first() },
+            sectionStep(filterKey, "liquidCulture", _liquidCulture) { tbDao.getDashboardLiquidCultureBreakdown(assignedVillageIds, villageName, startTime, endTime).first() },
+            sectionStep(filterKey, "hwc", _hwcReferral) { tbDao.getDashboardHwcReferralBreakdown(assignedVillageIds, villageName, startTime, endTime).first() },
+            sectionStep(filterKey, "nikshay", _nikshayCount) { tbDao.getDashboardNikshayBreakdown(assignedVillageIds, villageName, startTime, endTime).first() },
+            sectionStep(filterKey, "abha", _abhaCount) { benDao.getDashboardAbhaBreakdown(assignedVillageIds, startTime, endTime).first() },
         )
 
-        collectBreakdown(
-            target = _pastHistoryTb,
-            totalQuery = { tbDao.getDashboardPastHistoryTbCount(assignedVillageIds, villageName, startTime, endTime, "", 0, 0) },
-            maleQuery = { tbDao.getDashboardPastHistoryTbCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0, 0) },
-            femaleQuery = { tbDao.getDashboardPastHistoryTbCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0, 0) },
-            pregnantQuery = { tbDao.getDashboardPastHistoryTbCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0, 0, 1) },
-            childrenQuery = { tbDao.getDashboardPastHistoryTbCount(assignedVillageIds, villageName, startTime, endTime, "", 1, 0) },
-            othersQuery = { tbDao.getDashboardPastHistoryTbCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0, 0) },
-            seniorCitizenQuery = { tbDao.getDashboardPastHistoryTbCount(assignedVillageIds, villageName, startTime, endTime, "", 0, 1) }
-        )
-
-        collectBreakdown(
-            target = _antiTbDrugs,
-            totalQuery = { tbDao.getDashboardAntiTbDrugsCount(assignedVillageIds, villageName, startTime, endTime, "", 0, 0) },
-            maleQuery = { tbDao.getDashboardAntiTbDrugsCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0, 0) },
-            femaleQuery = { tbDao.getDashboardAntiTbDrugsCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0, 0) },
-            pregnantQuery = { tbDao.getDashboardAntiTbDrugsCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0, 0, 1) },
-            childrenQuery = { tbDao.getDashboardAntiTbDrugsCount(assignedVillageIds, villageName, startTime, endTime, "", 1, 0) },
-            othersQuery = { tbDao.getDashboardAntiTbDrugsCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0, 0) },
-            seniorCitizenQuery = { tbDao.getDashboardAntiTbDrugsCount(assignedVillageIds, villageName, startTime, endTime, "", 0, 1) }
-        )
-
-        collectBreakdown(
-            target = _presumptiveTb,
-            totalQuery = { tbDao.getDashboardPresumptiveTbCount(assignedVillageIds, villageName, startTime, endTime, "", 0) },
-            maleQuery = { tbDao.getDashboardPresumptiveTbCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0) },
-            femaleQuery = { tbDao.getDashboardPresumptiveTbCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0) },
-            pregnantQuery = { tbDao.getDashboardPresumptiveTbCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0, 1) },
-            childrenQuery = { tbDao.getDashboardPresumptiveTbCount(assignedVillageIds, villageName, startTime, endTime, "", 1) },
-            othersQuery = { tbDao.getDashboardPresumptiveTbCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0) },
-            seniorCitizenQuery = { zeroCountFlow() },
-        )
-
-        collectBreakdown(
-            target = _unscreened,
-            totalQuery = { tbDao.getDashboardUnscreenedCount(assignedVillageIds, villageName, startTime, endTime, "", 0) },
-            maleQuery = { tbDao.getDashboardUnscreenedCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0) },
-            femaleQuery = { tbDao.getDashboardUnscreenedCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0) },
-            childrenQuery = { tbDao.getDashboardUnscreenedCount(assignedVillageIds, villageName, startTime, endTime, "", 1) },
-            othersQuery = { tbDao.getDashboardUnscreenedCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0) },
-            seniorCitizenQuery = { zeroCountFlow() },
-        )
-
-        collectBreakdown(
-            target = _tbConfirmed,
-            totalQuery = { benDao.getDashboardFilteredTbConfirmedCount(assignedVillageIds, startTime, endTime, "", 0, 0) },
-            maleQuery = { benDao.getDashboardFilteredTbConfirmedCount(assignedVillageIds, startTime, endTime, "MALE", 0, 0) },
-            femaleQuery = { benDao.getDashboardFilteredTbConfirmedCount(assignedVillageIds, startTime, endTime, "FEMALE", 0, 0) },
-            pregnantQuery = { benDao.getDashboardFilteredTbConfirmedCount(assignedVillageIds, startTime, endTime, "FEMALE", 0, 0, 1) },
-            childrenQuery = { benDao.getDashboardFilteredTbConfirmedCount(assignedVillageIds, startTime, endTime, "", 1, 0) },
-            othersQuery = { benDao.getDashboardFilteredTbConfirmedCount(assignedVillageIds, startTime, endTime, "OTHERS", 0, 0) },
-            seniorCitizenQuery = { benDao.getDashboardFilteredTbConfirmedCount(assignedVillageIds, startTime, endTime, "", 0, 1) },
-        )
-
-        collectBreakdown(
-            target = _digitalChestXray,
-            totalQuery = { tbDao.getDashboardDigitalChestXRayCount(assignedVillageIds, villageName, startTime, endTime, "", 0,0) },
-            maleQuery = { tbDao.getDashboardDigitalChestXRayCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0,0) },
-            femaleQuery = { tbDao.getDashboardDigitalChestXRayCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0,0) },
-            childrenQuery = { tbDao.getDashboardDigitalChestXRayCount(assignedVillageIds, villageName, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardDigitalChestXRayCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0,0) },
-            seniorCitizenQuery = { tbDao.getDashboardDigitalChestXRayCount(assignedVillageIds, villageName, startTime, endTime, "", 0,1) }
-
-            )
-
-        collectBreakdown(
-            target = _sputumCollection,
-            totalQuery = { tbDao.getDashboardSputumCollectionCount(assignedVillageIds, villageName, startTime, endTime, "", 0,0) },
-            maleQuery = { tbDao.getDashboardSputumCollectionCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0,0) },
-            femaleQuery = { tbDao.getDashboardSputumCollectionCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0,0) },
-            pregnantQuery = { tbDao.getDashboardSputumCollectionCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0, 0, 1) },
-            childrenQuery = { tbDao.getDashboardSputumCollectionCount(assignedVillageIds, villageName, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardSputumCollectionCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0,0) },
-            seniorCitizenQuery = { tbDao.getDashboardSputumCollectionCount(assignedVillageIds, villageName, startTime, endTime, "", 0,1) }
-
-            )
-
-        collectBreakdown(
-            target = _trueNat,
-            totalQuery = { tbDao.getDashboardTrueNatCount(assignedVillageIds, villageName, startTime, endTime, "", 0,0) },
-            maleQuery = { tbDao.getDashboardTrueNatCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0,0) },
-            femaleQuery = { tbDao.getDashboardTrueNatCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0,0) },
-            pregnantQuery = { tbDao.getDashboardTrueNatCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0, 0, 1) },
-            childrenQuery = { tbDao.getDashboardTrueNatCount(assignedVillageIds, villageName, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardTrueNatCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0,0) },
-            seniorCitizenQuery = { tbDao.getDashboardTrueNatCount(assignedVillageIds, villageName, startTime, endTime, "", 0,1) }
-
-            )
-
-        collectBreakdown(
-            target = _liquidCulture,
-            totalQuery = { tbDao.getDashboardLiquidCultureCount(assignedVillageIds, villageName, startTime, endTime, "", 0,0) },
-            maleQuery = { tbDao.getDashboardLiquidCultureCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0,0) },
-            femaleQuery = { tbDao.getDashboardLiquidCultureCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0,0) },
-            pregnantQuery = { tbDao.getDashboardLiquidCultureCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0, 0, 1) },
-            childrenQuery = { tbDao.getDashboardLiquidCultureCount(assignedVillageIds, villageName, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardLiquidCultureCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0,0) },
-            seniorCitizenQuery = { tbDao.getDashboardLiquidCultureCount(assignedVillageIds, villageName, startTime, endTime, "", 0,1) },
-
-            )
-
-        collectBreakdown(
-            target = _hwcReferral,
-            totalQuery = { tbDao.getDashboardHwcReferralCount(assignedVillageIds, villageName, startTime, endTime, "", 0,0) },
-            maleQuery = { tbDao.getDashboardHwcReferralCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0,0) },
-            femaleQuery = { tbDao.getDashboardHwcReferralCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0,0) },
-            pregnantQuery = { tbDao.getDashboardHwcReferralCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0, 0, 1) },
-            childrenQuery = { tbDao.getDashboardHwcReferralCount(assignedVillageIds, villageName, startTime, endTime, "", 1,0) },
-            othersQuery = { tbDao.getDashboardHwcReferralCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0,0) },
-            seniorCitizenQuery = { tbDao.getDashboardHwcReferralCount(assignedVillageIds, villageName, startTime, endTime, "", 0,1) }
-
-            )
-
+        // Re-run only while the page is visible, and at most once per REFRESH_MS after writes:
+        // during sync the tables change every few seconds.
         collectJobs += viewModelScope.launch {
-            benDao.getVillageHeadcount(populationVillageIds(selectedVillageId, selectedVillage))
-                .collect { headcount ->
-                    _coverage.value = CoverageStats(
-                        population = headcount.population,
-                        screened = (headcount.population - headcount.unscreened).coerceAtLeast(0),
-                        unscreened = headcount.unscreened,
-                    )
-                }
-        }
-
-        collectBreakdown(
-            target = _nikshayCount,
-            totalQuery = { tbDao.getDashboardNikshayCount(assignedVillageIds, villageName, startTime, endTime, "", 0, 0) },
-            maleQuery = { tbDao.getDashboardNikshayCount(assignedVillageIds, villageName, startTime, endTime, "MALE", 0, 0) },
-            femaleQuery = { tbDao.getDashboardNikshayCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0, 0) },
-            pregnantQuery = { tbDao.getDashboardNikshayCount(assignedVillageIds, villageName, startTime, endTime, "FEMALE", 0, 0, 1) },
-            childrenQuery = { tbDao.getDashboardNikshayCount(assignedVillageIds, villageName, startTime, endTime, "", 1, 0) },
-            othersQuery = { tbDao.getDashboardNikshayCount(assignedVillageIds, villageName, startTime, endTime, "OTHERS", 0, 0) },
-            seniorCitizenQuery = { tbDao.getDashboardNikshayCount(assignedVillageIds, villageName, startTime, endTime, "", 0, 1) },
-        )
-
-        collectBreakdown(
-            target = _abhaCount,
-            totalQuery = { benDao.getDashboardAbhaCount(assignedVillageIds, startTime, endTime, "", 0, 0) },
-            maleQuery = { benDao.getDashboardAbhaCount(assignedVillageIds, startTime, endTime, "MALE", 0, 0) },
-            femaleQuery = { benDao.getDashboardAbhaCount(assignedVillageIds, startTime, endTime, "FEMALE", 0, 0) },
-            pregnantQuery = { benDao.getDashboardAbhaCount(assignedVillageIds, startTime, endTime, "FEMALE", 0, 0, 1) },
-            childrenQuery = { benDao.getDashboardAbhaCount(assignedVillageIds, startTime, endTime, "", 1, 0) },
-            othersQuery = { benDao.getDashboardAbhaCount(assignedVillageIds, startTime, endTime, "OTHERS", 0, 0) },
-            seniorCitizenQuery = { benDao.getDashboardAbhaCount(assignedVillageIds, startTime, endTime, "", 0, 1) },
-        )
-    }
-
-    private fun zeroCountFlow(): Flow<Int> = flow {
-        emit(0)
-        awaitCancellation()
-    }
-
-    private fun collectBreakdown(
-        target: MutableLiveData<TbGenderBreakdown>,
-        totalQuery: () -> Flow<Int>,
-        maleQuery: () -> Flow<Int>,
-        femaleQuery: () -> Flow<Int>,
-        childrenQuery: () -> Flow<Int>,
-        othersQuery: () -> Flow<Int>,
-        seniorCitizenQuery: () -> Flow<Int>,
-        pregnantQuery: () -> Flow<Int> = { zeroCountFlow() },
-    ) {
-        collectJobs += viewModelScope.launch {
-            kotlinx.coroutines.flow.combine(
-                totalQuery(),
-                maleQuery(),
-                femaleQuery(),
-                childrenQuery(),
-                othersQuery(),
-                seniorCitizenQuery(),
-                pregnantQuery()
-            ) { values ->
-                TbGenderBreakdown(
-                    total = values[0],
-                    male = values[1],
-                    female = values[2],
-                    pregnant = values[6],
-                    children = values[3],
-                    others = values[4],
-                    seniorCitizen = values[5]
-                )
-            }.collect { breakdown ->
-                target.value = breakdown
+            dashboardVisible.collectLatest { visible ->
+                if (visible) database.throttledQuery(DASHBOARD_TABLES, REFRESH_MS) { steps.forEach { it() } }.collect {}
             }
         }
     }
+
+    private fun coverageStep(filterKey: String, query: suspend () -> VillageHeadcount): suspend () -> Unit {
+        val key = "$filterKey:coverage"
+        cached(key, 2)?.let { (population, unscreened) -> _coverage.value = coverageOf(population, unscreened) }
+        return {
+            val headcount = query()
+            _coverage.value = coverageOf(headcount.population, headcount.unscreened)
+            save(key, listOf(headcount.population, headcount.unscreened))
+        }
+    }
+
+    private fun coverageOf(population: Int, unscreened: Int) = CoverageStats(
+        population = population,
+        screened = (population - unscreened).coerceAtLeast(0),
+        unscreened = unscreened,
+    )
+
+    private fun sectionStep(
+        filterKey: String,
+        name: String,
+        target: MutableLiveData<TbGenderBreakdown>,
+        query: suspend () -> DashboardBreakdownCounts,
+    ): suspend () -> Unit {
+        val key = "$filterKey:$name"
+        cached(key, 7)?.let { target.value = TbGenderBreakdown(it[0], it[1], it[2], it[3], it[4], it[5], it[6]) }
+        return {
+            val c = query()
+            val breakdown = TbGenderBreakdown(
+                total = c.total, male = c.male, female = c.female, pregnant = c.pregnant,
+                children = c.children, others = c.others, seniorCitizen = c.seniorCitizen
+            )
+            if (target.value != breakdown) target.value = breakdown
+            save(key, with(breakdown) { listOf(total, male, female, pregnant, children, others, seniorCitizen) })
+        }
+    }
+
+    private fun cached(key: String, size: Int): List<Int>? =
+        lastCounts.getString(key, null)?.split(',')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == size }
+
+    private fun save(key: String, values: List<Int>) {
+        lastCounts.edit().putString(key, values.joinToString(",")).apply()
+    }
+
 
     // private fun collectPositiveNegativeBreakdown(
     //     target: MutableLiveData<TbPositiveNegativeBreakdown>,

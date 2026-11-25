@@ -51,30 +51,25 @@ class ExamineViewModel @Inject constructor(
         }
     }
 
+    // Each status is a lookup for this beneficiary only. Reading every id of each table made
+    // Fill/View appear seconds late on large databases.
+    private fun Flow<Boolean>.shared(): Flow<Boolean> =
+        shareIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), replay = 1)
+
     /** 1. Anthropometric — height/weight stored directly in BENEFICIARY table */
-    val isAnthropometryFilled: Flow<Boolean> =
-        recordsRepo.anthropometryFilledBenIds.map { benId in it }
+    val isAnthropometryFilled: Flow<Boolean> = recordsRepo.isAnthropometryFilled(benId).shared()
 
     /** 2. General Exam (Vitals) — BEN_VITALS table */
-    val isGeneralExamFilled: Flow<Boolean> =
-        vitalRepo.vitalBenIds.map { benId in it }
+    val isGeneralExamFilled: Flow<Boolean> = vitalRepo.hasVitals(benId).shared()
 
     /** 3. TB Screening — TB_SCREENING table */
-    val isTbScreeningFilled: Flow<Boolean> =
-        tbRepo.tbScreeningBenIds.map { benId in it }
+    val isTbScreeningFilled: Flow<Boolean> = tbRepo.hasTbScreening(benId).shared()
 
     /** 4. General OPD — GENERAL_OPD table */
-    val isGeneralOpdFilled: Flow<Boolean> =
-        tbRepo.generalOpdBenIds.map { benId in it }
+    val isGeneralOpdFilled: Flow<Boolean> = tbRepo.hasGeneralOpd(benId).shared()
 
     /** 5. Diagnosis — checks TB_DIAGNOSTICS (new saves) OR TB_SUSPECTED (legacy saves) */
-    val isDiagnosisFilled: Flow<Boolean> =
-        combine(
-            tbRepo.tbDiagnosticsBenIds,
-            tbRepo.tbSuspectedBenIds
-        ) { diagnosticsIds, suspectedIds ->
-            benId in diagnosticsIds || benId in suspectedIds
-        }
+    val isDiagnosisFilled: Flow<Boolean> = tbRepo.hasTbDiagnosis(benId).shared()
 
     /**
      * Next unfilled form index in auto-flow order (0→1→2→3→4).

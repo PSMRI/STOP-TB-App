@@ -3,6 +3,7 @@ package org.piramalswasthya.stoptb.model
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
@@ -65,7 +66,11 @@ data class HouseholdAmenities(
     var otherMotorizedVehicle: String? = null,
 )
 
-@Entity(tableName = "HOUSEHOLD")
+@Entity(
+    tableName = "HOUSEHOLD",
+    // Household lists are per village (v62).
+    indices = [Index(name = "ind_hh_village", value = ["loc_village_id"])]
+)
 data class HouseholdCache(
 
     @PrimaryKey var householdId: Long,
@@ -91,7 +96,11 @@ data class HouseholdCache(
     var updatedTimeStamp: Long? = null,
     var processed: String,
     var isDraft: Boolean,
-    var isDeactivate: Boolean =false
+    var isDeactivate: Boolean =false,
+    /** Partial registration: the house was locked and mandatory fields may be empty. */
+    @ColumnInfo(defaultValue = "0") var isDoorLocked: Boolean = false,
+    /** Latest visit while the house was still locked. */
+    var doorLockVisitDate: Long? = null
 ) : FormDataModel {
 
 
@@ -314,7 +323,9 @@ data class HouseholdBasicCache(
             numMembers = numMembers,
             totalHhMembers = household.family?.totalHhMembers,
             isDeactivate = household.isDeactivate,
-            createdTimeStamp = household.createdTimeStamp
+            createdTimeStamp = household.createdTimeStamp,
+            isDoorLocked = household.isDoorLocked,
+            doorLockVisitDate = household.doorLockVisitDate
 
         )
     }
@@ -330,6 +341,8 @@ data class HouseHoldBasicDomain(
     val totalHhMembers: Int? = null,
     var isDeactivate: Boolean =false,
     var createdTimeStamp: Long? = null,
+    val isDoorLocked: Boolean = false,
+    val doorLockVisitDate: Long? = null,
 
     ) {
     val isPlaceholderMobileNo: Boolean

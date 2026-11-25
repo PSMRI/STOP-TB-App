@@ -30,10 +30,22 @@ class FeedDiagnosticOrderMergeTest {
 
     private val benId = 422455468513L
 
-    private val repo = TBRepo(
+    // The merge / cascade / suspected helpers live in DiagnosticOrderRepo (split out of TBRepo).
+    private val repo = org.piramalswasthya.stoptb.repositories.tb.DiagnosticOrderRepo(
         mock(TBDao::class.java, RETURNS_DEEP_STUBS), mock(BenDao::class.java), mock(PreferenceDao::class.java),
         mock(UserRepo::class.java), mock(AmritApiService::class.java), mock(InAppDb::class.java),
-        mock(DrugMasterRepo::class.java), mock(SyncRetryStore::class.java), mock(Context::class.java)
+        mock(SyncRetryStore::class.java), mock(Context::class.java),
+        mock(org.piramalswasthya.stoptb.repositories.tb.TbLocalRepo::class.java),
+        mock(org.piramalswasthya.stoptb.repositories.tb.TbPushRepo::class.java),
+        org.piramalswasthya.stoptb.repositories.tb.DeviceIntegrationRepo(
+            mock(PreferenceDao::class.java), mock(AmritApiService::class.java), mock(Context::class.java)),
+        org.piramalswasthya.stoptb.repositories.tb.BenIdLocks()
+    )
+
+    // The form-save merge lives in TbLocalRepo.
+    private val local = org.piramalswasthya.stoptb.repositories.tb.TbLocalRepo(
+        mock(TBDao::class.java), mock(BenDao::class.java),
+        org.piramalswasthya.stoptb.repositories.tb.BenIdLocks(), mock(InAppDb::class.java)
     )
 
     private fun result(status: String, summary: String? = null, id: String = "ext-1") =
@@ -239,7 +251,7 @@ class FeedDiagnosticOrderMergeTest {
         assertEquals("Patient refused", stored.reasonNotConductedRif)
         // The form, with RIF not open for entry, mapped the RIF reason away and holds a stale result.
         val form = stored.copy(reasonNotConductedRif = null, naatResult = "TB Negative", trueNatOrderStatus = "PENDING")
-        val saved = repo.formRowOverStored(form, stored)
+        val saved = local.formRowOverStored(form, stored)
         assertEquals("Patient refused", saved.reasonNotConductedRif)
         assertEquals("TB Positive", saved.naatResult)
         assertEquals(OrderStatus.CLOSED.name, saved.trueNatOrderStatus)
@@ -251,7 +263,7 @@ class FeedDiagnosticOrderMergeTest {
         val stored = merge(null, "SPUTUM_TRUENAT", mtbOrder("COMPLETED", mtb = "TB Negative")).cache
         assertEquals(false, stored.isTBConfirmed)
         val form = stored.copy(isLiquidCultureConducted = true, liquidCultureResult = "Positive", isTBConfirmed = true, isConfirmed = true)
-        val saved = repo.formRowOverStored(form, stored)
+        val saved = local.formRowOverStored(form, stored)
         assertEquals("Positive", saved.liquidCultureResult)
         assertEquals(true, saved.isTBConfirmed)
         assertEquals(true, saved.isConfirmed)
@@ -423,7 +435,7 @@ class FeedDiagnosticOrderMergeTest {
         assertEquals("Other", stored.reasonNotConductedRif)
         assertEquals("Cartridge expired", stored.reasonNotConductedRifOther)
         val form = stored.copy(reasonNotConductedRif = null, reasonNotConductedRifOther = null, chestXRayResult = "Normal")
-        val saved = repo.withStoredRifReasons(form, stored)
+        val saved = local.withStoredRifReasons(form, stored)
         assertEquals("Other", saved.reasonNotConductedRif)
         assertEquals("Cartridge expired", saved.reasonNotConductedRifOther)
         assertEquals("Normal", saved.chestXRayResult)
@@ -437,7 +449,7 @@ class FeedDiagnosticOrderMergeTest {
             mtbOrder("CLOSED", reasonToCloseMTB = "Other: Sample leaked")).cache
             .copy(reasonNotConductedChestXray = "Power issue")
         val form = stored.copy(reasonNotConductedNaat = null, reasonNotConductedNaatOther = null, reasonNotConductedChestXray = null)
-        val saved = repo.formRowOverStored(form, stored)
+        val saved = local.formRowOverStored(form, stored)
         assertEquals("Other", saved.reasonNotConductedNaat)
         assertEquals("Sample leaked", saved.reasonNotConductedNaatOther)
         assertEquals("Power issue", saved.reasonNotConductedChestXray)

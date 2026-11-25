@@ -36,10 +36,17 @@ interface VitalDao {
     @Query("SELECT benId FROM BEN_VITALS")
     fun getAllVitalBenIds(): Flow<List<Long>>
 
+    @Query("SELECT EXISTS(SELECT 1 FROM BEN_VITALS WHERE benId = :benId)")
+    fun hasVitals(benId: Long): Flow<Boolean>
+
     /** id + syncState in one pass; callers split it instead of running three queries. */
     @Query("SELECT benId, syncState FROM BEN_VITALS")
     fun getVitalBenIdSyncStates(): Flow<List<org.piramalswasthya.stoptb.model.BenIdSyncState>>
 
     @Query("SELECT benId FROM BEN_VITALS WHERE syncState = :syncState")
     fun getVitalBenIdsBySyncState(syncState: SyncState): Flow<List<Long>>
+
+    /** PR 6: vitals badges for the rows a paged list has loaded. */
+    @Query("SELECT benId, syncState FROM BEN_VITALS WHERE benId IN (:benIds)")
+    fun getVitalBenIdSyncStatesIn(benIds: Collection<Long>): Flow<List<org.piramalswasthya.stoptb.model.BenIdSyncState>>
 }

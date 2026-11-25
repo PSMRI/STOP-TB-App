@@ -27,6 +27,9 @@ import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.configuration.TBScreeningDataset
 import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
+import org.piramalswasthya.stoptb.databinding.RvItemBenVitalActionBinding
+import org.piramalswasthya.stoptb.databinding.RvItemBenAddSpouseBinding
+import org.piramalswasthya.stoptb.databinding.RvItemBenClassicDetailsBinding
 import org.piramalswasthya.stoptb.databinding.RvItemBenBinding
 import org.piramalswasthya.stoptb.helpers.getDateFromLong
 import org.piramalswasthya.stoptb.helpers.getPatientTypeByAge
@@ -41,6 +44,7 @@ import org.piramalswasthya.stoptb.model.RifResult
 import org.piramalswasthya.stoptb.model.TbDiagnosticsCardFields
 import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
 import org.piramalswasthya.stoptb.ui.setSyncStateForBen
+import org.piramalswasthya.stoptb.ui.TbDiagnosticsSnapshot
 import timber.log.Timber
 import org.piramalswasthya.stoptb.model.DiagnosticOrderType
 import org.piramalswasthya.stoptb.model.OrderAction
@@ -120,6 +124,26 @@ class BenListAdapter(
         // Referral even if no data changes in the meantime. Posted on its own handler rather than
         // the view, so it can still be cancelled when the holder is rebound while detached.
         private val refreshHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
+        /**
+         * The diagnostic order / result block is a ViewStub: only lists that show it build its ~40
+         * views. [vital] builds it on first use; [vitalOrNull] is for resets, which have nothing
+         * to reset while it was never built.
+         */
+        private val vitalOrNull: RvItemBenVitalActionBinding?
+            get() = binding.vitalAction.binding as? RvItemBenVitalActionBinding
+        private val addSpouseOrNull: RvItemBenAddSpouseBinding?
+            get() = binding.addSpouseStub.binding as? RvItemBenAddSpouseBinding
+        private val addSpouse: RvItemBenAddSpouseBinding
+            get() {
+                if (!binding.addSpouseStub.isInflated) binding.addSpouseStub.viewStub?.inflate()
+                return binding.addSpouseStub.binding as RvItemBenAddSpouseBinding
+            }
+        private val vital: RvItemBenVitalActionBinding
+            get() {
+                if (!binding.vitalAction.isInflated) binding.vitalAction.viewStub?.inflate()
+                return binding.vitalAction.binding as RvItemBenVitalActionBinding
+            }
         private var hubOrderRefresh: Runnable? = null
 
         private fun scheduleHubOrderRefresh(delayMs: Long) {
@@ -153,13 +177,14 @@ class BenListAdapter(
 
         private fun bindErrorMsg(text: String?) {
             if (text.isNullOrBlank()) {
-                binding.tvErrorMsg.visibility = View.GONE
-                binding.tvErrorMsg.movementMethod = null
+                val block = vitalOrNull ?: return
+                block.tvErrorMsg.visibility = View.GONE
+                block.tvErrorMsg.movementMethod = null
                 return
             }
-            binding.tvErrorMsg.visibility = View.VISIBLE
-            binding.tvErrorMsg.highlightColor = Color.TRANSPARENT
-            binding.tvErrorMsg.movementMethod = LinkMovementMethod.getInstance()
+            vital.tvErrorMsg.visibility = View.VISIBLE
+            vital.tvErrorMsg.highlightColor = Color.TRANSPARENT
+            vital.tvErrorMsg.movementMethod = LinkMovementMethod.getInstance()
             renderErrorMsg(text, expanded = false)
         }
 
@@ -183,10 +208,10 @@ class BenListAdapter(
             )
 
             if (expanded) {
-                binding.tvErrorMsg.maxLines = Int.MAX_VALUE
+                vital.tvErrorMsg.maxLines = Int.MAX_VALUE
                 builder.append(text)
             } else {
-                binding.tvErrorMsg.maxLines = 2
+                vital.tvErrorMsg.maxLines = 2
                 builder.append(if (isTruncated) text.take(ERROR_MSG_COLLAPSED_BODY_LENGTH).trimEnd() + "…" else text)
             }
 
@@ -209,7 +234,7 @@ class BenListAdapter(
                     toggleStart, builder.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
             }
-            binding.tvErrorMsg.text = builder
+            vital.tvErrorMsg.text = builder
         }
 
         private fun bindPillAndCaptions(
@@ -339,24 +364,24 @@ class BenListAdapter(
             tbDiag: TbDiagnosticsCardFields?,
             canActOnReferral: Boolean,
             pref: PreferenceDao?,
-            retryingBenIds: List<Long>,
+            retryingBenIds: Collection<Long>,
             clickListener: BenClickListener?
         ) {
             val ctx = binding.root.context
-            binding.llRifBlock.visibility = View.VISIBLE
+            vital.llRifBlock.visibility = View.VISIBLE
             val status = tbDiag?.rifOrderStatus
 
             // Reset per-bind (RecyclerView recycling).
-            binding.btnRifPrimary.visibility = View.GONE
-            binding.btnRifSecondary.visibility = View.GONE
-            binding.llRifSummaryStrip.visibility = View.GONE
-            binding.tvRifErrorMsg.visibility = View.GONE
-            binding.tvRifOrderStatus.visibility = View.GONE
-            binding.llRifOrderStatusPill.visibility = View.GONE
-            binding.tvRifLastCheckedCaption.visibility = View.GONE
-            binding.llRifPollingStoppedCaption.visibility = View.GONE
-            binding.btnRifPrimary.icon = null
-            binding.btnRifSecondary.icon = null
+            vital.btnRifPrimary.visibility = View.GONE
+            vital.btnRifSecondary.visibility = View.GONE
+            vital.llRifSummaryStrip.visibility = View.GONE
+            vital.tvRifErrorMsg.visibility = View.GONE
+            vital.tvRifOrderStatus.visibility = View.GONE
+            vital.llRifOrderStatusPill.visibility = View.GONE
+            vital.tvRifLastCheckedCaption.visibility = View.GONE
+            vital.llRifPollingStoppedCaption.visibility = View.GONE
+            vital.btnRifPrimary.icon = null
+            vital.btnRifSecondary.icon = null
 
             val orderStatus = tbDiag?.trueNatOrderStatus
             val rifDisplay = DiagnosticResultLabels.rif(ctx, tbDiag?.trueNatRifResult)
@@ -364,9 +389,9 @@ class BenListAdapter(
 
             fun bindRifPill(pillStatus: String?, pendingSync: Boolean) = bindPillAndCaptions(
                 pillStatus, tbDiag?.trueNatOrderId, item.benId, DiagnosticOrderType.SPUTUM_TRUENAT, pref, pendingSync,
-                binding.llRifOrderStatusPill, binding.ivRifOrderStatusPillIcon, binding.tvRifOrderStatusPillText,
-                binding.viewRifOrderStatusDivider, binding.tvRifLastCheckedCaption, binding.llRifPollingStoppedCaption,
-                binding.tvRifPollingStoppedCaptionTitle, binding.tvRifPollingStoppedCaptionText,
+                vital.llRifOrderStatusPill, vital.ivRifOrderStatusPillIcon, vital.tvRifOrderStatusPillText,
+                vital.viewRifOrderStatusDivider, vital.tvRifLastCheckedCaption, vital.llRifPollingStoppedCaption,
+                vital.tvRifPollingStoppedCaptionTitle, vital.tvRifPollingStoppedCaptionText,
                 waitingText = ctx.getString(R.string.order_status_waiting_rif)
             )
 
@@ -375,20 +400,20 @@ class BenListAdapter(
             when {
                 tbDiag?.rifManualResultPendingSync == true -> bindRifPill(orderStatus, pendingSync = true)
                 rifDisplay != null -> {
-                    binding.llRifSummaryStrip.visibility = View.VISIBLE
-                    binding.tvRifSummaryText.text = withDeviceUpdateNote(
+                    vital.llRifSummaryStrip.visibility = View.VISIBLE
+                    vital.tvRifSummaryText.text = withDeviceUpdateNote(
                         ctx.getString(R.string.order_status_rif_result, rifDisplay),
                         DiagnosticResultLabels.replacedByDevice(
                             "MDR_RIF", pref?.getManualEnteredResult(item.benId, "MDR_RIF"), tbDiag?.trueNatRifResult
                         )
                     )
-                    binding.btnViewRifResult.setOnClickListener {
+                    vital.btnViewRifResult.setOnClickListener {
                         clickListener?.onClickOrderAction(item, OrderAction.VIEW_RIF, DiagnosticOrderType.MDR_RIF)
                     }
                 }
                 rifReason.isNotBlank() || status.equals(OrderStatus.CLOSED.name, ignoreCase = true) -> {
-                    binding.tvRifOrderStatus.visibility = View.VISIBLE
-                    binding.tvRifOrderStatus.text = if (rifReason.isNotBlank()) {
+                    vital.tvRifOrderStatus.visibility = View.VISIBLE
+                    vital.tvRifOrderStatus.text = if (rifReason.isNotBlank()) {
                         ctx.getString(R.string.order_status_rif_not_conducted, rifReason)
                     } else {
                         ctx.getString(R.string.order_status_rif_closed)
@@ -404,17 +429,17 @@ class BenListAdapter(
                 // The vendor reported the RIF test FAILED. The server takes a hand-entered RIF on a
                 // FAILED order (but no reasonToCloseRif), so only Enter RIF Result is offered.
                 orderStatus.equals(OrderStatus.FAILED.name, ignoreCase = true) -> {
-                    binding.tvRifErrorMsg.visibility = View.VISIBLE
-                    binding.tvRifErrorMsg.text = ctx.getString(R.string.order_status_rif_failed) +
+                    vital.tvRifErrorMsg.visibility = View.VISIBLE
+                    vital.tvRifErrorMsg.text = ctx.getString(R.string.order_status_rif_failed) +
                             (tbDiag?.errorMsgTrueNat?.takeIf { it.isNotBlank() }?.let { " — $it" } ?: "")
-                    binding.btnRifPrimary.visibility = View.VISIBLE
-                    binding.btnRifPrimary.text = ctx.getString(R.string.order_status_enter_rif_result)
-                    binding.btnRifPrimary.icon = ContextCompat.getDrawable(ctx, R.drawable.ic_pencil)
-                    binding.btnRifPrimary.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
-                    binding.btnRifPrimary.setBackgroundTintList(ContextCompat.getColorStateList(ctx, android.R.color.holo_red_dark))
-                    binding.btnRifPrimary.isEnabled = canActOnReferral
-                    binding.btnRifPrimary.alpha = if (canActOnReferral) 1.0f else 0.5f
-                    binding.btnRifPrimary.setOnClickListener {
+                    vital.btnRifPrimary.visibility = View.VISIBLE
+                    vital.btnRifPrimary.text = ctx.getString(R.string.order_status_enter_rif_result)
+                    vital.btnRifPrimary.icon = ContextCompat.getDrawable(ctx, R.drawable.ic_pencil)
+                    vital.btnRifPrimary.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
+                    vital.btnRifPrimary.setBackgroundTintList(ContextCompat.getColorStateList(ctx, android.R.color.holo_red_dark))
+                    vital.btnRifPrimary.isEnabled = canActOnReferral
+                    vital.btnRifPrimary.alpha = if (canActOnReferral) 1.0f else 0.5f
+                    vital.btnRifPrimary.setOnClickListener {
                         clickListener?.onClickOrderAction(item, OrderAction.COMPLETE_RIF, DiagnosticOrderType.MDR_RIF)
                     }
                 }
@@ -425,25 +450,25 @@ class BenListAdapter(
                         orderStatus.equals(OrderStatus.INVALID.name, ignoreCase = true) -> {
                     bindRifPill(orderStatus, pendingSync = false)
 
-                    binding.btnRifPrimary.visibility = View.VISIBLE
-                    binding.btnRifPrimary.text = ctx.getString(R.string.order_status_enter_rif_result)
-                    binding.btnRifPrimary.icon = ContextCompat.getDrawable(ctx, R.drawable.ic_pencil)
-                    binding.btnRifPrimary.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
-                    binding.btnRifPrimary.setBackgroundTintList(ContextCompat.getColorStateList(ctx, android.R.color.holo_red_dark))
-                    binding.btnRifPrimary.isEnabled = canActOnReferral
-                    binding.btnRifPrimary.alpha = if (canActOnReferral) 1.0f else 0.5f
-                    binding.btnRifPrimary.setOnClickListener {
+                    vital.btnRifPrimary.visibility = View.VISIBLE
+                    vital.btnRifPrimary.text = ctx.getString(R.string.order_status_enter_rif_result)
+                    vital.btnRifPrimary.icon = ContextCompat.getDrawable(ctx, R.drawable.ic_pencil)
+                    vital.btnRifPrimary.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
+                    vital.btnRifPrimary.setBackgroundTintList(ContextCompat.getColorStateList(ctx, android.R.color.holo_red_dark))
+                    vital.btnRifPrimary.isEnabled = canActOnReferral
+                    vital.btnRifPrimary.alpha = if (canActOnReferral) 1.0f else 0.5f
+                    vital.btnRifPrimary.setOnClickListener {
                         clickListener?.onClickOrderAction(item, OrderAction.COMPLETE_RIF, DiagnosticOrderType.MDR_RIF)
                     }
 
-                    binding.btnRifSecondary.visibility = View.VISIBLE
-                    binding.btnRifSecondary.text = ctx.getString(R.string.order_status_rif_not_conducted_button)
-                    binding.btnRifSecondary.icon = ContextCompat.getDrawable(ctx, R.drawable.ic_block)
-                    binding.btnRifSecondary.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
-                    binding.btnRifSecondary.setBackgroundTintList(ContextCompat.getColorStateList(ctx, android.R.color.holo_orange_dark))
-                    binding.btnRifSecondary.isEnabled = canActOnReferral
-                    binding.btnRifSecondary.alpha = if (canActOnReferral) 1.0f else 0.5f
-                    binding.btnRifSecondary.setOnClickListener {
+                    vital.btnRifSecondary.visibility = View.VISIBLE
+                    vital.btnRifSecondary.text = ctx.getString(R.string.order_status_rif_not_conducted_button)
+                    vital.btnRifSecondary.icon = ContextCompat.getDrawable(ctx, R.drawable.ic_block)
+                    vital.btnRifSecondary.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
+                    vital.btnRifSecondary.setBackgroundTintList(ContextCompat.getColorStateList(ctx, android.R.color.holo_orange_dark))
+                    vital.btnRifSecondary.isEnabled = canActOnReferral
+                    vital.btnRifSecondary.alpha = if (canActOnReferral) 1.0f else 0.5f
+                    vital.btnRifSecondary.setOnClickListener {
                         clickListener?.onClickOrderAction(item, OrderAction.NOT_CONDUCTED, DiagnosticOrderType.MDR_RIF)
                     }
                 }
@@ -460,25 +485,25 @@ class BenListAdapter(
             tbDiag: TbDiagnosticsCardFields?,
             canActOnReferral: Boolean,
             pref: PreferenceDao?,
-            retryingBenIds: List<Long>,
+            retryingBenIds: Collection<Long>,
             clickListener: BenClickListener?
         ) {
             val ctx = binding.root.context
-            binding.llOrderStatusPill.visibility = View.GONE
-            binding.tvLastCheckedCaption.visibility = View.GONE
-            binding.llPollingStoppedCaption.visibility = View.GONE
-            binding.llMtbSummaryStrip.visibility = View.GONE
-            binding.viewRifDivider.visibility = View.GONE
-            binding.llRifBlock.visibility = View.GONE
+            vital.llOrderStatusPill.visibility = View.GONE
+            vital.tvLastCheckedCaption.visibility = View.GONE
+            vital.llPollingStoppedCaption.visibility = View.GONE
+            vital.llMtbSummaryStrip.visibility = View.GONE
+            vital.viewRifDivider.visibility = View.GONE
+            vital.llRifBlock.visibility = View.GONE
 
             when (source) {
                 6 -> {
                     val status = tbDiag?.xrayOrderStatus
                     bindPillAndCaptions(
                         status, tbDiag?.xrayOrderId, item.benId, DiagnosticOrderType.XRAY_CHEST, pref, tbDiag?.xrayManualResultPendingSync == true,
-                        binding.llOrderStatusPill, binding.ivOrderStatusPillIcon, binding.tvOrderStatusPillText,
-                        binding.viewOrderStatusDivider, binding.tvLastCheckedCaption, binding.llPollingStoppedCaption,
-                        binding.tvPollingStoppedCaptionTitle, binding.tvPollingStoppedCaptionText
+                        vital.llOrderStatusPill, vital.ivOrderStatusPillIcon, vital.tvOrderStatusPillText,
+                        vital.viewOrderStatusDivider, vital.tvLastCheckedCaption, vital.llPollingStoppedCaption,
+                        vital.tvPollingStoppedCaptionTitle, vital.tvPollingStoppedCaptionText
                     )
                     // A vendor X-ray result replaced the one entered by hand.
                     if (status.equals(OrderStatus.COMPLETED.name, ignoreCase = true) &&
@@ -487,14 +512,14 @@ class BenListAdapter(
                             "XRAY_CHEST", pref?.getManualEnteredResult(item.benId, "XRAY_CHEST"), tbDiag?.chestXRayResult
                         )
                     ) {
-                        binding.llOrderStatusPill.visibility = View.VISIBLE
-                        (binding.ivOrderStatusPillIcon.drawable as? androidx.swiperefreshlayout.widget.CircularProgressDrawable)?.stop()
-                        binding.ivOrderStatusPillIcon.setImageResource(R.drawable.ic_health_person)
-                        binding.ivOrderStatusPillIcon.imageTintList = ContextCompat.getColorStateList(ctx, android.R.color.holo_blue_dark)
-                        binding.tvOrderStatusPillText.text = ctx.getString(
+                        vital.llOrderStatusPill.visibility = View.VISIBLE
+                        (vital.ivOrderStatusPillIcon.drawable as? androidx.swiperefreshlayout.widget.CircularProgressDrawable)?.stop()
+                        vital.ivOrderStatusPillIcon.setImageResource(R.drawable.ic_health_person)
+                        vital.ivOrderStatusPillIcon.imageTintList = ContextCompat.getColorStateList(ctx, android.R.color.holo_blue_dark)
+                        vital.tvOrderStatusPillText.text = ctx.getString(
                             R.string.order_status_xray_updated_by_device, DiagnosticResultLabels.xray(tbDiag?.chestXRayResult)
                         )
-                        binding.tvOrderStatusPillText.setTextColor(ContextCompat.getColor(ctx, android.R.color.holo_blue_dark))
+                        vital.tvOrderStatusPillText.setTextColor(ContextCompat.getColor(ctx, android.R.color.holo_blue_dark))
                     }
                 }
                 7 -> {
@@ -503,22 +528,22 @@ class BenListAdapter(
                     val mtbDisplay = DiagnosticResultLabels.mtb(ctx, tbDiag?.naatResult)
                     // The MTB result shows as soon as it is known, even while the order waits for RIF.
                     if (mtbDisplay != null && !isPendingTrueNatSync) {
-                        binding.llMtbSummaryStrip.visibility = View.VISIBLE
-                        binding.tvMtbSummaryText.text = withDeviceUpdateNote(
+                        vital.llMtbSummaryStrip.visibility = View.VISIBLE
+                        vital.tvMtbSummaryText.text = withDeviceUpdateNote(
                             ctx.getString(R.string.order_status_mtb_result, mtbDisplay),
                             DiagnosticResultLabels.replacedByDevice(
                                 "SPUTUM_TRUENAT", pref?.getManualEnteredResult(item.benId, "SPUTUM_TRUENAT"), tbDiag?.naatResult
                             )
                         )
-                        binding.btnViewMtbResult.setOnClickListener {
+                        vital.btnViewMtbResult.setOnClickListener {
                             clickListener?.onClickOrderAction(item, OrderAction.VIEW, DiagnosticOrderType.SPUTUM_TRUENAT)
                         }
                     } else {
                         bindPillAndCaptions(
                             status, tbDiag?.trueNatOrderId, item.benId, DiagnosticOrderType.SPUTUM_TRUENAT, pref, isPendingTrueNatSync,
-                            binding.llOrderStatusPill, binding.ivOrderStatusPillIcon, binding.tvOrderStatusPillText,
-                            binding.viewOrderStatusDivider, binding.tvLastCheckedCaption, binding.llPollingStoppedCaption,
-                            binding.tvPollingStoppedCaptionTitle, binding.tvPollingStoppedCaptionText
+                            vital.llOrderStatusPill, vital.ivOrderStatusPillIcon, vital.tvOrderStatusPillText,
+                            vital.viewOrderStatusDivider, vital.tvLastCheckedCaption, vital.llPollingStoppedCaption,
+                            vital.tvPollingStoppedCaptionTitle, vital.tvPollingStoppedCaptionText
                         )
                     }
 
@@ -526,7 +551,7 @@ class BenListAdapter(
                     // replaces it (e.g. a vendor MTB Not Detected) hides the block again on its own.
                     val isMtbPositive = MtbResult.fromResultText(tbDiag?.naatResult) == MtbResult.TB_POSITIVE
                     if (isMtbPositive) {
-                        binding.viewRifDivider.visibility = View.VISIBLE
+                        vital.viewRifDivider.visibility = View.VISIBLE
                         bindRifBlock(item, tbDiag, canActOnReferral, pref, retryingBenIds, clickListener)
                     }
                 }
@@ -544,22 +569,22 @@ class BenListAdapter(
             isSoftDeleteEnabled: Boolean,
             pref: PreferenceDao?,
             context: FragmentActivity,
-            benIdList: List<Long>,
-            tbScreeningBenIds: List<Long> = emptyList(),
-            generalOpdBenIds: List<Long> = emptyList(),
-            anthropometryBenIds: List<Long> = emptyList(),
-            unsyncedVitalBenIds: List<Long> = emptyList(),
-            unsyncedTbScreeningBenIds: List<Long> = emptyList(),
-            unsyncedGeneralOpdBenIds: List<Long> = emptyList(),
-            syncingVitalBenIds: List<Long> = emptyList(),
-            syncingTbScreeningBenIds: List<Long> = emptyList(),
-            syncingGeneralOpdBenIds: List<Long> = emptyList(),
-            tbSuspectedBenIds: List<Long> = emptyList(),
-            contactFollowUpDoneBenIds: List<Long> = emptyList(),
-            tptFollowUpDoneBenIds: List<Long> = emptyList(),
-            tptEligibleBenIds: List<Long> = emptyList(),
+            benIdList: Collection<Long>,
+            tbScreeningBenIds: Collection<Long> = emptyList(),
+            generalOpdBenIds: Collection<Long> = emptyList(),
+            anthropometryBenIds: Collection<Long> = emptyList(),
+            unsyncedVitalBenIds: Collection<Long> = emptyList(),
+            unsyncedTbScreeningBenIds: Collection<Long> = emptyList(),
+            unsyncedGeneralOpdBenIds: Collection<Long> = emptyList(),
+            syncingVitalBenIds: Collection<Long> = emptyList(),
+            syncingTbScreeningBenIds: Collection<Long> = emptyList(),
+            syncingGeneralOpdBenIds: Collection<Long> = emptyList(),
+            tbSuspectedBenIds: Collection<Long> = emptyList(),
+            contactFollowUpDoneBenIds: Collection<Long> = emptyList(),
+            tptFollowUpDoneBenIds: Collection<Long> = emptyList(),
+            tptEligibleBenIds: Collection<Long> = emptyList(),
             childCountMap: Map<Long, Int> = emptyMap(),
-            tptRegistrationDoneBenIds: List<Long> = emptyList(),
+            tptRegistrationDoneBenIds: Collection<Long> = emptyList(),
             showActionButtons: Boolean = true,
             showResultButton: Boolean = false,
             showAnthropometryButton: Boolean = false,
@@ -572,7 +597,7 @@ class BenListAdapter(
             tbDiagnosticsLoaded: Boolean = false,
             tbScreeningMap: Map<Long, TbScreeningSymptoms> = emptyMap(),
             source: Int = 0,
-            retryingBenIds: List<Long> = emptyList(),
+            retryingBenIds: Collection<Long> = emptyList(),
             showContactTracingForms: Boolean = false,
             roleManager: RoleManager? = null,
             showRedesignedCard: Boolean = false,
@@ -590,8 +615,6 @@ class BenListAdapter(
             binding.showActionButtons = showActionButtons
             binding.showAddMemberButton = showAddMemberButton
             binding.showRegistrationDate = showRegistrationDate
-            binding.registrationDate.visibility =
-                if (showRegistrationDate) View.VISIBLE else View.INVISIBLE
             binding.hasAbha = !item.abhaId.isNullOrEmpty()
             binding.role = role
 
@@ -636,11 +659,6 @@ class BenListAdapter(
             binding.isGeneralOpdDone = hasGeneralOpd
             binding.isAnthropometryDone = hasAnthropometry
 
-            binding.btnAbove30.text = if (isMatched) {
-                binding.root.context.getString(R.string.view_edit_eye_surgery)
-            } else {
-                binding.root.context.getString(R.string.add_eye_surgery)
-            }
             val isNonHH = item.isNonHH
             val isHeadOfFamily = if (isNonHH) false else item.relToHeadId == 19
             val householdHeadName = householdHeadNameMap[item.hhId]
@@ -652,8 +670,15 @@ class BenListAdapter(
             binding.tvAgeGender.text = "${item.gender.replaceFirstChar { it.titlecase() }} | ${compactAge(item.age)}"
             binding.llRedesignedDetails.visibility = if (showRedesignedCard) View.VISIBLE else View.GONE
             binding.ncdHofName.visibility = if (showRedesignedCard) View.GONE else View.VISIBLE
-            binding.llBenDetails.visibility = if (showRedesignedCard) View.GONE else View.VISIBLE
-            binding.llBenDetails2.visibility = if (showRedesignedCard) View.GONE else View.VISIBLE
+            // The classic details are a ViewStub: built only for lists using the classic card. The
+            // variables reach it at executePendingBindings() below.
+            if (!showRedesignedCard && !binding.classicDetails.isInflated) {
+                binding.classicDetails.viewStub?.inflate()
+            }
+            binding.classicDetails.root?.visibility = if (showRedesignedCard) View.GONE else View.VISIBLE
+            val classicDetails = binding.classicDetails.binding as? RvItemBenClassicDetailsBinding
+            classicDetails?.registrationDate?.visibility =
+                if (showRegistrationDate) View.VISIBLE else View.INVISIBLE
             binding.detailsDivider.visibility = if (showRedesignedCard) View.GONE else View.VISIBLE
             if (showRedesignedCard) {
                 val fatherName = item.fatherName
@@ -685,7 +710,7 @@ class BenListAdapter(
                 binding.tvRedesignNikshayId.text = item.nikshayIdDisplay
                 binding.tvRedesignMobileNumber.text = if (item.isPlaceholderMobileNo) "N/A" else item.mobileNoDisplay
             }
-            binding.HOF.visibility = View.GONE
+            classicDetails?.HOF?.visibility = View.GONE
             if (isNonHH) {
                 binding.ivIsHead.visibility = View.VISIBLE
                 binding.ivIsHead.setImageResource(R.drawable.icon_non_household)
@@ -703,19 +728,21 @@ class BenListAdapter(
             } else {
                 View.GONE
             }
-            binding.btnAbove30.visibility = View.GONE
-            binding.btnVitalScreen.visibility = when {
-                showResultButton && !item.isDeath && !item.isDeactivate -> View.VISIBLE
-                else -> View.GONE
+            if (showResultButton && !item.isDeath && !item.isDeactivate) {
+                vital.btnVitalScreen.visibility = View.VISIBLE
+            } else {
+                vitalOrNull?.btnVitalScreen?.visibility = View.GONE
             }
             // Reset per bind to prevent recycled views from showing a previous row's error message.
             bindErrorMsg(null)
-            binding.llOrderStatusPill.visibility = View.GONE
-            binding.tvLastCheckedCaption.visibility = View.GONE
-            binding.llPollingStoppedCaption.visibility = View.GONE
-            binding.llMtbSummaryStrip.visibility = View.GONE
-            binding.viewRifDivider.visibility = View.GONE
-            binding.llRifBlock.visibility = View.GONE
+            vitalOrNull?.apply {
+                llOrderStatusPill.visibility = View.GONE
+                tvLastCheckedCaption.visibility = View.GONE
+                llPollingStoppedCaption.visibility = View.GONE
+                llMtbSummaryStrip.visibility = View.GONE
+                viewRifDivider.visibility = View.GONE
+                llRifBlock.visibility = View.GONE
+            }
 
             binding.btnGeneralOpd.visibility = View.GONE
             binding.llGeneralOpdRow.visibility = View.GONE
@@ -822,7 +849,7 @@ class BenListAdapter(
             }
 
 
-            if (binding.btnVitalScreen.visibility == View.VISIBLE) {
+            if (vitalOrNull?.btnVitalScreen?.visibility == View.VISIBLE) {
                 if (showResultButton) {
                     val tbDiag = tbDiagnosticsByBenId[item.benId]
                     // Legacy, kept for reference:
@@ -830,13 +857,12 @@ class BenListAdapter(
 //                    val isCounsellingOfficer = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
 //                    val canActOnReferral = isNurse || isCounsellingOfficer
                     val canActOnReferral = roleManager?.privilegesUnion()?.canActOnReferral == true
-                    Timber.d("RoleManager: canActOnReferral=$canActOnReferral")
                     val hubOrderWait = hubOrderWindowRemaining(tbDiag, pref)
                     val config = when (source) {
                         6 -> {
                             val status = tbDiag?.xrayOrderStatus.withoutHubPlaceholder(tbDiag?.xrayOrderId, pref)
                             val referred = tbDiag?.isReferredForDigitalChestXray
-                            binding.btnVitalScreenSecondary.visibility = View.GONE
+                            vital.btnVitalScreenSecondary.visibility = View.GONE
 
                             when {
                                 // The decoration map is filled by a separate flow and starts
@@ -877,16 +903,16 @@ class BenListAdapter(
                                     ButtonConfig(context.getString(R.string.order_status_retry_referral), android.R.color.holo_red_dark, OrderAction.RETRY_PUSH, DiagnosticOrderType.XRAY_CHEST)
                                 }
                                 else -> {
-                                    binding.btnVitalScreenSecondary.visibility = View.VISIBLE
-                                    binding.btnVitalScreenSecondary.text = context.getString(R.string.order_status_not_conducted)
-                                    binding.btnVitalScreenSecondary.setBackgroundTintList(
+                                    vital.btnVitalScreenSecondary.visibility = View.VISIBLE
+                                    vital.btnVitalScreenSecondary.text = context.getString(R.string.order_status_not_conducted)
+                                    vital.btnVitalScreenSecondary.setBackgroundTintList(
                                         ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_orange_dark)
                                     )
-                                    binding.btnVitalScreenSecondary.isEnabled = canActOnReferral
-                                    binding.btnVitalScreenSecondary.alpha = if (canActOnReferral) 1.0f else 0.5f
-                                    binding.btnVitalScreenSecondary.icon = ContextCompat.getDrawable(binding.root.context, R.drawable.ic_block)
-                                    binding.btnVitalScreenSecondary.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
-                                    binding.btnVitalScreenSecondary.setOnClickListener {
+                                    vital.btnVitalScreenSecondary.isEnabled = canActOnReferral
+                                    vital.btnVitalScreenSecondary.alpha = if (canActOnReferral) 1.0f else 0.5f
+                                    vital.btnVitalScreenSecondary.icon = ContextCompat.getDrawable(binding.root.context, R.drawable.ic_block)
+                                    vital.btnVitalScreenSecondary.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
+                                    vital.btnVitalScreenSecondary.setOnClickListener {
                                         clickListener?.onClickOrderAction(item, OrderAction.NOT_CONDUCTED, DiagnosticOrderType.XRAY_CHEST)
                                     }
                                     ButtonConfig(context.getString(R.string.order_status_enter_result), android.R.color.holo_red_dark, OrderAction.COMPLETE, DiagnosticOrderType.XRAY_CHEST)
@@ -896,9 +922,9 @@ class BenListAdapter(
                         7 -> {
                             val status = tbDiag?.trueNatOrderStatus.withoutHubPlaceholder(tbDiag?.trueNatOrderId, pref)
                             val referredForSputum = tbDiag?.isReferredForSputum
-                            binding.btnVitalScreenSecondary.visibility = View.GONE
-                            binding.btnVitalScreen.visibility = View.VISIBLE
-                            binding.llMtbSummaryStrip.visibility = View.GONE
+                            vital.btnVitalScreenSecondary.visibility = View.GONE
+                            vital.btnVitalScreen.visibility = View.VISIBLE
+                            vital.llMtbSummaryStrip.visibility = View.GONE
 
                             when {
                                 // The decoration map is filled by a separate flow and starts
@@ -926,7 +952,7 @@ class BenListAdapter(
                                 status.equals(OrderStatus.COMPLETED.name, ignoreCase = true) ||
                                         (!tbDiag?.naatResult.isNullOrBlank() &&
                                                 !status.equals(OrderStatus.CLOSED.name, ignoreCase = true)) -> {
-                                    binding.btnVitalScreen.visibility = View.GONE
+                                    vital.btnVitalScreen.visibility = View.GONE
                                     ButtonConfig("", android.R.color.holo_green_dark, OrderAction.NONE, DiagnosticOrderType.SPUTUM_TRUENAT)
                                 }
                                 status.equals(OrderStatus.CLOSED.name, ignoreCase = true) -> {
@@ -947,15 +973,15 @@ class BenListAdapter(
                                 else -> {
                                     // PENDING / MANUAL_ENTRY (or no order status yet) —
                                     // same standing-actions pattern as Chest X-Ray.
-                                    binding.btnVitalScreenSecondary.visibility = View.VISIBLE
-                                    binding.btnVitalScreenSecondary.text = context.getString(R.string.order_status_not_conducted)
-                                    binding.btnVitalScreenSecondary.setBackgroundTintList(
+                                    vital.btnVitalScreenSecondary.visibility = View.VISIBLE
+                                    vital.btnVitalScreenSecondary.text = context.getString(R.string.order_status_not_conducted)
+                                    vital.btnVitalScreenSecondary.setBackgroundTintList(
                                         ContextCompat.getColorStateList(binding.root.context, android.R.color.holo_orange_dark)
                                     )
-                                    binding.btnVitalScreenSecondary.isEnabled = canActOnReferral
-                                    binding.btnVitalScreenSecondary.alpha = if (canActOnReferral) 1.0f else 0.5f
-                                    binding.btnVitalScreenSecondary.icon = ContextCompat.getDrawable(binding.root.context, R.drawable.ic_block)
-                                    binding.btnVitalScreenSecondary.setOnClickListener {
+                                    vital.btnVitalScreenSecondary.isEnabled = canActOnReferral
+                                    vital.btnVitalScreenSecondary.alpha = if (canActOnReferral) 1.0f else 0.5f
+                                    vital.btnVitalScreenSecondary.icon = ContextCompat.getDrawable(binding.root.context, R.drawable.ic_block)
+                                    vital.btnVitalScreenSecondary.setOnClickListener {
                                         clickListener?.onClickOrderAction(item, OrderAction.NOT_CONDUCTED, DiagnosticOrderType.SPUTUM_TRUENAT)
                                     }
                                     ButtonConfig(context.getString(R.string.order_status_enter_result), android.R.color.holo_red_dark, OrderAction.COMPLETE, DiagnosticOrderType.SPUTUM_TRUENAT)
@@ -975,62 +1001,62 @@ class BenListAdapter(
                         else -> ButtonConfig("RESULT", android.R.color.holo_green_dark, OrderAction.VIEW, null)
                     }
 
-                    binding.btnVitalScreen.text = config.text
-                    binding.btnVitalScreen.setBackgroundTintList(
+                    vital.btnVitalScreen.text = config.text
+                    vital.btnVitalScreen.setBackgroundTintList(
                         ContextCompat.getColorStateList(binding.root.context, config.colorRes)
                     )
-                    binding.btnVitalScreen.setTextColor(
+                    vital.btnVitalScreen.setTextColor(
                         ContextCompat.getColor(binding.root.context, android.R.color.white)
                     )
 
                     val isViewAction = config.action == OrderAction.VIEW || config.action == OrderAction.VIEW_LC || config.action == OrderAction.ENTER_LC
                     if (config.action == OrderAction.POLL || config.action == OrderAction.NO_RESULT || config.action == OrderAction.NONE) {
-                        binding.btnVitalScreen.isEnabled = false
-                        binding.btnVitalScreen.alpha = 0.5f
+                        vital.btnVitalScreen.isEnabled = false
+                        vital.btnVitalScreen.alpha = 0.5f
                     } else if (!canActOnReferral && !isViewAction) {
-                        binding.btnVitalScreen.isEnabled = false
-                        binding.btnVitalScreen.alpha = 0.5f
+                        vital.btnVitalScreen.isEnabled = false
+                        vital.btnVitalScreen.alpha = 0.5f
                     } else {
-                        binding.btnVitalScreen.isEnabled = true
-                        binding.btnVitalScreen.alpha = 1.0f
+                        vital.btnVitalScreen.isEnabled = true
+                        vital.btnVitalScreen.alpha = 1.0f
                     }
 
                     val isRetryPushInFlight = (config.action == OrderAction.RETRY_PUSH || config.action == OrderAction.REORDER) &&
                             retryingBenIds.contains(item.benId)
                     if (isRetryPushInFlight) {
-                        binding.btnVitalScreen.isEnabled = false
-                        binding.btnVitalScreen.alpha = 1.0f
-                        binding.btnVitalScreen.icon = androidx.swiperefreshlayout.widget.CircularProgressDrawable(binding.root.context).apply {
+                        vital.btnVitalScreen.isEnabled = false
+                        vital.btnVitalScreen.alpha = 1.0f
+                        vital.btnVitalScreen.icon = androidx.swiperefreshlayout.widget.CircularProgressDrawable(binding.root.context).apply {
                             setStyle(androidx.swiperefreshlayout.widget.CircularProgressDrawable.DEFAULT)
                             setColorSchemeColors(android.graphics.Color.WHITE)
                             start()
                         }
-                        binding.btnVitalScreen.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
+                        vital.btnVitalScreen.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
                     } else {
-                        (binding.btnVitalScreen.icon as? androidx.swiperefreshlayout.widget.CircularProgressDrawable)?.stop()
-                        binding.btnVitalScreen.icon = if (config.action == OrderAction.COMPLETE)
+                        (vital.btnVitalScreen.icon as? androidx.swiperefreshlayout.widget.CircularProgressDrawable)?.stop()
+                        vital.btnVitalScreen.icon = if (config.action == OrderAction.COMPLETE)
                             ContextCompat.getDrawable(binding.root.context, R.drawable.ic_pencil) else null
-                        binding.btnVitalScreen.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
+                        vital.btnVitalScreen.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
                     }
 
-                    val isSecondaryRetryInFlight = binding.btnVitalScreenSecondary.visibility == View.VISIBLE &&
-                            binding.btnVitalScreenSecondary.text == "Retry Referral" &&
+                    val isSecondaryRetryInFlight = vital.btnVitalScreenSecondary.visibility == View.VISIBLE &&
+                            vital.btnVitalScreenSecondary.text == "Retry Referral" &&
                             retryingBenIds.contains(item.benId)
                     if (isSecondaryRetryInFlight) {
-                        binding.btnVitalScreenSecondary.isEnabled = false
-                        binding.btnVitalScreenSecondary.alpha = 1.0f
-                        binding.btnVitalScreenSecondary.icon = androidx.swiperefreshlayout.widget.CircularProgressDrawable(binding.root.context).apply {
+                        vital.btnVitalScreenSecondary.isEnabled = false
+                        vital.btnVitalScreenSecondary.alpha = 1.0f
+                        vital.btnVitalScreenSecondary.icon = androidx.swiperefreshlayout.widget.CircularProgressDrawable(binding.root.context).apply {
                             setStyle(androidx.swiperefreshlayout.widget.CircularProgressDrawable.DEFAULT)
                             setColorSchemeColors(android.graphics.Color.WHITE)
                             start()
                         }
-                        binding.btnVitalScreenSecondary.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
+                        vital.btnVitalScreenSecondary.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_END
                     } else {
-                        (binding.btnVitalScreenSecondary.icon as? androidx.swiperefreshlayout.widget.CircularProgressDrawable)?.stop()
+                        (vital.btnVitalScreenSecondary.icon as? androidx.swiperefreshlayout.widget.CircularProgressDrawable)?.stop()
                         // "Mark Test Not Conducted" block icon was already set inline above for
                         // the standing-actions case (Chest X-Ray/MTB Pending) — don't clobber it.
-                        if (binding.btnVitalScreenSecondary.text != context.getString(R.string.order_status_not_conducted)) {
-                            binding.btnVitalScreenSecondary.icon = null
+                        if (vital.btnVitalScreenSecondary.text != context.getString(R.string.order_status_not_conducted)) {
+                            vital.btnVitalScreenSecondary.icon = null
                         }
                     }
 
@@ -1124,10 +1150,10 @@ class BenListAdapter(
                     }
 
                     if (statusText != null) {
-                        binding.tvOrderStatus.text = statusText
-                        binding.tvOrderStatus.visibility = View.VISIBLE
+                        vital.tvOrderStatus.text = statusText
+                        vital.tvOrderStatus.visibility = View.VISIBLE
                     } else {
-                        binding.tvOrderStatus.visibility = View.GONE
+                        vital.tvOrderStatus.visibility = View.GONE
                     }
                     val orderId = when (source) {
                         6 -> tbDiag?.xrayOrderId?.takeIf { it.isNotBlank() && !it.equals("N/A", ignoreCase = true) }
@@ -1162,36 +1188,36 @@ class BenListAdapter(
                         }
                         val orderIdDisplayText = listOfNotNull(mainOrderLine, rifOrderLine).joinToString("\n")
                         if (orderIdDisplayText.isNotEmpty()) {
-                            binding.tvOrderID.visibility = View.VISIBLE
-                            binding.tvOrderID.text = orderIdDisplayText
+                            vital.tvOrderID.visibility = View.VISIBLE
+                            vital.tvOrderID.text = orderIdDisplayText
                         } else {
-                            binding.tvOrderID.visibility = View.GONE
+                            vital.tvOrderID.visibility = View.GONE
                         }
                     } else {
-                        binding.tvOrderID.visibility = View.GONE
+                        vital.tvOrderID.visibility = View.GONE
                     }
 
                     // Additive-only order-status pill/captions/MTB summary strip/RIF block —
                     // see bindOrderStatusExtras for the approved-mockup design language.
                     bindOrderStatusExtras(item, source, tbDiag, canActOnReferral, pref, retryingBenIds, clickListener)
 
-                    binding.btnVitalScreen.setOnClickListener {
+                    vital.btnVitalScreen.setOnClickListener {
                         clickListener?.onClickOrderAction(item, config.action, config.type)
                     }
                 } else {
-                    binding.tvOrderStatus.visibility = View.GONE
-                    binding.btnVitalScreen.text = binding.root.context.getString(R.string.vital_screen)
+                    vital.tvOrderStatus.visibility = View.GONE
+                    vital.btnVitalScreen.text = binding.root.context.getString(R.string.vital_screen)
                     val hasVitals = benIdList.contains(item.benId)
-                    binding.btnVitalScreen.setBackgroundTintList(
+                    vital.btnVitalScreen.setBackgroundTintList(
                         ContextCompat.getColorStateList(
                             binding.root.context,
                             if (hasVitals) android.R.color.holo_green_dark else android.R.color.holo_red_dark
                         )
                     )
-                    binding.btnVitalScreen.setTextColor(
+                    vital.btnVitalScreen.setTextColor(
                         ContextCompat.getColor(binding.root.context, android.R.color.white)
                     )
-                    binding.btnVitalScreen.setOnClickListener {
+                    vital.btnVitalScreen.setOnClickListener {
                         clickListener?.onClickVitalScreen(item)
                     }
                 }
@@ -1316,7 +1342,6 @@ class BenListAdapter(
                     Pair(filled, 4)
                 }
             }
-            Timber.d("RoleManager: denominatorRule=$examineDenominatorRule, filled=$examineFilledCount/$examineTotal")
 
             binding.btnExamine.text = binding.root.context.getString(
                 R.string.btn_examine_count_ben,
@@ -1339,42 +1364,30 @@ class BenListAdapter(
             )
             binding.btnExamine.visibility = if (showExamineButton) View.VISIBLE else View.GONE
 
-            binding.llBenDetails4.visibility = View.GONE
-            binding.btnAddChildren.visibility = View.GONE
-
-            // Register Wife / Register Husband ? Registrar tab only (hidden when on Nurse or Counselling tab,
-            // or in TPT/Referral workflows)
+            // Register Wife / Register Husband: Registrar tab only (hidden on the Nurse and
+            // Counselling tabs and in TPT/Referral workflows). Add Children is not used. The
+            // buttons are a ViewStub, built only for a row that shows one.
             val showRegisterSpouseButtons =
                 roleManager?.privilegesForActiveRole()?.showRegisterSpouseButtons == true &&
                 !showContactTracingForms &&
                 source !in 5..8
-            Timber.d("RoleManager: showRegisterSpouseButtons=$showRegisterSpouseButtons")
-            when {
-//                !isNurseRole && !isCounsellingOfficer && !item.isNonHH && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
-//                        && !item.isDeath && !item.isDeactivate -> {
-                showRegisterSpouseButtons && !item.isNonHH && item.gender == "MALE" && item.isMarried && !item.isSpouseAdded
-                        && !item.isDeath && !item.isDeactivate -> {
-                    binding.llAddSpouseBtn.visibility = View.VISIBLE
-                    binding.btnAddSpouse.visibility = View.VISIBLE
-                    binding.btnAddSpouse.text = context.getString(R.string.add_wife)
-                    binding.btnAddSpouse.setOnClickListener {
-                        clickListener?.onClickedWifeBen(item)
-                    }
-                }
-//                (!isNurseRole && !isCounsellingOfficer) && !item.isNonHH && item.gender == "FEMALE" && item.isMarried && !item.isSpouseAdded
-//                        && !item.isDeath && !item.isDeactivate -> {
-                showRegisterSpouseButtons && !item.isNonHH && item.gender == "FEMALE" && item.isMarried && !item.isSpouseAdded
-                        && !item.isDeath && !item.isDeactivate -> {
-                    binding.llAddSpouseBtn.visibility = View.VISIBLE
-                    binding.btnAddSpouse.visibility = View.VISIBLE
-                    binding.btnAddSpouse.text = context.getString(R.string.add_husband)
-                    binding.btnAddSpouse.setOnClickListener {
-                        clickListener?.onClickedHusbandBen(item)
-                    }
-                }
-                else -> {
-                    binding.llAddSpouseBtn.visibility = View.GONE
-                    binding.btnAddSpouse.visibility = View.GONE
+            val canAddSpouse = showRegisterSpouseButtons && !item.isNonHH && item.isMarried &&
+                !item.isSpouseAdded && !item.isDeath && !item.isDeactivate
+            val addSpouseLabel = when {
+                canAddSpouse && item.gender == "MALE" -> R.string.add_wife
+                canAddSpouse && item.gender == "FEMALE" -> R.string.add_husband
+                else -> null
+            }
+            if (addSpouseLabel == null) {
+                addSpouseOrNull?.llAddSpouseBtn?.visibility = View.GONE
+            } else {
+                addSpouse.llAddSpouseBtn.visibility = View.VISIBLE
+                addSpouse.btnAddChildren.visibility = View.GONE
+                addSpouse.btnAddSpouse.visibility = View.VISIBLE
+                addSpouse.btnAddSpouse.text = context.getString(addSpouseLabel)
+                addSpouse.btnAddSpouse.setOnClickListener {
+                    if (item.gender == "MALE") clickListener?.onClickedWifeBen(item)
+                    else clickListener?.onClickedHusbandBen(item)
                 }
             }
             binding.ivSoftDelete.visibility = View.GONE
@@ -1508,6 +1521,27 @@ class BenListAdapter(
     /** Set by [submitTBDiagnostics]; until then a missing row means "not loaded yet". */
     private var tbDiagnosticsLoaded = false
 
+    /**
+     * The benIds the latest diagnostics snapshot was read for, when the screen reads them per
+     * loaded row ([LoadedRowBadges]); null for a whole-table list. A row outside it is "not
+     * loaded yet" even after the first snapshot - see [isTbDiagnosticsLoadedFor].
+     */
+    private var tbDiagnosticsCoveredBenIds: Set<Long>? = null
+
+    private fun isTbDiagnosticsLoadedFor(benId: Long): Boolean =
+        tbDiagnosticsLoaded && (tbDiagnosticsCoveredBenIds?.contains(benId) ?: true)
+
+    /**
+     * Per-row snapshot from [LoadedRowBadges]: rows whose benId the snapshot just started
+     * covering are rebound, so they leave the "Checking" placeholder even when they have no
+     * diagnostics row at all.
+     */
+    fun submitTBDiagnostics(snapshot: TbDiagnosticsSnapshot) {
+        val previouslyCovered = tbDiagnosticsCoveredBenIds.orEmpty()
+        tbDiagnosticsCoveredBenIds = snapshot.coveredBenIds
+        submitTBDiagnostics(snapshot.rows, newlyCovered = snapshot.coveredBenIds - previouslyCovered)
+    }
+
     private val tbScreeningMap = mutableMapOf<Long, TbScreeningSymptoms>()
     private val householdMemberCountMap = mutableMapOf<Long, Int>()
     private val householdHeadNameMap = mutableMapOf<Long, String>()
@@ -1547,7 +1581,7 @@ class BenListAdapter(
             showAnthropometryButton = showAnthropometryButton,
             showScreeningStatus = showScreeningStatus,
             tbDiagnosticsByBenId = tbDiagnosticsByBenId,
-            tbDiagnosticsLoaded = tbDiagnosticsLoaded,
+            tbDiagnosticsLoaded = isTbDiagnosticsLoadedFor(item.benId),
             tbScreeningMap = tbScreeningMap,
             showRedesignedCard = showRedesignedCard,
             householdMemberCountMap = householdMemberCountMap,
@@ -1576,7 +1610,7 @@ class BenListAdapter(
         }
     }
 
-    fun submitTBDiagnostics(list: List<TbDiagnosticsCardFields>) {
+    fun submitTBDiagnostics(list: List<TbDiagnosticsCardFields>, newlyCovered: Set<Long> = emptySet()) {
         // Diff instead of notifyDataSetChanged() — a blanket refresh here rebinds every visible
         // row (including its click listeners) on every emission, which was the root cause of
         // cards needing multiple taps to register.
@@ -1598,6 +1632,7 @@ class BenListAdapter(
         }
         val changedBenIds = (oldByBenId.keys + newByBenId.keys)
             .filterTo(mutableSetOf()) { benId -> oldByBenId[benId] != newByBenId[benId] }
+        changedBenIds += newlyCovered
         if (changedBenIds.isNotEmpty() || firstLoad) {
             currentList.forEachIndexed { index, item ->
                 if (item.benId in changedBenIds || (firstLoad && item.benId !in newByBenId)) {

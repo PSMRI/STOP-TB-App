@@ -2,21 +2,26 @@ package org.piramalswasthya.stoptb.ui.home_activity.unscreened_people
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.model.BenBasicDomain
 import org.piramalswasthya.stoptb.model.BenRegCache
 import org.piramalswasthya.stoptb.repositories.BenRepo
 import org.piramalswasthya.stoptb.repositories.RecordsRepo
-import org.piramalswasthya.stoptb.repositories.TBRepo
-import org.piramalswasthya.stoptb.repositories.VitalRepo
+import org.piramalswasthya.stoptb.repositories.RowBadgeRepo
+import org.piramalswasthya.stoptb.ui.LoadedRowBadges
+import org.piramalswasthya.stoptb.ui.debounceTyping
+import org.piramalswasthya.stoptb.ui.pagedByQuery
+import org.piramalswasthya.stoptb.ui.QueryPages
 import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -24,109 +29,39 @@ import javax.inject.Inject
 class UnScreenedPeopleViewModel @Inject constructor(
     private val recordsRepo: RecordsRepo,
     private val benRepo: BenRepo,
-    private val vitalRepo: VitalRepo,
-    private val tbRepo: TBRepo,
-    private val preferenceDao: PreferenceDao
+    rowBadgeRepo: RowBadgeRepo
 ) : ViewModel() {
 
     private val filter = MutableStateFlow("")
 
+    /**
+     * PR 6: paged; the search and the "no TB screening yet" exclusion run in SQL. The screen
+     * used to hold the whole village's unscreened list plus every TB_SCREENING benId in memory
+     * and filter both on each keystroke and each write.
+     */
+    val unscreenedList: Flow<QueryPages<BenBasicDomain>> = filter.debounceTyping()
+        .pagedByQuery(viewModelScope) { query -> recordsRepo.unscreenedPaged(query.trim().lowercase()) }
 
-
-    val unscreenedList: StateFlow<List<BenBasicDomain>> =
-        combine(
-            recordsRepo.unscreenedList,
-            tbRepo.tbScreeningBenIds,
-            filter
-        ) { list, tbScreenedIds, text ->
-
-            val filteredByTbScreening = list.filter { ben ->
-                ben.benId !in tbScreenedIds
-            }
-
-            filterUnscreened(filteredByTbScreening, text)
-
-        }.stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
-            emptyList()
-        )
-
-
-//    val unscreenedCount: StateFlow<Int> =
-//        recordsRepo.unscreenedListCount
-//            .stateIn(
-//                viewModelScope,
-//                SharingStarted.WhileSubscribed(5000),
-//                0
-//            )
-
-
-    val unscreenedCount: StateFlow<Int> =
-        combine(
-            recordsRepo.unscreenedList,
-            tbRepo.tbScreeningBenIds
-        ) { list, tbScreenedIds ->
-            list.count { it.benId !in tbScreenedIds }
-        }.stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
-            0
-        )
-
-
-
-
+    val unscreenedCount: StateFlow<Int> = recordsRepo.unscreenedNotTbScreenedCount
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     fun filterText(text: String) {
         viewModelScope.launch { filter.emit(text) }
     }
 
-    private fun filterUnscreened(
-        list: List<BenBasicDomain>,
-        filter: String
-    ): List<BenBasicDomain> {
-        if (filter.isBlank()) return list
-        val filterText = filter.lowercase()
-        return list.filter {
-            it.benId.toString().contains(filterText) ||
-                    "${it.benName} ${it.benSurname}".lowercase().contains(filterText) ||
-                    it.mobileNo?.contains(filterText) == true
-        }
-    }
-
     // ---------------- Examine Status ----------------
+    // PR 6 (6.3): for the rows the list has loaded, not whole tables (RowBadgeRepo).
+    private val rowBadges = LoadedRowBadges(viewModelScope, rowBadgeRepo)
 
-    val vitalBenIds: StateFlow<List<Long>> =
-        vitalRepo.vitalBenIds
-            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    fun onRowsLoaded(benIds: Set<Long>) = rowBadges.onRowsLoaded(benIds)
 
-    val tbScreeningBenIds: StateFlow<List<Long>> =
-        tbRepo.tbScreeningBenIds
-            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-
-    val allTbDiagnostics = tbRepo.allTbDiagnostics
+    val vitalBenIds: Flow<List<Long>> = rowBadges.vitalBenIds
+    val tbScreeningBenIds: Flow<List<Long>> = rowBadges.tbScreeningBenIds
+    val allTbDiagnostics = rowBadges.tbDiagnostics
     val householdMemberCounts = recordsRepo.householdMemberCounts
-
-    val generalOpdBenIds: StateFlow<List<Long>> =
-        tbRepo.generalOpdBenIds
-            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-
-    val anthropometryBenIds: StateFlow<List<Long>> =
-        recordsRepo.anthropometryFilledBenIds
-            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-
-    val diagnosisBenIds: StateFlow<List<Long>> =
-        combine(
-            tbRepo.tbDiagnosticsBenIdsFromCards,
-            tbRepo.tbSuspectedBenIds
-        ) { diagnostics, suspected ->
-            (diagnostics + suspected).distinct()
-        }.stateIn(
-            viewModelScope,
-            SharingStarted.Eagerly,
-            emptyList()
-        )
+    val generalOpdBenIds: Flow<List<Long>> = rowBadges.generalOpdBenIds
+    val anthropometryBenIds: Flow<List<Long>> = rowBadges.anthropometryBenIds
+    val diagnosisBenIds: Flow<List<Long>> = rowBadges.diagnosisBenIds
 
     // ---------------- Examine Navigation ----------------
 
