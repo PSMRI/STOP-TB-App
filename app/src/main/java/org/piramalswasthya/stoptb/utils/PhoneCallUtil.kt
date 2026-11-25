@@ -7,7 +7,6 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 
 private fun String?.toCallablePhoneNumber(): String? =
     this?.trim()?.takeIf { it.isNotBlank() && it != "9999999999" }
@@ -28,7 +27,6 @@ fun Fragment.callPhoneNumber(phoneNumber: String?) {
     if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CALL_PHONE)
         != PackageManager.PERMISSION_GRANTED
     ) {
-        (activity as? HomeActivity)?.askForPermissions()
         Toast.makeText(requireContext(), "Please allow permissions first", Toast.LENGTH_SHORT).show()
         return
     }

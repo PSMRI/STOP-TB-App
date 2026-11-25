@@ -23,7 +23,6 @@ import org.piramalswasthya.stoptb.adapters.NCDCategoryAdapter
 import org.piramalswasthya.stoptb.adapters.NcdCbacBenListAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.databinding.FragmentNcdEligibleListBinding
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.utils.HelperUtil.getDateStrFromLong
 import timber.log.Timber
@@ -170,10 +169,6 @@ class NcdEligibleListFragment : Fragment() , NCDCategoryAdapter.ClickListener {
         super.onStart()
         activity?.let {
             when (it) {
-                is HomeActivity -> it.updateActionBar(
-                    R.drawable.ic__ncd_list,
-                    getString(R.string.ncd_eligible_list)
-                )
                 is VolunteerActivity -> it.updateActionBar(
                     R.drawable.ic__ncd_list,
                     getString(R.string.ncd_eligible_list)

@@ -17,7 +17,6 @@ import androidx.recyclerview.widget.GridLayoutManager
 import dagger.hilt.android.AndroidEntryPoint
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.databinding.FragmentDashboardBinding
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 
 @AndroidEntryPoint
 class DashboardFragment : Fragment() {
@@ -231,10 +230,6 @@ class DashboardFragment : Fragment() {
         super.onResume()
         // Only the visible ViewPager2 page is RESUMED; off-screen pages stay STARTED.
         viewModel.setDashboardVisible(true)
-        (activity as? HomeActivity)?.updateActionBar(
-            R.drawable.ic_dashboard,
-            getString(R.string.dashboard)
-        )
     }
 
     override fun onPause() {

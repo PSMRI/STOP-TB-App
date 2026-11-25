@@ -23,7 +23,6 @@ import org.piramalswasthya.stoptb.adapters.TbSuspectedListAdapter
 import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchRvButtonBinding
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import javax.inject.Inject
 
@@ -128,10 +127,6 @@ class TBSuspectedListFragment : Fragment() {
         super.onStart()
         activity?.let {
             when (it) {
-                is HomeActivity -> it.updateActionBar(
-                    R.drawable.ic__ncd,
-                    getString(R.string.tb_suspected_list)
-                )
                 is VolunteerActivity -> it.updateActionBar(
                     R.drawable.ic__ncd,
                     getString(R.string.tb_suspected_list)

@@ -13,7 +13,6 @@ import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.IconGridAdapter
 import org.piramalswasthya.stoptb.configuration.IconDataset
 import org.piramalswasthya.stoptb.databinding.RvIconGridBinding
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.utils.navigateSafe
 import javax.inject.Inject
@@ -64,10 +63,6 @@ class NcdFragment : Fragment() {
         super.onStart()
         activity?.let {
             when (it) {
-                is HomeActivity -> it.updateActionBar(
-                    R.drawable.ic__ncd,
-                    getString(R.string.icon_title_ncd)
-                )
                 is VolunteerActivity -> it.updateActionBar(
                     R.drawable.ic__ncd,
                     getString(R.string.icon_title_ncd)

@@ -2,8 +2,6 @@ package org.piramalswasthya.stoptb.helpers
 
 import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.Fragment
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
-import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 
 interface AutoFlowBackNavigationHost {
     fun setAutoFlowBackNavigationBlocked(blocked: Boolean)

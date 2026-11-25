@@ -27,7 +27,6 @@ import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.adapters.dynamicAdapter.FormRendererAdapter
 import org.piramalswasthya.stoptb.configuration.dynamicDataSet.FormField
 import org.piramalswasthya.stoptb.databinding.FragmentNcdReferalFollowUpFormBinding
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.utils.Log
 import org.piramalswasthya.stoptb.utils.dynamicFiledValidator.FieldValidator
@@ -313,13 +312,6 @@ class NCDReferalFormFragment : Fragment() {
         super.onStart()
         activity?.let { act ->
             when (act) {
-                is HomeActivity -> {
-                    act.updateActionBar(
-                        R.drawable.ic__ncd_priority,
-                        getString(R.string.ncd_folloup_form)
-                    )
-                }
-
                 is VolunteerActivity -> {
                     act.updateActionBar(
                         R.drawable.ic__ncd_priority,

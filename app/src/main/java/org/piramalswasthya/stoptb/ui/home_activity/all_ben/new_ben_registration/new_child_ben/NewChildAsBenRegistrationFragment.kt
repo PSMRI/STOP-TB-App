@@ -26,7 +26,6 @@ import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.databinding.AlertConsentBinding
 import org.piramalswasthya.stoptb.databinding.FragmentNewFormBinding
 import org.piramalswasthya.stoptb.helpers.Konstants
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
@@ -352,10 +351,6 @@ class NewChildAsBenRegistrationFragment : Fragment() {
         super.onStart()
         activity?.let {
             when (it) {
-                is HomeActivity -> it.updateActionBar(
-                    R.drawable.ic__child,
-                    getString( R.string.child_reg)
-                )
                 is VolunteerActivity -> it.updateActionBar(
                     R.drawable.ic__child,
                     getString( R.string.child_reg)

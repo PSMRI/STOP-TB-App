@@ -20,7 +20,6 @@ import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchRvButtonBinding
 import org.piramalswasthya.stoptb.helpers.RoleManager
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import javax.inject.Inject
 
@@ -121,10 +120,6 @@ class NcdNonEligibleListFragment : Fragment() {
         super.onStart()
         activity?.let {
             when (it) {
-                is HomeActivity -> it.updateActionBar(
-                    R.drawable.ic_ncd_noneligible,
-                    getString(R.string.ncd_non_eligible_list)
-                )
                 is VolunteerActivity -> it.updateActionBar(
                     R.drawable.ic_ncd_noneligible,
                     getString(R.string.ncd_non_eligible_list)
