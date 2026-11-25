@@ -20,8 +20,6 @@ import org.piramalswasthya.stoptb.contracts.SpeechToTextContract
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchRvButtonBinding
 import org.piramalswasthya.stoptb.helpers.RoleManager
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
-import org.piramalswasthya.stoptb.ui.home_activity.home.HomeViewModel
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import javax.inject.Inject
 
@@ -42,7 +40,6 @@ class NcdPriorityListFragment : Fragment() {
         get() = _binding!!
 
     private val viewModel: NcdPriorityListViewModel by viewModels()
-    private val homeViewModel: HomeViewModel by viewModels({ requireActivity() })
 
     private val sttContract = registerForActivityResult(SpeechToTextContract()) { value ->
         val lowerValue = value.lowercase()
@@ -135,10 +132,6 @@ class NcdPriorityListFragment : Fragment() {
         super.onStart()
         activity?.let {
             when (it) {
-                is HomeActivity -> it.updateActionBar(
-                    R.drawable.ic__ncd_priority,
-                    getString(R.string.ncd_priority_list)
-                )
                 is VolunteerActivity -> it.updateActionBar(
                     R.drawable.ic__ncd_priority,
                     getString(R.string.ncd_priority_list)

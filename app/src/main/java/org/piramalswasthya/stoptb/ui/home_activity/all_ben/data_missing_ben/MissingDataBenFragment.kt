@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.databinding.FragmentMissingDataBenBinding
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 
 @AndroidEntryPoint
@@ -71,7 +70,6 @@ class MissingDataBenFragment : Fragment() {
             val title = getString(R.string.icon_title_missing_data_ben)
             val icon = R.drawable.ic__ben
             when (it) {
-                is HomeActivity -> it.updateActionBar(icon, title)
                 is VolunteerActivity -> it.updateActionBar(icon, title)
             }
         }

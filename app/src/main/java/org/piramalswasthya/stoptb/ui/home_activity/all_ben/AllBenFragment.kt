@@ -51,7 +51,6 @@ import kotlinx.coroutines.delay
 import org.piramalswasthya.stoptb.databinding.FragmentDisplaySearchAndToggleRvButtonBinding
 import org.piramalswasthya.stoptb.model.AppRole
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.examine.ExamineBottomSheetFragment
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.utils.callPhoneNumber
@@ -1161,7 +1160,6 @@ class AllBenFragment : Fragment(), ExamineBottomSheetFragment.ExamineCallback {
             }
 
             when (it) {
-                is HomeActivity -> it.updateActionBar(icon, title)
                 is VolunteerActivity -> it.updateActionBar(icon, title)
             }
         }

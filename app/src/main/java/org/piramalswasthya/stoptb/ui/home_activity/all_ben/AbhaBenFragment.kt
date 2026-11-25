@@ -24,9 +24,7 @@ import org.piramalswasthya.stoptb.databinding.AlertFilterBinding
 import org.piramalswasthya.stoptb.databinding.FragmentAbhaBenBinding
 import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.ui.abha_id_activity.AbhaIdActivity
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
-import org.piramalswasthya.stoptb.ui.home_activity.home.HomeViewModel
 import org.piramalswasthya.stoptb.utils.callPhoneNumber
 import timber.log.Timber
 import javax.inject.Inject
@@ -64,7 +62,6 @@ class AbhaBenFragment : Fragment() {
         viewModel.filterText(value)
     }
 
-    private val homeViewModel: HomeViewModel by viewModels({ requireActivity() })
 
     private val abhaDisclaimer by lazy {
         AlertDialog.Builder(requireContext())
@@ -334,7 +331,6 @@ class AbhaBenFragment : Fragment() {
                 getString(R.string.icon_title_ben)
             }
             when (it) {
-                is HomeActivity -> it.updateActionBar(R.drawable.ic__ben, title)
                 is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ben, title)
             }
         }

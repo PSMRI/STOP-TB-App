@@ -278,8 +278,6 @@ class UnScreenedPeople : Fragment(),
         activity?.let {
             val title = getString(R.string.unscreened_population_title)
             when (it) {
-                is org.piramalswasthya.stoptb.ui.home_activity.HomeActivity ->
-                    it.updateActionBar(R.drawable.ic__ben, title)
                 is org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity ->
                     it.updateActionBar(R.drawable.ic__ben, title)
             }

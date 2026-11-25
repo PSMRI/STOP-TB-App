@@ -45,7 +45,6 @@ import org.piramalswasthya.stoptb.helpers.RoleManager
 import org.piramalswasthya.stoptb.model.LocationState
 import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.home_activity.new_household_registration.NewHouseholdViewModel.State
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.utils.scrollToFormValidationError
 import timber.log.Timber
@@ -120,7 +119,6 @@ class NewHouseholdFragment : Fragment() {
 
     private fun updateActionBarTitle(title: String) {
         when (val host = activity) {
-            is HomeActivity -> host.updateActionBar(R.drawable.ic__hh, title)
             is VolunteerActivity -> host.updateActionBar(R.drawable.ic__hh, title)
         }
     }
@@ -809,10 +807,7 @@ class NewHouseholdFragment : Fragment() {
             .setPositiveButton(getString(R.string.dialog_yes)) { dialog, _ ->
                 dialog.dismiss()
                 if (isAdded) {
-                    val popped = findNavController().popBackStack(R.id.homeFragment, false)
-                    if (!popped) {
-                        findNavController().popBackStack(R.id.volunteerHomeFragment, false)
-                    }
+                    findNavController().popBackStack(R.id.volunteerHomeFragment, false)
                 }
             }
             .setNegativeButton(getString(R.string.dialog_no)) { dialog, _ ->

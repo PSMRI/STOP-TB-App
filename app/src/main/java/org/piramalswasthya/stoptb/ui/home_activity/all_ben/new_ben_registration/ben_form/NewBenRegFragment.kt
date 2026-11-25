@@ -54,7 +54,6 @@ import org.piramalswasthya.stoptb.helpers.GpsDiagnostics
 import org.piramalswasthya.stoptb.helpers.ImageUtils
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.helpers.RoleManager
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.model.LocationState
 import org.piramalswasthya.stoptb.model.Permission
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel.State
@@ -161,7 +160,6 @@ class NewBenRegFragment : Fragment() {
         // Toolbar back arrow — same discard logic as back press
         activity?.let { act ->
             val toolbar = when (act) {
-                is HomeActivity -> act.findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
                 is VolunteerActivity -> act.findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
                 else -> null
             }
@@ -854,7 +852,6 @@ class NewBenRegFragment : Fragment() {
         val icon = if (viewModel.relToHeadId == 18) R.drawable.ic__hh else R.drawable.ic__ben
         activity?.let {
             when (it) {
-                is HomeActivity -> it.updateActionBar(icon, title)
                 is VolunteerActivity -> it.updateActionBar(icon, title)
             }
         }
@@ -904,10 +901,7 @@ class NewBenRegFragment : Fragment() {
                 if (viewModel.isDataUpdateFlow) {
                     findNavController().popBackStack()
                 } else if (isAdded) {
-                    val popped = findNavController().popBackStack(R.id.homeFragment, false)
-                    if (!popped) {
-                        findNavController().popBackStack(R.id.volunteerHomeFragment, false)
-                    }
+                    findNavController().popBackStack(R.id.volunteerHomeFragment, false)
                 }
             }
             .setNegativeButton(getString(R.string.stay)) { dialog, _ -> dialog.dismiss() }
@@ -1081,7 +1075,6 @@ class NewBenRegFragment : Fragment() {
         stopListeningForLocation()
         activity?.let { act ->
             when (act) {
-                is HomeActivity -> act.restoreToolbarNavigation()
                 is VolunteerActivity -> act.restoreToolbarNavigation()
             }
         }

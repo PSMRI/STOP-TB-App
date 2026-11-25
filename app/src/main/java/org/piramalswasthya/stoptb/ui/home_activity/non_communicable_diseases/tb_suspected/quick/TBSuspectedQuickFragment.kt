@@ -21,7 +21,6 @@ import org.piramalswasthya.stoptb.helpers.DiagnosticResultLabels
 import org.piramalswasthya.stoptb.helpers.applyManagedFlowBackPolicyOnResume
 import org.piramalswasthya.stoptb.helpers.blockBackNavigationInManagedFlow
 import org.piramalswasthya.stoptb.helpers.setAutoFlowBackNavigationBlocked
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.work.WorkerUtils
@@ -327,7 +326,6 @@ class TBSuspectedQuickFragment : Fragment() {
         }
         activity?.let {
             when (it) {
-                is HomeActivity -> it.updateActionBar(icon, title)
                 is VolunteerActivity -> it.updateActionBar(icon, title)
             }
         }

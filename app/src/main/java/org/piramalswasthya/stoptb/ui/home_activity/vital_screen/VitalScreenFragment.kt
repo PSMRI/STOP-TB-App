@@ -22,7 +22,6 @@ import dagger.hilt.android.AndroidEntryPoint
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.databinding.FragmentVitalScreenBinding
 import org.piramalswasthya.stoptb.helpers.applyAutoFlowBackPolicyOnResume
-import org.piramalswasthya.stoptb.ui.home_activity.HomeActivity
 import org.piramalswasthya.stoptb.ui.volunteer.VolunteerActivity
 import org.piramalswasthya.stoptb.utils.scrollToFormValidationField
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
@@ -719,7 +718,6 @@ class VitalScreenFragment : Fragment() {
 
 
 
-            is HomeActivity -> it.updateActionBar(R.drawable.ic__ben, getString(R.string.vital_screen))
             is VolunteerActivity -> it.updateActionBar(R.drawable.ic__ben, getString(R.string.vital_screen))
             }
         }
