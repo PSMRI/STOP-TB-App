@@ -177,7 +177,7 @@ class ServiceLocationActivity : AppCompatActivity() {
                         }
                         binding.actvHealthFacilityDropdown.apply {
                             isFocusable = false
-                            isEnabled = viewModel.selectedTuCount() > 0
+                            isEnabled = viewModel.isFacilitySelectionEnabled()
                             setText(viewModel.selectedHealthFacilityLabels())
                         }
                         val showTuDialog = View.OnClickListener { showMultiSelectDialog(
@@ -186,13 +186,13 @@ class ServiceLocationActivity : AppCompatActivity() {
                         ) { selected ->
                             viewModel.selectTus(selected)
                             binding.actvTuDropdown.setText(viewModel.selectedTuLabels())
-                            binding.actvHealthFacilityDropdown.isEnabled = selected.isNotEmpty()
+                            binding.actvHealthFacilityDropdown.isEnabled = viewModel.isFacilitySelectionEnabled()
                             binding.actvHealthFacilityDropdown.setText(viewModel.selectedHealthFacilityLabels())
                         } }
                         binding.actvTuDropdown.setOnClickListener(showTuDialog)
                         binding.tilTuDropdown.setEndIconOnClickListener(showTuDialog)
                         val showFacilityDialog = View.OnClickListener {
-                            if (viewModel.selectedTuCount() > 0) showMultiSelectDialog(
+                            if (viewModel.isFacilitySelectionEnabled()) showMultiSelectDialog(
                                 getString(R.string.service_type_dd_health_facility_text), viewModel.healthFacilityList,
                                 viewModel.selectedHealthFacilityIndices()
                             ) { selected ->
@@ -326,7 +326,7 @@ class ServiceLocationActivity : AppCompatActivity() {
         return !(binding.actvStateDropdown.text.isNullOrBlank() ||
                 binding.actvDistrictDropdown.text.isNullOrBlank() ||
                 (viewModel.isTuRequired() && viewModel.selectedTuCount() == 0) ||
-                (viewModel.isHealthFacilityRequired() && viewModel.selectedTuCount() > 0 && viewModel.selectedHealthFacilityIndices().isEmpty()) ||
+                (viewModel.isHealthFacilityRequired() && viewModel.selectedHealthFacilityIndices().isEmpty()) ||
                 binding.actvVillageDropdown.text.isNullOrBlank())
 
     }

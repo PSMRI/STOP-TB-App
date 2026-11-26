@@ -113,6 +113,12 @@ class ServiceTypeViewModel @Inject constructor(
                     .ifEmpty { linkedSetOf<Int>().apply { currentLocation?.tu?.let { selected -> tus.indexOfFirst { it.id == selected.id }.takeIf { it >= 0 }?.let(::add) } } }
                 selectedHealthFacilityIndices = pref.getSelectedHealthFacilityIds().mapNotNull { id -> healthFacilities.indexOfFirst { it.id == id }.takeIf { it >= 0 } }.toCollection(linkedSetOf())
                     .ifEmpty { linkedSetOf<Int>().apply { currentLocation?.healthFacility?.let { selected -> healthFacilities.indexOfFirst { it.id == selected.id }.takeIf { it >= 0 }?.let(::add) } } }
+                _selectedTu = currentLocation?.tu?.takeIf { primary ->
+                    selectedTuIndices.any { index -> tus[index].id == primary.id }
+                } ?: selectedTuIndices.firstOrNull()?.let { tus[it] }
+                _selectedHealthFacility = currentLocation?.healthFacility?.takeIf { primary ->
+                    selectedHealthFacilityIndices.any { index -> healthFacilities[index].id == primary.id }
+                } ?: selectedHealthFacilityIndices.firstOrNull()?.let { healthFacilities[it] }
                 when (pref.getCurrentLanguage()) {
                     ENGLISH -> {
                         stateDropdownEntry = user.state.name
@@ -188,6 +194,7 @@ class ServiceTypeViewModel @Inject constructor(
     fun selectedTuIndices(): Set<Int> = selectedTuIndices
     fun selectedHealthFacilityIndices(): Set<Int> = selectedHealthFacilityIndices
     fun selectedTuCount(): Int = selectedTuIndices.size
+    fun isFacilitySelectionEnabled(): Boolean = selectedTuIndices.isNotEmpty() || !isTuRequired()
     fun selectedTuLabels(): String = selectedTuIndices.sorted().mapNotNull { tuList.getOrNull(it) }.joinToString(", ")
     fun selectedHealthFacilityLabels(): String = selectedHealthFacilityIndices.sorted().mapNotNull { healthFacilityList.getOrNull(it) }.joinToString(", ")
     fun selectTus(indices: Set<Int>) {
@@ -202,7 +209,7 @@ class ServiceTypeViewModel @Inject constructor(
         }
     }
     fun selectHealthFacilities(indices: Set<Int>) {
-        if (selectedTuIndices.isEmpty()) return
+        if (!isFacilitySelectionEnabled()) return
         selectedHealthFacilityIndices = indices.filter { it in healthFacilities.indices }.toCollection(linkedSetOf())
         _selectedHealthFacility = selectedHealthFacilityIndices.firstOrNull()?.let { healthFacilities[it] }
     }
