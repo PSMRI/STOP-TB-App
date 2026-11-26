@@ -27,7 +27,7 @@
                 android:layout_weight="1"
                 android:drawableStart="@drawable/ic_search"
                 android:drawablePadding="@dimen/padding_normal"
-                android:hint="Search Beneficiary"
+                android:hint="@string/household_search"
                 android:singleLine="true" />
 
             <androidx.cardview.widget.CardView
