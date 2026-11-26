@@ -223,6 +223,19 @@ class PreferenceDao @Inject constructor(@ApplicationContext private val context:
         return Gson().fromJson(json, LocationRecord::class.java)
     }
 
+    fun saveSelectedTuAndFacilityIds(tuIds: Set<Int>, facilityIds: Set<Int>) {
+        pref.edit()
+            .putStringSet("selected_tu_ids", tuIds.map(Int::toString).toSet())
+            .putStringSet("selected_health_facility_ids", facilityIds.map(Int::toString).toSet())
+            .apply()
+    }
+
+    fun getSelectedTuIds(): Set<Int> = pref.getStringSet("selected_tu_ids", emptySet())
+        .orEmpty().mapNotNull(String::toIntOrNull).toSet()
+
+    fun getSelectedHealthFacilityIds(): Set<Int> = pref.getStringSet("selected_health_facility_ids", emptySet())
+        .orEmpty().mapNotNull(String::toIntOrNull).toSet()
+
     /**
      * Pincode / Residential Area for a village: the backend master value (getUserDetail) where it has one,
      * otherwise the value captured on the device.

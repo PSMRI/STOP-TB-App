@@ -99,6 +99,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="@string/service_type_dd_block_text"
+                    android:visibility="gone"
                     android:labelFor="@id/actv_block_dropdown">
 
                     <com.google.android.material.textfield.MaterialAutoCompleteTextView
@@ -115,6 +116,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="@string/service_type_dd_tu_text"
+                    app:endIconMode="custom"
+                    app:endIconDrawable="@drawable/ic_arrow_drop_down"
                     android:labelFor="@id/actv_tu_dropdown">
 
                     <com.google.android.material.textfield.MaterialAutoCompleteTextView
@@ -131,6 +134,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="@string/service_type_dd_health_facility_text"
+                    app:endIconMode="custom"
+                    app:endIconDrawable="@drawable/ic_arrow_drop_down"
                     android:labelFor="@id/actv_health_facility_dropdown">
 
                     <com.google.android.material.textfield.MaterialAutoCompleteTextView
