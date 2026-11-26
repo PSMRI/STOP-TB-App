@@ -13,10 +13,8 @@ import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.model.GeneralOpdCache
 import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
-import org.piramalswasthya.stoptb.model.TbDiagnosticsCardFields
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
-import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
 
 @Dao
 interface TBDao :
@@ -134,15 +132,6 @@ interface TBDao :
     ORDER BY followUpDate DESC
     LIMIT 1
 """)    suspend fun getTbConfirmed(benId: Long): TBConfirmedTreatmentCache?
-
-    @Query("""
-    SELECT *
-    FROM TB_CONFIRMED_TREATMENT
-    WHERE benId = :benId
-      AND followUpDate IS NOT NULL
-    ORDER BY followUpDate DESC
-    limit 1
-""")    suspend fun getALLTbConfirmed(benId: Long): TBConfirmedTreatmentCache?
 
     @Query("SELECT * FROM TB_SUSPECTED WHERE benId =:benId and (visitDate = :visitDate or visitDate = :visitDateGMT) limit 1")
     suspend fun getTbSuspected(benId: Long, visitDate: Long, visitDateGMT: Long): TBSuspectedCache?

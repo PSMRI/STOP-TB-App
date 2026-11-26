@@ -144,49 +144,6 @@ class FBMessaging : FirebaseMessagingService() {
         var messageUpdate: MessageUpdate ?= null
     }
 
-//    private fun mShowNotification(
-//        mTitle: String,
-//        mBody: String
-//    ) {
-//        var intent = Intent()
-//
-//            intent = Intent(this, HomeActivity::class.java)
-//            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-//
-//        val pendingIntent = PendingIntent.getActivity(
-//            this, 0, intent,
-//            PendingIntent.FLAG_ONE_SHOT
-//        )
-//        val channelId = "circular_app_021"
-//        val channelName = "CIRCULAR_APP"
-//        val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-//        val notificationBuilder = NotificationCompat.Builder(this, channelId).apply {
-//            setContentTitle(mTitle)
-//            setContentText(mBody)
-//            setAutoCancel(true)
-//            setContentIntent(pendingIntent)
-//            setSmallIcon(R.mipmap.ic_circular_launcher)
-//            val bigTextStyle = NotificationCompat.BigTextStyle()
-//            bigTextStyle.setBigContentTitle(mTitle)
-//            bigTextStyle.bigText(mBody)
-//            setStyle(bigTextStyle)
-//        }
-//        val notificationManager =
-//            getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-//
-//        // Since android Oreo notification channel is needed.
-//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-//            val channel = NotificationChannel(
-//                channelId,
-//                channelName,
-//                NotificationManager.IMPORTANCE_DEFAULT
-//            )
-//            notificationManager.createNotificationChannel(channel)
-//
-//        }
-//        notificationManager.notify(0, notificationBuilder.build())
-//    }
-
     private fun mShowNotification(
         mTitle: String,
         mBody: String,

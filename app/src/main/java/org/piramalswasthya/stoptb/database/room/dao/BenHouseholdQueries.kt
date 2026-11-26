@@ -1,11 +1,7 @@
 package org.piramalswasthya.stoptb.database.room.dao
 
-import androidx.lifecycle.LiveData
-import androidx.paging.PagingSource
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
-import org.piramalswasthya.stoptb.database.room.SyncState
-import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.model.*
 
 /**
@@ -15,9 +11,6 @@ import org.piramalswasthya.stoptb.model.*
  * readable. Room generates these queries as part of BenDao_Impl - SQL and callers unchanged.
  */
 interface BenHouseholdQueries {
-
-    @Query("SELECT * FROM BENEFICIARY WHERE isDraft = 1 and householdId =:hhId LIMIT 1")
-    suspend fun getDraftBenKidForHousehold(hhId: Long): BenRegCache?
 
     @Query("""
         SELECT householdId AS hhId,
@@ -54,7 +47,4 @@ interface BenHouseholdQueries {
 
     @Query("SELECT * FROM BENEFICIARY WHERE householdId = :hhId AND beneficiaryId != :selectedbenIdFromArgs AND (:firstName IS NULL OR :firstName = '' OR motherName LIKE :firstName || '%') order by age desc")
     suspend fun getChildBenForHousehold(hhId: Long, selectedbenIdFromArgs: Long, firstName: String?): List<BenRegCache>
-
-    @Query("SELECT * FROM BEN_BASIC_CACHE WHERE reproductiveStatusId = 4 and hhId = :hhId ORDER BY BEN_BASIC_CACHE.updatedDate DESC")
-    suspend fun getAllPNCMotherListFromHousehold(hhId: Long): List<BenBasicCache>
 }

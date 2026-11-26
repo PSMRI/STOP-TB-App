@@ -1,7 +1,5 @@
 package org.piramalswasthya.stoptb.database.room.dao
 
-import androidx.lifecycle.LiveData
-import androidx.paging.PagingSource
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 import org.piramalswasthya.stoptb.database.room.SyncState
@@ -61,42 +59,8 @@ interface BenScreeningListQueries {
     ): Flow<List<BenWithLeprosyScreeningCache>>
 
     @Transaction
-    @Query("SELECT * FROM BEN_BASIC_CACHE WHERE benId = :benId and isDeactivate=0")
-    suspend fun getBenWithLeprosyScreeningAndFollowUps(benId: Long): BenWithLeprosyScreeningCache?
-    @Transaction
     @Query("SELECT * FROM BEN_BASIC_CACHE where villageId = :selectedVillage and hhId = :hhId and isDeactivate=0 ORDER BY BEN_BASIC_CACHE.updatedDate DESC")
     fun getAllFilariaScreeningBen(selectedVillage: Int,hhId: Long): Flow<List<BenWithFilariaScreeningCache>>
-
-    @Query("SELECT * FROM BEN_BASIC_CACHE WHERE CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN :min and :max and reproductiveStatusId = 1  and villageId=:selectedVillage ORDER BY BEN_BASIC_CACHE.updatedDate DESC")
-    fun getAllEligibleCoupleList(
-        selectedVillage: Int,
-        min: Int = Konstants.minAgeForEligibleCouple, max: Int = Konstants.maxAgeForEligibleCouple
-    ): Flow<List<BenBasicCache>>
-
-    @Query("SELECT * FROM BEN_BASIC_CACHE WHERE villageId = :selectedVillage AND isDeactivate = 0 ORDER BY BEN_BASIC_CACHE.updatedDate DESC")
-    fun getAllNCDPriorityList(selectedVillage: Int): Flow<List<BenBasicCache>>
-
-    @Query("SELECT b.* FROM BEN_BASIC_CACHE b INNER JOIN CBAC c on b.benId==c.benId WHERE c.total_score < 4 and b.villageId=:selectedVillage ORDER BY b.updatedDate DESC")
-    fun getAllNCDNonEligibleList(selectedVillage: Int): Flow<List<BenBasicCache>>
-
-
-
-    @Query("SELECT * FROM BEN_BASIC_CACHE WHERE isKid = 1 or reproductiveStatusId in (2, 3) and villageId=:selectedVillage and  isDeactivate=0 ORDER BY BEN_BASIC_CACHE.updatedDate DESC")
-    fun getAllImmunizationDueList(selectedVillage: Int): Flow<List<BenBasicCache>>
-
-    @Query("SELECT * FROM BEN_BASIC_CACHE WHERE hrpStatus = 1 and villageId=:selectedVillage and  isDeactivate=0 ORDER BY BEN_BASIC_CACHE.updatedDate DESC")
-    fun getAllHrpCasesList(selectedVillage: Int): Flow<List<BenBasicCache>>
-    @Query("SELECT * FROM BEN_BASIC_CACHE WHERE  CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER)<=:max and villageId=:selectedVillage ORDER BY BEN_BASIC_CACHE.updatedDate DESC")
-    fun getAllChildrenImmunizationList(
-        selectedVillage: Int, max: Int = Konstants.maxAgeForAdolescentlist
-    ): Flow<List<BenBasicCache>>
-
-    @Query("SELECT * FROM BEN_BASIC_CACHE WHERE reproductiveStatusId = 4 and villageId=:selectedVillage and  isDeactivate=0 ORDER BY BEN_BASIC_CACHE.updatedDate DESC")
-    fun getAllMotherImmunizationList(selectedVillage: Int): Flow<List<BenBasicCache>>
-
-
-    @Query("select * from BEN_BASIC_CACHE b inner join tb_screening t on  b.benId = t.benId where villageId = :villageId and (t.bloodInSputum =1 or t.coughMoreThan2Weeks = 1 or feverMoreThan2Weeks = 1 or nightSweats = 1 or lossOfWeight = 1 or historyOfTb = 1) ORDER BY b.updatedDate DESC")
-    fun getScreeningList(villageId: Int): Flow<List<BenBasicCache>>
 
     @Transaction
     @Query("SELECT * FROM BEN_BASIC_CACHE b where CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER)  >= :min and b.reproductiveStatusId!=2 and b.isDeactivate=0 and b.villageId=:selectedVillage group by b.benId order by b.regDate desc")

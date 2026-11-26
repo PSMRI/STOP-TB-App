@@ -96,14 +96,4 @@ interface NCDReferalFormResponseJsonDao {
         oldBenId: Long,
         newBenId: Long
     )
-
-    @Query("""
-        SELECT formDataJson 
-        FROM ncd_referal_all_visit 
-        WHERE benId = :benId AND formId = :formId
-    """)
-    suspend fun getFormJsonList(
-        benId: Long,
-        formId: String
-    ): List<String>
 }

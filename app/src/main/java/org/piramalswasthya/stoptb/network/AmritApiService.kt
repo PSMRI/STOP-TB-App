@@ -74,12 +74,6 @@ interface AmritApiService {
         @Body request: UpdateNikshaySyncStatusRequest
     ): Response<UpdateNikshaySyncStatusResponse>
 
-//    @POST("flw-api/stoptb/nurse/worklist")
-//    suspend fun getNurseWorklist(@Body request: NurseWorklistRequest): Response<ResponseBody>
-//
-//    @POST("flw-api/stoptb/registrar/worklist")
-//    suspend fun getRegistrarWorklist(@Body request: NurseWorklistRequest): Response<ResponseBody>
-
     @POST("common-api/beneficiaryConsent/sendConsent")
     suspend fun sendOtp(@Body sendOtpRequest: sendOtpRequest): Response<ResponseBody>
 
@@ -131,33 +125,6 @@ interface AmritApiService {
     @POST("flw-api/stoptb/nurse/generalOpd/save")
     suspend fun saveGeneralOpdData(@Body request: List<GeneralOpdSaveRequest>): Response<ResponseBody>
 
-    @POST("flw-api/disease/kalaAzar/saveAll")
-    suspend fun saveKalaAzarScreeningData(@Body kalaAzarScreenRequestDTO: KalaAzarScreeningRequestDTO): Response<ResponseBody>
-
-    @POST("flw-api/disease/malaria/saveAll")
-    suspend fun saveMalariaScreeningData(@Body malariaScreeningRequestDTO: MalariaScreeningRequestDTO): Response<ResponseBody>
-
-    @POST("flw-api/disease/leprosy/saveAll")
-    suspend fun saveLeprosyScreeningData(@Body leprosyScreeningRequestDTO: LeprosyScreeningRequestDTO): Response<ResponseBody>
-
-    @POST("flw-api/disease/aesJe/saveAll")
-    suspend fun saveAESScreeningData(@Body aesScreeningRequestDTO: AESScreeningRequestDTO): Response<ResponseBody>
-
-    @POST("flw-api/disease/filaria/saveAll")
-    suspend fun saveFilariaScreeningData(@Body filariaScreeningRequestDTO: FilariaScreeningRequestDTO): Response<ResponseBody>
-
-    @POST("flw-api/disease/leprosy/getAll")
-    suspend fun getAllLeprosyData(@Body request: GetDataPaginatedRequestForDisease): Response<ResponseBody>
-
-    @POST("flw-api/disease/leprosy/followUp/getAll")
-    suspend fun getAllLeprosyFollowUpData(@Body request: GetDataPaginatedRequestForDisease): Response<ResponseBody>
-
-    @POST("flw-api/disease/leprosy/followUp/saveAll")
-    suspend fun saveLeprosyFollowUpData(@Body request: List<LeprosyFollowUpDTO>): Response<ResponseBody>
-
-    @POST("flw-api/disease/getAllDisease")
-    suspend fun getMalariaScreeningData(@Body userDetail: GetDataPaginatedRequestForDisease): Response<ResponseBody>
-
     @POST("flw-api/tb/suspected/saveAll")
     suspend fun saveTBSuspectedData(@Body tbSuspectedRequestDTO: TBSuspectedRequestDTO): Response<ResponseBody>
 
@@ -176,12 +143,6 @@ interface AmritApiService {
     // Unused — no caller found in codebase
 //    @POST("/hwc-api/sync/generalOPDNurseFormDataToServer")
 //    suspend fun saveVitalNurseData(@Body patientVisitInfo: VitalNurseDataRequest): Response<ResponseBody>
-
-    @POST("flw-api/follow-up/save")
-    suspend fun saveMalariaConfirmedData(@Body malariaConfirmedRequestDTO: MalariaConfirmedRequestDTO): Response<ResponseBody>
-
-    @POST("flw-api/follow-up/get")
-    suspend fun getMalariaConfirmedData(@Body malariaConfirmedRequestDTO: GetDataPaginatedRequestForDisease): Response<ResponseBody>
 
     // Unused — BenRepo.getBeneficiaryWithId() calls getBenHealthID instead
 //    @POST("identity-api/id/getByBenId")
@@ -304,13 +265,6 @@ interface AmritApiService {
         @Query("beneficiaryId") benId: Long,
         @Query("orderType") orderType: String
     ): Response<OrderResultResponse>
-
-    @GET("flw-api/diagnostic/order/getBeneficiariesByStatus")
-    suspend fun getBeneficiariesByStatus(
-        @Query("orderType") orderType: String,
-        @Query("villageId") villageId: Int,
-        @Query("providerServiceMapId") providerServiceMapId: Int
-    ): Response<ResponseBody>
 
     @POST("flw-api/diagnostic/order/manualResult")
     suspend fun submitManualResult(

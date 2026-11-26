@@ -1,7 +1,6 @@
 package org.piramalswasthya.stoptb.database.room.dao
 
 import androidx.room.*
-import kotlinx.coroutines.flow.Flow
 import org.piramalswasthya.stoptb.database.room.BeneficiaryIdsAvail
 
 @Dao
@@ -18,9 +17,6 @@ interface BeneficiaryIdsAvailDao {
 
     @Delete
     suspend fun delete(idEntry: BeneficiaryIdsAvail)
-
-    @Query("SELECT COUNT(*) FROM BEN_ID_LIST")
-    fun liveCount(): Flow<Int>
 
     @Query("SELECT MIN(benId) FROM BEN_ID_LIST")
     suspend fun getMinBenId(): Long?
