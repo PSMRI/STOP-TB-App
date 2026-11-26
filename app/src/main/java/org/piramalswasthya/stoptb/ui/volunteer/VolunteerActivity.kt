@@ -455,6 +455,10 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         viewModel.currentUser?.let {
             headerView.findViewById<TextView>(R.id.tv_nav_name).text =
                 resources.getString(R.string.nav_item_1_text, it.name)
+            headerView.findViewById<TextView>(R.id.tv_nav_team).apply {
+                text = resources.getString(R.string.nav_item_team_text, it.teamName.orEmpty())
+                visibility = if (it.teamName.isNullOrBlank()) View.GONE else View.VISIBLE
+            }
             headerView.findViewById<TextView>(R.id.tv_nav_role).text =
                 resources.getString(R.string.nav_item_2_text, it.userName)
 

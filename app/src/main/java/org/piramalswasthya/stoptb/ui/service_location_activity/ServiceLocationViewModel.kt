@@ -191,11 +191,15 @@ class ServiceTypeViewModel @Inject constructor(
     fun selectedTuLabels(): String = selectedTuIndices.sorted().mapNotNull { tuList.getOrNull(it) }.joinToString(", ")
     fun selectedHealthFacilityLabels(): String = selectedHealthFacilityIndices.sorted().mapNotNull { healthFacilityList.getOrNull(it) }.joinToString(", ")
     fun selectTus(indices: Set<Int>) {
-        selectedTuIndices = indices.filter { it in tus.indices }.toCollection(linkedSetOf())
+        val normalizedIndices = indices.filter { it in tus.indices }.toSet()
+        val tuSelectionChanged = normalizedIndices != selectedTuIndices
+        selectedTuIndices = normalizedIndices.toCollection(linkedSetOf())
         _selectedTu = selectedTuIndices.firstOrNull()?.let { tus[it] }
-        // Facility options are scoped to the logged-in user's TU assignment. A TU change clears stale choices.
-        selectedHealthFacilityIndices.clear()
-        _selectedHealthFacility = null
+        if (tuSelectionChanged) {
+            // Facility options are scoped to the logged-in user's TU assignment. A TU change clears stale choices.
+            selectedHealthFacilityIndices.clear()
+            _selectedHealthFacility = null
+        }
     }
     fun selectHealthFacilities(indices: Set<Int>) {
         if (selectedTuIndices.isEmpty()) return
