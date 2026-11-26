@@ -20,11 +20,7 @@ import androidx.work.WorkManager
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceDao
 import org.piramalswasthya.stoptb.database.shared_preferences.PreferenceManager
-import org.piramalswasthya.stoptb.work.dynamicWoker.FormSyncWorker
-import org.piramalswasthya.stoptb.work.dynamicWoker.NCDFollowUpSyncWorker
-import org.piramalswasthya.stoptb.work.dynamicWoker.NDCFollowUpPushWorker
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
@@ -461,20 +457,6 @@ object WorkerUtils {
 
     fun cancelCampPullWorker(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(pullWorkerUniqueName)
-    }
-
-    fun triggerD2dSyncWorker(context: Context) {}
-
-    fun triggerCbacPullWorker(context: Context) {
-        val workRequest = syncRequestBuilder<CbacPullFromAmritWorker>().build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            CbacPullFromAmritWorker.name, ExistingWorkPolicy.APPEND_OR_REPLACE, workRequest)
-    }
-
-    fun triggerCbacPushWorker(context: Context) {
-        val workRequest = syncRequestBuilder<CbacPushToAmritWorker>().build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            CbacPushToAmritWorker.name, ExistingWorkPolicy.APPEND_OR_REPLACE, workRequest)
     }
 
     fun triggerGenBenIdWorker(context: Context) {
