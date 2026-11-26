@@ -156,7 +156,8 @@ class ServiceLocationActivity : AppCompatActivity() {
                         binding.viewModel = viewModel
 
                         binding.tilTuDropdown.visibility = View.GONE
-                        binding.tilHealthFacilityDropdown.visibility = View.GONE
+                        binding.tilTuDropdown.visibility = if (viewModel.tuList.isNotEmpty()) View.VISIBLE else View.GONE
+                        binding.tilHealthFacilityDropdown.visibility = if (viewModel.healthFacilityList.isNotEmpty()) View.VISIBLE else View.GONE
 
                         binding.actvStateDropdown.apply {
                             isEnabled = false
@@ -170,22 +171,37 @@ class ServiceLocationActivity : AppCompatActivity() {
                             isEnabled = false
                             setText(viewModel.blockList.first())
                         }
-//                        binding.actvTuDropdown.apply {
-//                            isEnabled = false
-//                            setText(viewModel.selectedTuName)
-//                            if (viewModel.tuList.size == 1) {
-//                                setText(viewModel.tuList.first())
-//                                viewModel.setTu(0)
-//                            }
-//                        }
-//                        binding.actvHealthFacilityDropdown.apply {
-//                            isEnabled = false
-//                            setText(viewModel.selectedHealthFacilityName)
-//                            if (viewModel.healthFacilityList.size == 1) {
-//                                setText(viewModel.healthFacilityList.first())
-//                                viewModel.setHealthFacility(0)
-//                            }
-//                        }
+                        binding.actvTuDropdown.apply {
+                            isFocusable = false
+                            setText(viewModel.selectedTuLabels())
+                        }
+                        binding.actvHealthFacilityDropdown.apply {
+                            isFocusable = false
+                            isEnabled = viewModel.selectedTuCount() > 0
+                            setText(viewModel.selectedHealthFacilityLabels())
+                        }
+                        val showTuDialog = View.OnClickListener { showMultiSelectDialog(
+                            getString(R.string.service_type_dd_tu_text), viewModel.tuList,
+                            viewModel.selectedTuIndices()
+                        ) { selected ->
+                            viewModel.selectTus(selected)
+                            binding.actvTuDropdown.setText(viewModel.selectedTuLabels())
+                            binding.actvHealthFacilityDropdown.isEnabled = selected.isNotEmpty()
+                            binding.actvHealthFacilityDropdown.setText(viewModel.selectedHealthFacilityLabels())
+                        } }
+                        binding.actvTuDropdown.setOnClickListener(showTuDialog)
+                        binding.tilTuDropdown.setEndIconOnClickListener(showTuDialog)
+                        val showFacilityDialog = View.OnClickListener {
+                            if (viewModel.selectedTuCount() > 0) showMultiSelectDialog(
+                                getString(R.string.service_type_dd_health_facility_text), viewModel.healthFacilityList,
+                                viewModel.selectedHealthFacilityIndices()
+                            ) { selected ->
+                                viewModel.selectHealthFacilities(selected)
+                                binding.actvHealthFacilityDropdown.setText(viewModel.selectedHealthFacilityLabels())
+                            }
+                        }
+                        binding.actvHealthFacilityDropdown.setOnClickListener(showFacilityDialog)
+                        binding.tilHealthFacilityDropdown.setEndIconOnClickListener(showFacilityDialog)
                         binding.actvVillageDropdown.apply {
                             if (viewModel.villageList.size == 1) {
                                 setText(viewModel.villageList.first())
@@ -204,6 +220,24 @@ class ServiceLocationActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun showMultiSelectDialog(
+        title: String,
+        labels: Array<String>,
+        initiallySelected: Set<Int>,
+        onDone: (Set<Int>) -> Unit
+    ) {
+        if (labels.isEmpty()) return
+        val checked = BooleanArray(labels.size) { it in initiallySelected }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(title)
+            .setMultiChoiceItems(labels, checked) { _, which, isChecked -> checked[which] = isChecked }
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                onDone(checked.indices.filter { checked[it] }.toSet())
+            }
+            .show()
     }
 
     private fun showSearchableVillageDialog() {
@@ -291,9 +325,8 @@ class ServiceLocationActivity : AppCompatActivity() {
     private fun dataValid(): Boolean {
         return !(binding.actvStateDropdown.text.isNullOrBlank() ||
                 binding.actvDistrictDropdown.text.isNullOrBlank() ||
-                binding.actvBlockDropdown.text.isNullOrBlank() ||
-//                (viewModel.isTuRequired() && binding.actvTuDropdown.text.isNullOrBlank()) ||
-//                (viewModel.isHealthFacilityRequired() && binding.actvHealthFacilityDropdown.text.isNullOrBlank()) ||
+                (viewModel.isTuRequired() && viewModel.selectedTuCount() == 0) ||
+                (viewModel.isHealthFacilityRequired() && viewModel.selectedTuCount() > 0 && viewModel.selectedHealthFacilityIndices().isEmpty()) ||
                 binding.actvVillageDropdown.text.isNullOrBlank())
 
     }

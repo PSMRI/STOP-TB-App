@@ -67,6 +67,8 @@ class ServiceTypeViewModel @Inject constructor(
     private var _selectedHealthFacility: LocationEntity? = null
     val selectedHealthFacility: LocationEntity?
         get() = _selectedHealthFacility
+    private var selectedTuIndices = linkedSetOf<Int>()
+    private var selectedHealthFacilityIndices = linkedSetOf<Int>()
     val selectedVillageName: String?
         get() = selectedVillage?.localizedName()
     val selectedTuName: String?
@@ -107,6 +109,10 @@ class ServiceTypeViewModel @Inject constructor(
                 _selectedVillageDefaults = _selectedVillage?.let { pref.getVillageDefaults(it.id) }
                 _selectedTu = currentLocation?.tu
                 _selectedHealthFacility = currentLocation?.healthFacility
+                selectedTuIndices = pref.getSelectedTuIds().mapNotNull { id -> tus.indexOfFirst { it.id == id }.takeIf { it >= 0 } }.toCollection(linkedSetOf())
+                    .ifEmpty { linkedSetOf<Int>().apply { currentLocation?.tu?.let { selected -> tus.indexOfFirst { it.id == selected.id }.takeIf { it >= 0 }?.let(::add) } } }
+                selectedHealthFacilityIndices = pref.getSelectedHealthFacilityIds().mapNotNull { id -> healthFacilities.indexOfFirst { it.id == id }.takeIf { it >= 0 } }.toCollection(linkedSetOf())
+                    .ifEmpty { linkedSetOf<Int>().apply { currentLocation?.healthFacility?.let { selected -> healthFacilities.indexOfFirst { it.id == selected.id }.takeIf { it >= 0 }?.let(::add) } } }
                 when (pref.getCurrentLanguage()) {
                     ENGLISH -> {
                         stateDropdownEntry = user.state.name
@@ -171,10 +177,30 @@ class ServiceTypeViewModel @Inject constructor(
 
     fun setTu(i: Int) {
         _selectedTu = tus[i]
+        selectedTuIndices = linkedSetOf(i)
     }
 
     fun setHealthFacility(i: Int) {
         _selectedHealthFacility = healthFacilities[i]
+        selectedHealthFacilityIndices = linkedSetOf(i)
+    }
+
+    fun selectedTuIndices(): Set<Int> = selectedTuIndices
+    fun selectedHealthFacilityIndices(): Set<Int> = selectedHealthFacilityIndices
+    fun selectedTuCount(): Int = selectedTuIndices.size
+    fun selectedTuLabels(): String = selectedTuIndices.sorted().mapNotNull { tuList.getOrNull(it) }.joinToString(", ")
+    fun selectedHealthFacilityLabels(): String = selectedHealthFacilityIndices.sorted().mapNotNull { healthFacilityList.getOrNull(it) }.joinToString(", ")
+    fun selectTus(indices: Set<Int>) {
+        selectedTuIndices = indices.filter { it in tus.indices }.toCollection(linkedSetOf())
+        _selectedTu = selectedTuIndices.firstOrNull()?.let { tus[it] }
+        // Facility options are scoped to the logged-in user's TU assignment. A TU change clears stale choices.
+        selectedHealthFacilityIndices.clear()
+        _selectedHealthFacility = null
+    }
+    fun selectHealthFacilities(indices: Set<Int>) {
+        if (selectedTuIndices.isEmpty()) return
+        selectedHealthFacilityIndices = indices.filter { it in healthFacilities.indices }.toCollection(linkedSetOf())
+        _selectedHealthFacility = selectedHealthFacilityIndices.firstOrNull()?.let { healthFacilities[it] }
     }
 
     fun isTuRequired(): Boolean = tus.isNotEmpty()
@@ -192,6 +218,10 @@ class ServiceTypeViewModel @Inject constructor(
             village = selectedVillage!!
         )
         pref.saveLocationRecord(locationRecord)
+        pref.saveSelectedTuAndFacilityIds(
+            selectedTuIndices.mapNotNull { tus.getOrNull(it)?.id }.toSet(),
+            selectedHealthFacilityIndices.mapNotNull { healthFacilities.getOrNull(it)?.id }.toSet()
+        )
         pref.saveVillageDefaults(
             locationRecord.village.id,
             VillageDefaults(pinCode = pinCode, residentialAreaId = residentialAreaId)
