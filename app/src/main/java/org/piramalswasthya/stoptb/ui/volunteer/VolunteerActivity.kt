@@ -78,6 +78,8 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     private var refreshMenuItem: MenuItem? = null
     private var showQuickRefreshAction: Boolean = false
     private var quickRefreshActionEnabled: Boolean = true
+    private var hasRoleBottomNavTabs: Boolean = false
+    private var isHomeTabSelected: Boolean = true
 
     /** Mirrors the same listener in HomeActivity — see comments there. */
     private val campHubPrefListener =
@@ -336,8 +338,8 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
      * tapping a tab updates [RoleManager.activeRole], which every migrated screen already
      * reads via [RoleManager.privilegesForActiveRole].
      *
-     * Only shown on the Home screen (volunteerHomeFragment) — role switching only affects
-     * Home-screen content, and most other screens read [RoleManager.privilegesForActiveRole]
+     * Only shown on the Home page of volunteerHomeFragment — role switching only affects
+     * Home-page content, and most other screens read [RoleManager.privilegesForActiveRole]
      * once at build time rather than reactively, so leaving the bar visible elsewhere would
      * let a role switch silently go stale on whatever screen the user is looking at.
      */
@@ -350,6 +352,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
         )
         val itemIdToRole = roleToItemId.entries.associate { (role, id) -> id to role }
         val visibleRoles = roleManager.assignedRoles.filter { it in roleToItemId }
+        hasRoleBottomNavTabs = visibleRoles.isNotEmpty()
         Timber.d("RoleManager: bottomNav visibleTabs=$visibleRoles, activeRole=${roleManager.activeRole.value}")
 
         binding.bottomNavRole.menu.let { menu ->
@@ -357,7 +360,7 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
                 menu.findItem(id)?.isVisible = role in visibleRoles
             }
         }
-        if (visibleRoles.isEmpty()) {
+        if (!hasRoleBottomNavTabs) {
             binding.bottomNavRole.visibility = View.GONE
             return
         }
@@ -384,17 +387,30 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
             }
         }
 
-        // Visible on Home only; addOnDestinationChangedListener fires immediately with the
-        // current destination, so this also sets the correct initial state.
+        // The Home and Dashboard pages share one destination, so page selection is checked too.
+        // addOnDestinationChangedListener fires immediately for the initial destination.
         navController.addOnDestinationChangedListener { _, destination, _ ->
-            binding.bottomNavRole.visibility =
-                if (destination.id == R.id.volunteerHomeFragment) View.VISIBLE else View.GONE
+            updateRoleBottomNavVisibility(destination.id)
             // Back on Home from any in-app module: re-check form versions, so a single-role
             // Counselling user (who never switches tabs) still picks up a server-side upgrade.
             if (destination.id == R.id.volunteerHomeFragment && roleManager.activeRole.value == AppRole.COUNSELING) {
                 viewModel.checkFormVersions()
             }
         }
+    }
+
+    fun setHomeTabSelected(selected: Boolean) {
+        isHomeTabSelected = selected
+        updateRoleBottomNavVisibility()
+    }
+
+    private fun updateRoleBottomNavVisibility(destinationId: Int? = navController.currentDestination?.id) {
+        binding.bottomNavRole.visibility =
+            if (hasRoleBottomNavTabs && destinationId == R.id.volunteerHomeFragment && isHomeTabSelected) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
     }
 
     private fun askForPermissions() {

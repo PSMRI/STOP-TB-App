@@ -122,16 +122,6 @@ class DashboardFragment : Fragment() {
                 viewModel.applyFilters(current.copy(periodKey = periodKey))
             }
         }
-
-        val villageNames = mutableListOf(getString(R.string.filter_all_villages))
-        villageNames.addAll(viewModel.villageList.map { viewModel.villageDisplayName(it) })
-        bindDropdown(binding.actvVillage, villageNames) { position ->
-            val villageId = if (position == 0) 0 else viewModel.villageList[position - 1].id
-            val current = viewModel.filters.value ?: DashboardFilterState()
-            if (current.villageId != villageId) {
-                viewModel.applyFilters(current.copy(villageId = villageId))
-            }
-        }
     }
 
     private fun bindFilterSelection(state: DashboardFilterState) {
@@ -139,18 +129,7 @@ class DashboardFragment : Fragment() {
         if (binding.actvPeriod.text?.toString() != periodText) {
             binding.actvPeriod.setText(periodText, false)
         }
-        val villageText = villageLabel(state.villageId)
-        if (binding.actvVillage.text?.toString() != villageText) {
-            binding.actvVillage.setText(villageText, false)
-        }
         adapter.updatePeriod(periodText)
-    }
-
-    private fun villageLabel(villageId: Int): String {
-        if (villageId == 0) return getString(R.string.filter_all_villages)
-        val village = viewModel.villageList.firstOrNull { it.id == villageId }
-            ?: return getString(R.string.filter_all_villages)
-        return viewModel.villageDisplayName(village)
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -229,6 +208,8 @@ class DashboardFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        binding.tvVillageName.text = viewModel.selectedVillageName().orEmpty()
+        viewModel.refreshCurrentVillage()
         // Only the visible ViewPager2 page is RESUMED; off-screen pages stay STARTED.
         viewModel.setDashboardVisible(true)
         (activity as? HomeActivity)?.updateActionBar(

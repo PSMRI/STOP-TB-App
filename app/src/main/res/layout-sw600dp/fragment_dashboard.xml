@@ -84,37 +84,21 @@
                 android:textSize="12sp"
                 android:textStyle="bold" />
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/tilVillage"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            <TextView
+                android:id="@+id/tvVillageName"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:minHeight="48dp"
                 android:layout_marginTop="4dp"
-                app:boxBackgroundColor="@android:color/white"
-                app:boxCornerRadiusBottomEnd="10dp"
-                app:boxCornerRadiusBottomStart="10dp"
-                app:boxCornerRadiusTopEnd="10dp"
-                app:boxCornerRadiusTopStart="10dp"
-                app:boxStrokeColor="#D0D5D4"
-                app:endIconDrawable="@drawable/ic_chevron_down"
-                app:endIconMode="custom"
-                app:endIconTint="#1F8C78">
-
-                <AutoCompleteTextView
-                    android:id="@+id/actvVillage"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:inputType="none"
-                    android:maxLines="1"
-                    android:paddingTop="10dp"
-                    android:paddingBottom="10dp"
-                    android:paddingStart="@dimen/_10sdp"
-                    android:paddingEnd="@dimen/_1sdp"
-                    android:textColor="@color/dashboard_ink"
-                    android:textSize="15sp"
-                    tools:text="All Villages" />
-            </com.google.android.material.textfield.TextInputLayout>
+                android:background="@drawable/bg_dashboard_village_name"
+                android:ellipsize="end"
+                android:gravity="center_vertical"
+                android:maxLines="1"
+                android:paddingStart="@dimen/_10sdp"
+                android:paddingEnd="@dimen/_10sdp"
+                android:textColor="@color/dashboard_ink"
+                android:textSize="15sp"
+                tools:text="Addam" />
         </LinearLayout>
     </LinearLayout>
 

@@ -143,6 +143,26 @@
     <string name="view">देखें</string>
     <string name="home">होम</string>
     <string name="sync_records">रिकॉर्ड सिंक करें</string>
+    <string-array name="sync_records">
+        <item>लाभार्थी</item>
+        <item>सीबीएसी</item>
+        <item>टीबी स्क्रीनिंग</item>
+        <item>टीबी संदिग्ध</item>
+        <item>पात्र दंपति पंजीकरण</item>
+        <item>पात्र दंपति अनुवर्ती</item>
+        <item>गर्भवती महिला पंजीकरण</item>
+        <item>गर्भवती महिला प्रसवपूर्व देखभाल</item>
+        <item>उच्च जोखिम गर्भावस्था आकलन</item>
+        <item>उच्च जोखिम गर्भावस्था अनुवर्ती</item>
+        <item>उच्च जोखिम गैर-गर्भवती आकलन</item>
+        <item>उच्च जोखिम गैर-गर्भवती अनुवर्ती</item>
+        <item>मानवमितीय माप</item>
+        <item>सामान्य जाँच</item>
+        <item>ओपीडी</item>
+        <item>निदान</item>
+        <item>परामर्श</item>
+        <item>टीबी की पुष्टि</item>
+    </string-array>
     <string name="counselling_section_title_format">अनुभाग %1$s - %2$s</string>
     <string name="about">हमारे बारे में</string>
     <string name="help">सहायता</string>
@@ -1292,6 +1312,9 @@
     <string name="sync_tb_screening">टीबी स्क्रीनिंग</string>
     <string name="sync_tb_confirmed">टीबी की पुष्टि</string>
     <string name="sync_counselling">परामर्श</string>
+    <string name="sync_header_synced">सिंक हो गया</string>
+    <string name="sync_header_unsynced">सिंक नहीं हुआ</string>
+    <string name="sync_header_syncing">सिंक हो रहा है</string>
 
 
     <string name="home_village_at_a_glance">गाँव %1$s एक नज़र में</string>

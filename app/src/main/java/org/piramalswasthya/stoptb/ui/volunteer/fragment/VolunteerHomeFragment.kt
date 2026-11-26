@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.viewpager2.widget.ViewPager2
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkQuery
@@ -57,6 +58,7 @@ class VolunteerHomeFragment : Fragment() {
     private var manualRefreshGeneration = 0
     private var manualRefreshTimeoutJob: Job? = null
     private var manualRefreshProgressJob: Job? = null
+    private var homePageChangeCallback: ViewPager2.OnPageChangeCallback? = null
 
     /**
      * Resets the "Refreshing..." state immediately when the camp hub connection
@@ -339,6 +341,12 @@ class VolunteerHomeFragment : Fragment() {
                 else -> "NA"
             }
         }.attach()
+        homePageChangeCallback = object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                (activity as? VolunteerActivity)?.setHomeTabSelected(position == 0)
+            }
+        }.also(binding.vp2Home::registerOnPageChangeCallback)
+        (activity as? VolunteerActivity)?.setHomeTabSelected(binding.vp2Home.currentItem == 0)
     }
 
     override fun onStart() {
@@ -362,7 +370,8 @@ class VolunteerHomeFragment : Fragment() {
                 it.setQuickRefreshActionVisible(true)
             }
         }
-        binding.vp2Home.setCurrentItem(0, false)
+        // Keep the restored page when returning from a list opened on Dashboard.
+        (activity as? VolunteerActivity)?.setHomeTabSelected(binding.vp2Home.currentItem == 0)
     }
 
     private fun getHomeToolbarTitle(): String {
@@ -385,6 +394,8 @@ class VolunteerHomeFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        homePageChangeCallback?.let(binding.vp2Home::unregisterOnPageChangeCallback)
+        homePageChangeCallback = null
         // End a refresh this view started: its startup and timeout are view-scoped and are
         // cancelled here, so on a new view it would show "Refreshing..." and refuse a new
         // refresh with nothing left to end it. Bumps the generation, so a late result is dropped.
