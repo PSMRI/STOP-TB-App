@@ -91,7 +91,8 @@ class TbSuspectedListAdapter(
             binding.btnFormTb.text = binding.root.resources.getString(R.string.view)
             binding.btnFormTb.setBackgroundColor(
                 binding.root.resources.getColor(
-                    android.R.color.holo_green_dark
+                    android.R.color.holo_green_dark,
+                    binding.root.context.theme
                 )
             )
             binding.clickListener = clickListener

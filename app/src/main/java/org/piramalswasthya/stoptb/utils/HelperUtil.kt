@@ -7,7 +7,6 @@ import android.content.res.Configuration
 import android.content.res.Resources
 import android.graphics.Canvas
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.provider.OpenableColumns
@@ -70,7 +69,7 @@ object HelperUtil {
 
 
     fun getLocalizedResources(context: Context, currentLanguage: Languages): Resources {
-        val desiredLocale = Locale(currentLanguage.symbol)
+        val desiredLocale = Locale.forLanguageTag(currentLanguage.symbol)
         var conf = context.resources.configuration
         conf = Configuration(conf)
         conf.setLocale(desiredLocale)
@@ -179,24 +178,15 @@ object HelperUtil {
         val cacheKey = "$text-$start-$end-$textPaint-$width-$alignment-" +
                 "$spacingMult-$spacingAdd-$includePad-$ellipsizedWidth-$ellipsize"
 
-        // The public constructor was deprecated in API level 28,
-        // but the builder is only available from API level 23 onwards
+        // minSdk is 25, so the builder (API 23+) is always available.
         val staticLayout =
-            StaticLayoutCache[cacheKey] ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                StaticLayout.Builder.obtain(text, start, end, textPaint, width)
-                    .setAlignment(alignment)
-                    .setLineSpacing(spacingAdd, spacingMult)
-                    .setIncludePad(includePad)
-                    .setEllipsizedWidth(ellipsizedWidth)
-                    .setEllipsize(ellipsize)
-                    .build()
-            } else {
-                StaticLayout(
-                    text, start, end, textPaint, width, alignment,
-                    spacingMult, spacingAdd, includePad, ellipsize, ellipsizedWidth
-                )
-                    .apply { StaticLayoutCache[cacheKey] = this }
-            }
+            StaticLayoutCache[cacheKey] ?: StaticLayout.Builder.obtain(text, start, end, textPaint, width)
+                .setAlignment(alignment)
+                .setLineSpacing(spacingAdd, spacingMult)
+                .setIncludePad(includePad)
+                .setEllipsizedWidth(ellipsizedWidth)
+                .setEllipsize(ellipsize)
+                .build()
 
         staticLayout.draw(this, x, y)
     }

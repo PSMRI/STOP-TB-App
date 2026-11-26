@@ -6,7 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.text.Html
+import androidx.core.text.HtmlCompat
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -92,7 +92,7 @@ class SignInFragment : Fragment() {
         }
 
         MaterialAlertDialogBuilder(requireContext()).setTitle(resources.getString(R.string.logout))
-            .setMessage(Html.fromHtml(str))
+            .setMessage(HtmlCompat.fromHtml(str, HtmlCompat.FROM_HTML_MODE_LEGACY))
             .setPositiveButton(resources.getString(R.string.yes)) { dialog, _ ->
                 viewModel.unprocessedRecordsCount.value?.let {
                     if (it > 0) {

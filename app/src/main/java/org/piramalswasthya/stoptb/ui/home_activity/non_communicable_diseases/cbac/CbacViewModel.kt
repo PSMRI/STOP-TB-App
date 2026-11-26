@@ -75,7 +75,7 @@ class CbacViewModel @Inject constructor(
 
     private val resources by lazy {
         val configuration = Configuration(context.resources.configuration)
-        configuration.setLocale(Locale(preferenceDao.getCurrentLanguage().symbol))
+        configuration.setLocale(Locale.forLanguageTag(preferenceDao.getCurrentLanguage().symbol))
         context.createConfigurationContext(configuration).resources
     }
      var referralCache: ReferalCache? = null
@@ -942,7 +942,7 @@ class CbacViewModel @Inject constructor(
     }
 
     private fun getLocalizedResources(context: Context, currentLanguage: Languages): Resources {
-        val desiredLocale = Locale(currentLanguage.symbol)
+        val desiredLocale = Locale.forLanguageTag(currentLanguage.symbol)
         var conf = context.resources.configuration
         conf = Configuration(conf)
         conf.setLocale(desiredLocale)
