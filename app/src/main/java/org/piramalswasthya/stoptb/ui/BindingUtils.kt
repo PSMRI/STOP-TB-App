@@ -134,7 +134,7 @@ fun TextView.setBenIdText(benId: Long?) {
     benId?.let {
         if (benId < 0L) {
             text = "Pending Sync"
-            setTextColor(resources.getColor(android.R.color.holo_orange_light))
+            setTextColor(resources.getColor(android.R.color.holo_orange_light, context.theme))
         } else {
             text = benId.toString()
             setTextColor(
@@ -233,10 +233,7 @@ fun ConstraintLayout.setItemsCheckBox(form: FormInputOld?) {
                 cbx.layoutParams =
                     LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, 1.0F)
                 cbx.id = View.generateViewId()
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) cbx.setTextAppearance(
-                    context, android.R.style.TextAppearance_Material_Medium
-                )
-                else cbx.setTextAppearance(android.R.style.TextAppearance_Material_Subhead)
+                cbx.setTextAppearance(android.R.style.TextAppearance_Material_Subhead)
                 cbx.text = it
                 addView(cbx)
                 if (form.value.value?.contains(it) == true) cbx.isChecked = true

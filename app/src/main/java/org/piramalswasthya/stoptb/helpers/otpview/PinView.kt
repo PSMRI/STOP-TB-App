@@ -46,7 +46,6 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.Px
 import androidx.appcompat.widget.AppCompatEditText
 import androidx.core.content.res.ResourcesCompat
-import androidx.core.view.ViewCompat
 import org.piramalswasthya.stoptb.R
 import kotlin.math.abs
 
@@ -261,7 +260,7 @@ class PinView @JvmOverloads constructor(
             width = widthSize
         } else {
             val boxesWidth = (mPinItemCount - 1) * mPinItemSpacing + mPinItemCount * mPinItemWidth
-            width = boxesWidth + ViewCompat.getPaddingEnd(this) + ViewCompat.getPaddingStart(this)
+            width = boxesWidth + paddingEnd + paddingStart
             if (mPinItemSpacing == 0) {
                 width -= (mPinItemCount - 1) * mLineWidth
             }
@@ -570,7 +569,7 @@ class PinView @JvmOverloads constructor(
     private fun updateItemRectF(i: Int) {
         val halfLineWidth = (mLineWidth.toFloat()) / 2
         var left =
-            scrollX + ViewCompat.getPaddingStart(this) + i * (mPinItemSpacing + mPinItemWidth) + halfLineWidth
+            scrollX + paddingStart + i * (mPinItemSpacing + mPinItemWidth) + halfLineWidth
         if (mPinItemSpacing == 0 && i > 0) {
             left = left - (mLineWidth) * i
         }

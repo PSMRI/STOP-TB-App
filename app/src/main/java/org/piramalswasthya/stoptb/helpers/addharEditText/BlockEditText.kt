@@ -28,7 +28,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
-import androidx.core.view.ViewCompat
 import org.piramalswasthya.stoptb.R
 import org.piramalswasthya.stoptb.utils.HelperUtil.convertDpToPixel
 
@@ -69,7 +68,7 @@ class BlockEditText : FrameLayout {
     private var showPasswordToggle:Boolean = false
     private var isToggleAdded:Boolean = false
     private var passwordToggleSize = resources.getDimensionPixelSize(R.dimen.password_toggle_size)
-    private var passwordToggleColor = resources.getColor(android.R.color.black)
+    private var passwordToggleColor = resources.getColor(android.R.color.black, context.theme)
 
 
     constructor(context: Context) : super(context) {
@@ -474,7 +473,7 @@ class BlockEditText : FrameLayout {
     }
 
     private fun setEdiTextBackground(editText: EditText?, drawable: Drawable?) {
-        ViewCompat.setBackground(editText!!, drawable?.constantState?.newDrawable())
+        editText!!.background = drawable?.constantState?.newDrawable()
     }
 
     fun setLengthAt(index: Int, length: Int) {

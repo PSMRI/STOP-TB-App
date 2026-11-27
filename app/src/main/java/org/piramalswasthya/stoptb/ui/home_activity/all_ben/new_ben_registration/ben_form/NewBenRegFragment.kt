@@ -26,6 +26,7 @@ import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.withStarted
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -976,9 +977,11 @@ class NewBenRegFragment : Fragment() {
 
     // ─── Camera ──────────────────────────────────────────────────────────
     private fun takeImage() {
-        viewLifecycleOwner.lifecycleScope.launchWhenStarted {
-            latestTmpUri = getTmpFileUri()
-            takePicture.launch(latestTmpUri)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.withStarted {
+                latestTmpUri = getTmpFileUri()
+                takePicture.launch(latestTmpUri)
+            }
         }
     }
 

@@ -108,7 +108,7 @@ PagingDataAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder
             if (isRefused) {
                 binding.btnCounselling.visibility = View.GONE
                 binding.btnCounselled.text = binding.root.context.getString(org.piramalswasthya.stoptb.R.string.refused)
-                binding.btnCounselled.setBackgroundColor(binding.root.resources.getColor(android.R.color.holo_red_dark))
+                binding.btnCounselled.setBackgroundColor(binding.root.resources.getColor(android.R.color.holo_red_dark, binding.root.context.theme))
             } else if (isInProgress) {
                 binding.btnCounselled.visibility = View.GONE
                 binding.btnCounselling.visibility = View.VISIBLE
@@ -116,11 +116,11 @@ PagingDataAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder
             } else if (isCounselledFinal) {
                 binding.btnCounselling.visibility = View.GONE
                 binding.btnCounselled.text = binding.root.context.getString(org.piramalswasthya.stoptb.R.string.counselled)
-                binding.btnCounselled.setBackgroundColor(binding.root.resources.getColor(android.R.color.holo_green_dark))
+                binding.btnCounselled.setBackgroundColor(binding.root.resources.getColor(android.R.color.holo_green_dark, binding.root.context.theme))
             } else {
                 binding.btnCounselled.visibility = View.GONE
                 binding.btnCounselled.text = binding.root.context.getString(org.piramalswasthya.stoptb.R.string.counselled)
-                binding.btnCounselled.setBackgroundColor(binding.root.resources.getColor(android.R.color.holo_green_dark))
+                binding.btnCounselled.setBackgroundColor(binding.root.resources.getColor(android.R.color.holo_green_dark, binding.root.context.theme))
                 binding.btnCounselling.visibility = View.VISIBLE
                 binding.btnCounselling.text = binding.root.context.getString(org.piramalswasthya.stoptb.R.string.counselling_start_button)
             }
@@ -184,7 +184,7 @@ PagingDataAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder
             }
 
 
-            binding.btnFormTb.setBackgroundColor(binding.root.resources.getColor(if (item.tbConfirmedList == null) android.R.color.holo_red_dark else android.R.color.holo_green_dark))
+            binding.btnFormTb.setBackgroundColor(binding.root.resources.getColor(if (item.tbConfirmedList == null) android.R.color.holo_red_dark else android.R.color.holo_green_dark, binding.root.context.theme))
             binding.clickListener = clickListener
 
             binding.executePendingBindings()

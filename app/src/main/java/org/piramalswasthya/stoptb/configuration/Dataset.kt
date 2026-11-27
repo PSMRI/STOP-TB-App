@@ -62,10 +62,12 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
             val f = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
             val date = dateString?.let { f.parse(it) }
             return date?.let {
-                if (it.month >= 3) {
-                    "" + (it.year + 1900) + " - " + (it.year + 1901)
+                val cal = Calendar.getInstance().apply { time = it }
+                val year = cal.get(Calendar.YEAR)
+                if (cal.get(Calendar.MONTH) >= 3) {
+                    "" + year + " - " + (year + 1)
                 } else {
-                    "" + (it.year + 1899) + " - " + (it.year + 1900)
+                    "" + (year - 1) + " - " + year
                 }
             }
         }

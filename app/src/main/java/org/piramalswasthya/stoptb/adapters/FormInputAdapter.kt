@@ -514,9 +514,11 @@ class FormInputAdapter(
                                 ), intArrayOf(
                                     binding.root.resources.getColor(
                                         android.R.color.darker_gray,
+                                        binding.root.context.theme
                                     ),  // disabled
                                     binding.root.resources.getColor(
                                         android.R.color.darker_gray,
+                                        binding.root.context.theme
                                     ) // enabled
                                 )
                             )
@@ -1101,7 +1103,7 @@ class FormInputAdapter(
             isOtpVerified(isEnabled, isInternetAvailable(binding.root.context))
 
             binding.generateOtp.setOnClickListener {
-                formValueListener!!.onButtonClick(item,binding.generateOtp,binding.timerInSec,binding.tilEditText,isEnabled,adapterPosition,binding.et)
+                formValueListener!!.onButtonClick(item,binding.generateOtp,binding.timerInSec,binding.tilEditText,isEnabled,bindingAdapterPosition,binding.et)
             }
 
 

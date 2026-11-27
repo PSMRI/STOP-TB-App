@@ -678,7 +678,7 @@ class FormRendererAdapter(
                                             } else if (maxDate != null && selectedDate.after(maxDate)) {
                                                 field.errorMessage = "Date cannot be after ${sdf.format(maxDate)}"
                                             }
-                                            notifyItemChanged(adapterPosition)
+                                            notifyItemChanged(bindingAdapterPosition)
                                         }
 
                                         when (field.fieldId) {
@@ -776,7 +776,7 @@ class FormRendererAdapter(
                     if (isSNCUDisabled && field.value != "Yes") {
                         field.value = "Yes"
                         onValueChanged(field, "Yes")
-                        notifyItemChanged(adapterPosition)
+                        notifyItemChanged(bindingAdapterPosition)
                     }
 
                     val preSelectedValue = if (!field.isEditable) field.value?.toString() else null
