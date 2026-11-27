@@ -1,17 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/toolbar_contact_tracing"
+    <!-- Status-bar inset is applied as top padding on this container (see ContactTracingActivity),
+         so the toolbar keeps its normal height and the back arrow and title stay aligned. -->
+    <FrameLayout
+        android:id="@+id/toolbar_container_contact_tracing"
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:background="?attr/colorPrimary"
-        app:titleTextColor="@color/md_theme_light_onPrimary"
-        app:navigationIconTint="@color/md_theme_light_onPrimary"
-        xmlns:app="http://schemas.android.com/apk/res-auto" />
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_toolbar_surface">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar_contact_tracing"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@android:color/transparent"
+            app:titleTextAppearance="@style/TextAppearance.Sakhi.ContactTracingToolbarTitle"
+            app:titleTextColor="@color/md_theme_light_onPrimary"
+            app:navigationIconTint="@color/md_theme_light_onPrimary" />
+    </FrameLayout>
 
     <FrameLayout
         android:id="@+id/fragment_container"

@@ -877,6 +877,9 @@ class NewBenRegViewModel @Inject constructor(
         return benRepo.getBenFromId(benId)
     }
 
+    suspend fun getHouseholdMembers(hhId: Long): List<BenRegCache> =
+        benRepo.getBenListFromHousehold(hhId)
+
     fun enableFieldEditAndGetIndex(formId: Int): Int {
         dataset.enableFieldEdit(formId)
         return dataset.getIndexById(formId)

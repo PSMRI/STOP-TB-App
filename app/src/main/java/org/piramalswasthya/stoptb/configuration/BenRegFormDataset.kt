@@ -555,7 +555,8 @@ class BenRegFormDataset(context: Context, language: Languages) : Dataset(context
             ?.takeIf { it > 0L && it != 9999999999L }
         val hasFamilyHeadMobile = normalizedFamilyHeadPhone != null
         isHeadOfFamilyRegistration = relToHeadId == 18
-        if (isHeadOfFamilyRegistration) {
+        // Non-HH is also opened as "Self" but allows 0–99; the HoF age check moves to Link Household.
+        if (isHeadOfFamilyRegistration && !isNonHH) {
             // Minimum age 15 for Head of Family registration — restrict DOB picker upper bound
             val maxDobForHoF = Calendar.getInstance()
                 .apply { add(Calendar.YEAR, -Konstants.minAgeForHoF) }.timeInMillis

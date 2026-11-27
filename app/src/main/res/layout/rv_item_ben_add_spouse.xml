@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Add spouse / add children buttons of rv_item_ben. Not shown anywhere today (the adapter always hid it), so it is a ViewStub in rv_item_ben
+     that nothing inflates: kept for when the feature returns, without costing every row its views. -->
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <data>
+        <variable name="ben" type="org.piramalswasthya.stoptb.model.BenBasicDomain" />
+        <variable name="clickListener" type="org.piramalswasthya.stoptb.adapters.BenListAdapter.BenClickListener" />
+        <variable name="isMatched" type="Boolean" />
+    </data>
+
+    <LinearLayout
+                android:id="@+id/ll_add_spouse_btn"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                
+                android:orientation="horizontal"
+               
+               
+               >
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_add_children"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/add_children"
+                            android:visibility="gone"
+                            android:layout_marginEnd="5dp"
+                            android:backgroundTint="@android:color/holo_green_dark"
+                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                            android:textColor="?attr/colorOnPrimary"
+                            app:cornerRadius="@dimen/padding_small"
+                            app:strokeColor="?attr/colorPrimary"
+                            app:strokeWidth="1dp"/>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_add_spouse"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="5dp"
+                            android:visibility="gone"
+                            android:text="@string/add_wife"
+                            android:backgroundTint="@android:color/holo_green_dark"
+                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                            android:textColor="?attr/colorOnPrimary"
+                            app:cornerRadius="@dimen/padding_small"
+                            app:strokeColor="?attr/colorPrimary"
+                            app:strokeWidth="1dp"/>
+                </LinearLayout>
+</layout>

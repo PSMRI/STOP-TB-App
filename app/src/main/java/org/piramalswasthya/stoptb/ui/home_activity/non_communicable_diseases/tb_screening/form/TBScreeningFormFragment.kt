@@ -104,7 +104,9 @@ class TBScreeningFormFragment : Fragment() {
                             }
                         } else {
                             viewModel.updateListOnValueChanged(formId, index)
-                            if (formId != 27)
+                            // A headline reports index -1 from bind(): nothing was answered, so
+                            // there is nothing to redraw.
+                            if (formId != 27 && index >= 0)
                             hardCodedListUpdate(16)
 
                         }
@@ -202,13 +204,12 @@ class TBScreeningFormFragment : Fragment() {
         }
     }
     private fun hardCodedListUpdate(formId: Int) {
-        binding.form.rvInputForm.adapter?.apply {
-            when (formId) {
-                1,2,3,4,5,6,7,8,9,10,11,16,21,22,23,24,25,26-> {
-                    notifyDataSetChanged()
-
-                }
-
+        val list = binding.form.rvInputForm
+        when (formId) {
+            1,2,3,4,5,6,7,8,9,10,11,16,21,22,23,24,25,26-> {
+                // After the current layout pass: RecyclerView rejects a refresh during one, and
+                // the rejected refresh left dependent questions hidden until the next tap.
+                list.post { list.adapter?.notifyDataSetChanged() }
             }
         }
     }
