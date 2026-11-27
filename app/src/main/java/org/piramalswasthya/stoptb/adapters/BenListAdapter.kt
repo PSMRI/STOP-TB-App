@@ -11,8 +11,6 @@ import android.text.method.LinkMovementMethod
 import android.text.style.ClickableSpan
 import android.text.style.ForegroundColorSpan
 import android.text.style.StyleSpan
-import android.content.res.ColorStateList
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -38,9 +36,6 @@ import org.piramalswasthya.stoptb.model.ExamineDenominatorRule
 import org.piramalswasthya.stoptb.model.Gender
 import org.piramalswasthya.stoptb.model.MtbResult
 import org.piramalswasthya.stoptb.model.OrderStatus
-import org.piramalswasthya.stoptb.model.RifResult
-import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
-import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.model.TbDiagnosticsCardFields
 import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
@@ -1333,50 +1328,6 @@ class BenListAdapter(
             // IContactTracingRepository.observeTptEligibleBenIds) ? otherwise FULL_TREATMENT/NO_TREATMENT
             // beneficiaries would incorrectly get stuck at x/5.
             // Others: all 5 forms
-            // Legacy, kept for reference:
-//            val currentRole = pref?.getLoggedInUser()?.role
-//            val isCounsellingOfficer = currentRole.isCounsellingOfficerRole()
-//            val isRegistrar = pref?.getLoggedInUser()?.role.isRegistrationOfficerRole()
-//            val isNurse = pref?.getLoggedInUser()?.role.isNurseRole()
-//            val isCounsellingOfficerForExamine = pref?.getLoggedInUser()?.role.isCounsellingOfficerRole()
-//            val (examineFilledCount, examineTotal) = if (isCounsellingOfficerForExamine) {
-//                if (showContactTracingForms) {
-//                    val requiredItems = if (isTptEligible) {
-//                        listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone, hasTptFollowUpDone)
-//                    } else {
-//                        listOf(hasAnthropometry, hasTbScreening, hasContactFollowUpDone)
-//                    }
-//                    Pair(requiredItems.count { it }, requiredItems.size)
-//                } else {
-//                    val filled = listOf(
-//                        hasAnthropometry,
-//                        hasTbScreening
-//                    ).count { it }
-//                    Pair(filled, 2)
-//                }
-//            } else if (isRegistrar) {
-//                val filled = listOf(
-//                    hasAnthropometry,
-//                    hasTbScreening
-//                ).count { it }
-//                Pair(filled, 2)
-//            } else if (isNurse || isCounsellingOfficer) {
-//                val filled = listOf(
-//                    hasAnthropometry,
-//                    isMatched,
-//                    hasTbScreening,
-//                    hasGeneralOpd
-//                ).count { it }
-//                Pair(filled, 4)
-//            } else {
-//                val filled = listOf(
-//                    hasAnthropometry,
-//                    isMatched,
-//                    hasTbScreening,
-//                    hasGeneralOpd
-//                ).count { it }
-//                Pair(filled, 4)
-//            }
 
             // Reused below for relevantUnsynced/relevantSyncing too, not just the denominator.
             val assignedRoles = roleManager?.assignedRoles.orEmpty()

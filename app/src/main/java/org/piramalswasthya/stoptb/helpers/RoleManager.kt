@@ -34,7 +34,7 @@ class RoleManager @Inject constructor(
     private val _activeRole = MutableStateFlow(AppRole.VOLUNTEER)
     val activeRole: StateFlow<AppRole> = _activeRole.asStateFlow()
 
-    /** Call once per cold start (VolunteerActivity/HomeActivity onCreate). Always resets
+    /** Call once per cold start (VolunteerActivity onCreate). Always resets
      *  active role to the first assigned role — no persistence across app restarts. */
     fun initializeFromLoggedInUser() {
         val user = preferenceDao.getLoggedInUser()

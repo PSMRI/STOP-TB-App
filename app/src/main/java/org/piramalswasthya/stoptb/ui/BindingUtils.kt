@@ -5,7 +5,6 @@ import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
 import android.text.Html
-import android.text.InputType
 import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
@@ -24,7 +23,6 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.signature.ObjectKey
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.divider.MaterialDivider
-import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -63,15 +61,6 @@ fun IconDataset.Disease.getTitleRes(): Int {
 fun setFormattedDate(view: TextView, timestamp: Long?) {
     timestamp?.let {
         val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.ENGLISH)
-        view.text = sdf.format(Date(it))
-    }
-}
-
-
-@BindingAdapter("formattedDatewitheMonth")
-fun setFormattedDateWithMonth(view: TextView, timestamp: Long?) {
-    timestamp?.let {
-        val sdf = SimpleDateFormat("dd-MM-yyyy , MMM", Locale.ENGLISH)
         view.text = sdf.format(Date(it))
     }
 }
@@ -206,14 +195,6 @@ fun AutoCompleteTextView.setSpinnerItems(list: Array<String>?) {
     }
 }
 
-@BindingAdapter("allCaps")
-fun TextInputEditText.setAllAlphabetCaps(allCaps: Boolean) {
-    if (allCaps) {
-        isAllCaps = true
-        inputType = InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
-    }
-}
-
 @BindingAdapter("showLayout")
 fun Button.setVisibilityOfLayout(show: Boolean?) {
     show?.let {
@@ -232,24 +213,6 @@ fun ImageView.setVisibilityOfLayout(show: Boolean?) {
 fun ViewGroup.setVisibilityOfLayout(show: Boolean?) {
     show?.let {
         visibility = if (it) View.VISIBLE else View.GONE
-    }
-}
-
-@BindingAdapter("boundMinHeight")
-fun View.setBoundMinHeight(minHeight: Float?) {
-    minHeight?.let {
-        minimumHeight = it.toInt()
-    }
-}
-
-@BindingAdapter("boundMarginTop")
-fun View.setBoundMarginTop(marginTop: Float?) {
-    marginTop?.let {
-        val params = layoutParams
-        if (params is ViewGroup.MarginLayoutParams) {
-            params.topMargin = it.toInt()
-            layoutParams = params
-        }
     }
 }
 
@@ -499,36 +462,6 @@ fun TextView.setAsteriskTextView(required: Boolean?, title: String?) {
 }
 
 
-@BindingAdapter(value = ["formattedSessionDate"], requireAll = false)
-fun setFormattedSessionDate(textView: TextView, timestamp: Long?) {
-    if (timestamp == null) {
-        textView.text =textView.context.getString(R.string.session_date_n_a)
-        return
-    }
-
-    val date = Date(timestamp)
-    val formatType = textView.tag as? String ?: "default"
-
-    val format = SimpleDateFormat("dd MMM yyyy", Locale.ENGLISH)
-    val formattedDate = format.format(date)
-
-    textView.text = when (formatType) {
-        "default" -> textView.context.getString(R.string.session_date_format, formattedDate)
-        "monthYear" -> {
-            val monthFormat = SimpleDateFormat("MMMM - yyyy", Locale.ENGLISH)
-            val monthYear = monthFormat.format(date)
-            textView.context.getString(R.string.uwin_session_format, monthYear)
-        }
-        else -> textView.context.getString(R.string.session_date_format, formattedDate)
-    }
-}
-
-@BindingAdapter(value = ["visibleIfAgeAbove30AndAliveAge", "isDeath"], requireAll = true)
-fun Button.visibleIfAgeAbove30AndAlive(age: Int?, isDeath: String?) {
-    val shouldShow = (age ?: 0) >= 30 && isDeath.equals("false", ignoreCase = true)
-    visibility = if (shouldShow) View.VISIBLE else View.GONE
-}
-
 @BindingAdapter(value = ["visibleIfEligibleFemale", "isDeath", "reproductiveStatusId", "gender"], requireAll = true)
 fun Button.visibleIfEligibleFemale(age: Int?, isDeath: String?, reproductiveStatusId: Int?, gender: String?) {
 
@@ -539,15 +472,6 @@ fun Button.visibleIfEligibleFemale(age: Int?, isDeath: String?, reproductiveStat
                 isDeath.equals("false", ignoreCase = true)
 
     visibility = if (shouldShow) View.VISIBLE else View.GONE
-}
-
-@BindingAdapter("dynamicBackground")
-fun setDynamicBackground(view: View, isEligible: Boolean) {
-    if (isEligible) {
-        view.setBackgroundResource(R.color.md_theme_light_error)
-    } else {
-        view.background = null
-    }
 }
 
 @BindingAdapter("visibleOrGone")

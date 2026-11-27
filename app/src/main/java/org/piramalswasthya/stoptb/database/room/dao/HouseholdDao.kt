@@ -1,6 +1,6 @@
 package org.piramalswasthya.stoptb.database.room.dao
 
-import androidx.paging.PagingSource
+
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -19,18 +19,8 @@ interface HouseholdDao {
     @Update
     suspend fun update(household: HouseholdCache)
 
-    @Query("UPDATE HOUSEHOLD SET processed = :proccess , serverUpdatedStatus =:updateStatus WHERE householdId = :householdId")
-    suspend fun updateHouseholdToSync(
-        householdId: Long,
-        proccess: String,
-        updateStatus: Int
-    )
-
     @Query("SELECT * FROM HOUSEHOLD WHERE isDraft = 1 LIMIT 1")
     suspend fun getDraftHousehold(): HouseholdCache?
-
-    @Query("SELECT * FROM HOUSEHOLD WHERE isDraft = 0 and loc_village_Id = :selectedVillage")
-    fun getAllHouseholds(selectedVillage: Int): Flow<List<HouseholdCache>>
 
     @Query("SELECT h.*, count(b.householdId) as numMembers FROM HOUSEHOLD as h left outer join BENEFICIARY b on b.householdId = h.householdId WHERE h.isDraft = 0 and h.loc_village_Id = :selectedVillage and ifnull(h.isDoorLocked, 0) = 0 group by h.householdId")
     fun getAllHouseholdWithNumMembers(selectedVillage: Int): Flow<List<HouseholdBasicCache>>

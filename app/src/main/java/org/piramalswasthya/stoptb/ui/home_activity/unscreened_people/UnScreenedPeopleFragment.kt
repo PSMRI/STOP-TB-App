@@ -106,10 +106,6 @@ class UnScreenedPeople : Fragment(),
                     pendingExamineBenId = benId
                     showExamineBottomSheet(benId)
                 },
-
-//                clickedUnscreened = { ben ->
-//                    viewModel.markSymptomsScreened(ben.benId)
-//                }
             ),
             showBeneficiaries = true,
             showRegistrationDate = true,

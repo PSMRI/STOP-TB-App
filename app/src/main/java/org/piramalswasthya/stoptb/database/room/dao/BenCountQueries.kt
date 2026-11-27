@@ -1,10 +1,7 @@
 package org.piramalswasthya.stoptb.database.room.dao
 
-import androidx.lifecycle.LiveData
-import androidx.paging.PagingSource
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
-import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.model.*
 
@@ -52,10 +49,6 @@ interface BenCountQueries {
     fun getConfirmedLeprosyCaseCount(
         selectedVillage: Int
     ): Flow<Int>
-
-
-    @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeactivate=0")
-    fun getAllBenCount(selectedVillage: Int): Flow<Int>
 
     /**
      * TEMPORARY PERFORMANCE INSTRUMENTATION - remove with the rest of the trace scaffolding.
@@ -199,49 +192,6 @@ interface BenCountQueries {
         firstName: String?
     ): Int
 
-    @Query("SELECT COUNT(*) FROM BENEFICIARY WHERE isDraft = 0 AND (processed = 'N' OR processed = 'U') AND syncState =0")
-    fun getUnProcessedRecordCount(): Flow<Int>
-
-    @Query("SELECT COUNT(*) FROM BENEFICIARY WHERE isDraft = 0 AND (processed = 'N' OR processed = 'U') AND syncState =0")
-    fun getAllUnProcessedRecordCount(): Flow<Int>
-
-
-
-
-    @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE WHERE CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) BETWEEN :min and :max and reproductiveStatusId = 1 and villageId=:selectedVillage")
-    fun getAllEligibleCoupleListCount(
-        selectedVillage: Int,
-        min: Int = Konstants.minAgeForEligibleCouple, max: Int = Konstants.maxAgeForEligibleCouple
-    ): Flow<Int>
-
-
-
-    @Transaction
-    @Query("SELECT count(*) FROM BEN_BASIC_CACHE WHERE reproductiveStatusId = 2 and isDeactivate=0 and villageId=:selectedVillage")
-    fun getAllPregnancyWomenForHRListCount(selectedVillage: Int): Flow<Int>
-
-
-    @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE WHERE reproductiveStatusId = 2 and isDeactivate=0 and villageId=:selectedVillage")
-    fun getAllPregnancyWomenListCount(selectedVillage: Int): Flow<Int>
-
-    @Query("""
-        SELECT COUNT(*) FROM BEN_BASIC_CACHE
-        WHERE villageId = :selectedVillage
-          AND isDeactivate = 0
-          AND isDeath = 0
-          AND CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) < 5
-    """)
-    fun getUnderFiveChildrenCount(selectedVillage: Int): Flow<Int>
-
-    @Query("""
-        SELECT COUNT(*) FROM BEN_BASIC_CACHE
-        WHERE villageId = :selectedVillage
-          AND isDeactivate = 0
-          AND isDeath = 0
-          AND benId IN (${ReferralListSql.HWC_BEN_IDS})
-    """)
-    fun getHwcBenDataCount(selectedVillage: Int): Flow<Int>
-
     @Query("""
         SELECT COUNT(*) FROM BEN_BASIC_CACHE
         WHERE villageId = :selectedVillage
@@ -261,44 +211,6 @@ interface BenCountQueries {
           AND ${ReferralListSql.TRUENAT}
     """)
     fun getTrueNatBenCount(selectedVillage: Int): Flow<Int>
-
-    @Query("""
-        SELECT COUNT(*) FROM BEN_BASIC_CACHE
-        WHERE villageId = :selectedVillage
-          AND isDeactivate = 0
-          AND isDeath = 0
-          AND (
-            ${LIQUID_CULTURE_REFERRAL_CONDITION}
-          )
-    """)
-    fun getLiquidCultureBenCount(selectedVillage: Int): Flow<Int>
-
-    @Query("""
-        SELECT COUNT(*) FROM BEN_BASIC_CACHE
-        WHERE villageId = :selectedVillage AND isDeactivate = 0 AND isDeath = 0
-          AND benId IN (
-    """ + ClinicalAssessmentSql.MATCHING_BEN_IDS + """
-          )
-    """)
-    fun getClinicalAssessmentBenCount(selectedVillage: Int): Flow<Int>
-
-
-    @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE WHERE reproductiveStatusId = 1 and gender = 'FEMALE' and isDeactivate=0 and villageId=:selectedVillage")
-    fun getAllNonPregnancyWomenListCount(selectedVillage: Int): Flow<Int>
-
-    @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE WHERE pwHrp = 1 and isDeactivate=0 and villageId=:selectedVillage")
-    fun getAllWomenListForPmsmaCount(selectedVillage: Int): Flow<Int>
-
-    @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE WHERE CAST((strftime('%s','now') - dob/1000)/60/60/24/365 AS INTEGER) <= :max and villageId=:selectedVillage AND isDeath = 1 and isDeactivate=0" )
-    fun getAllCDRListCount(
-        selectedVillage: Int, max: Int = Konstants.maxAgeForCdr
-    ): Flow<Int>
-
-
-
-    @Transaction
-    @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE WHERE reproductiveStatusId in (2, 3, 4) and isMdsr = 1 and villageId=:selectedVillage and isDeactivate=0")
-    fun getAllMDSRCount(selectedVillage: Int): Flow<Int>
 
     // Dashboard TB Confirmed tile. Definition shared with the Confirmed list: [TbCaseSql.CONFIRMED];
     // each record type is confirmed within its own visit date for the time filter.
@@ -420,34 +332,6 @@ interface BenCountQueries {
         selectedVillage: Int,
     ): Flow<Int>
 
-    @Query("""
-        SELECT COUNT(b.benId)
-        FROM BEN_BASIC_CACHE b
-        INNER JOIN NCD_REFER r ON b.benId = r.benId
-        WHERE b.villageId = :selectedVillage
-          AND b.isDeactivate = 0
-          AND r.type = "TB"
-          AND r.refrredToAdditionalServiceList IS NOT NULL
-          AND r.refrredToAdditionalServiceList LIKE '%' || :serviceName || '%'
-    """)
-    fun getTbReferralServiceCount(
-        selectedVillage: Int,
-        serviceName: String
-    ): Flow<Int>
-
-    @Query("""
-        SELECT COUNT(b.benId)
-        FROM BEN_BASIC_CACHE b
-        INNER JOIN NCD_REFER r ON b.benId = r.benId
-        WHERE b.villageId = :selectedVillage
-          AND b.isDeactivate = 0
-          AND r.referredToInstituteName = :instituteName
-    """)
-    fun getReferralInstituteCount(
-        selectedVillage: Int,
-        instituteName: String
-    ): Flow<Int>
-
 
     @Query("SELECT COUNT(*) FROM BEN_BASIC_CACHE b where CAST((strftime('%s','now') - b.dob/1000)/60/60/24/365 AS INTEGER)  >= :min and b.reproductiveStatusId!=2 and isDeactivate=0 and b.villageId=:selectedVillage")
     fun getBenWithCbacCount(
@@ -490,10 +374,10 @@ interface BenCountQueries {
     fun getVillageHeadcount(villageIds: List<Int>): Flow<VillageHeadcount>
 
     /**
-     * The home screen's village counts in one pass: All Beneficiaries ([getAllBenCount]),
-     * Non-Household ([getNonHHCount]) and population / unscreened ([getVillageHeadcount]).
-     * Each of those reads every beneficiary of the village; at 1M the three ran side by side
-     * at startup and took 2-7 s each on a tablet.
+     * The home screen's village counts in one pass: All Beneficiaries, Non-Household and
+     * population / unscreened (same rule as [getVillageHeadcount]). Separate queries each read
+     * every beneficiary of the village; at 1M three of them ran side by side at startup and
+     * took 2-7 s each on a tablet.
      */
     @Query("""
         SELECT
@@ -520,7 +404,7 @@ interface BenCountQueries {
     suspend fun villagePresumptiveCount(villageIds: List<Int>): Int
 
     /**
-     * The three Tuberculosis cards in one pass: [getTbScreenedBenCount],
+     * The three Tuberculosis cards in one pass: TB screened (TB_BEN_SUMMARY.hasScreening),
      * [BenTbListQueries.getTbPresumptiveListCount] and [BenTbListQueries.getTbConfirmedListCount].
      */
     @Query(
@@ -533,9 +417,9 @@ interface BenCountQueries {
     suspend fun villageTbCardCounts(villageId: Int): TbCardCounts
 
     /**
-     * The five Referrals cards in one pass, same rules as [getDigitalChestXRayBenCount],
-     * [getTrueNatBenCount], [getHwcBenDataCount], [getLiquidCultureBenCount] and
-     * [getClinicalAssessmentBenCount] (see ReferralListSql / ClinicalAssessmentSql).
+     * The five Referrals cards in one pass: Digital Chest X-ray ([getDigitalChestXRayBenCount]),
+     * TrueNat ([getTrueNatBenCount]), HWC, Liquid Culture and Clinical Assessment
+     * (see ReferralListSql / ClinicalAssessmentSql).
      */
     @Query("""
         SELECT

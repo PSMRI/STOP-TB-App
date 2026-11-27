@@ -19,7 +19,6 @@ import org.piramalswasthya.stoptb.model.InputType.EDIT_TEXT
 import org.piramalswasthya.stoptb.model.InputType.HEADLINE
 import org.piramalswasthya.stoptb.model.InputType.RADIO
 import org.piramalswasthya.stoptb.model.InputType.TEXT_VIEW
-import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.ben_form.NewBenRegViewModel.Companion.isOtpVerified
 import org.piramalswasthya.stoptb.ui.home_activity.all_ben.new_ben_registration.new_child_ben.NewChildBenViewModel.Companion.isConsentAgreed
 import org.piramalswasthya.stoptb.utils.HelperUtil.getDiffYears
 import java.text.SimpleDateFormat
@@ -1194,105 +1193,6 @@ class NewChildBenRegDataset(context: Context, language: Languages) : Dataset(con
     override fun mapValues(cacheModel: FormDataModel, pageNumber: Int) {
         // ECR mapping removed - not needed for volunteer flow
     }
-//    private fun mapValuesUnused(cacheModel: FormDataModel) {
-//        run { val ecr = cacheModel
-//            ecr.dateOfReg =
-//                getLongFromDate(dateOfReg.value!!)
-//
-//            ecr.noOfChildren = noOfChildren.value?.takeIf { it.isNotBlank() }?.toInt() ?: 0
-//            ecr.noOfMaleChildren = numMale.value?.takeIf { it.isNotBlank() }?.toInt() ?: 0
-//            ecr.noOfFemaleChildren = numFemale.value?.takeIf { it.isNotBlank() }?.toInt() ?: 0
-//            ecr.dob1 = getLongFromDate(dob1.value)
-//            ecr.age1 = age1.value?.toInt()
-//            ecr.gender1 = when (gender1.value) {
-//                gender1.entries!![0] -> Gender.MALE
-//                gender1.entries!![1] -> Gender.FEMALE
-//                else -> null
-//            }
-//            ecr.marriageFirstChildGap =marriageFirstChildGap.value?.filter { it.isDigit() }?.toIntOrNull() ?: 0
-//            if ((noOfChildren.value?.toIntOrNull() ?: 0) > 1){
-//                ecr.dob2 = getLongFromDate(dob2.value)
-//                ecr.age2 = age2.value?.toInt()
-//                ecr.gender2 = when (gender2.value) {
-//                    gender2.entries!![0] -> Gender.MALE
-//                    gender2.entries!![1] -> Gender.FEMALE
-//                    else -> null
-//                }
-//                ecr.firstAndSecondChildGap =firstAndSecondChildGap.value?.filter { it.isDigit() }?.toIntOrNull() ?: 0
-//            }
-//            if (noOfChildren.value?.toInt()!! > 2) {
-//                ecr.dob3 = getLongFromDate(dob3.value)
-//                ecr.age3 = age3.value?.toInt()
-//                ecr.gender3 = when (gender3.value) {
-//                    gender3.entries!![0] -> Gender.MALE
-//                    gender3.entries!![1] -> Gender.FEMALE
-//                    else -> null
-//                }
-//                ecr.secondAndThirdChildGap =secondAndThirdChildGap.value?.filter { it.isDigit() }?.toIntOrNull() ?: 0
-//            }
-//            if (noOfChildren.value?.toInt()!! > 3) {
-//                ecr.dob4 = getLongFromDate(dob4.value)
-//                ecr.age4 = age4.value?.toInt()
-//                ecr.gender4 = when (gender4.value) {
-//                    gender4.entries!![0] -> Gender.MALE
-//                    gender4.entries!![1] -> Gender.FEMALE
-//                    else -> null
-//                }
-//                ecr.thirdAndFourthChildGap =thirdAndFourthChildGap.value?.filter { it.isDigit() }?.toIntOrNull() ?: 0
-//            }
-//            if (noOfChildren.value?.toInt()!! > 4) {
-//                ecr.dob5 = getLongFromDate(dob5.value)
-//                ecr.age5 = age5.value?.toInt()
-//                ecr.gender5 = when (gender5.value) {
-//                    gender5.entries!![0] -> Gender.MALE
-//                    gender5.entries!![1] -> Gender.FEMALE
-//                    else -> null
-//                }
-//                ecr.fourthAndFifthChildGap =fourthAndFifthChildGap.value?.filter { it.isDigit() }?.toIntOrNull() ?: 0
-//            }
-//            if (noOfChildren.value?.toInt()!! > 5) {
-//                ecr.dob6 = getLongFromDate(dob6.value)
-//                ecr.age6 = age6.value?.toInt()
-//                ecr.gender6 = when (gender6.value) {
-//                    gender6.entries!![0] -> Gender.MALE
-//                    gender6.entries!![1] -> Gender.FEMALE
-//                    else -> null
-//                }
-//                ecr.fifthANdSixthChildGap =fifthAndSixthChildGap.value?.filter { it.isDigit() }?.toIntOrNull() ?: 0
-//            }
-//            if (noOfChildren.value?.toInt()!! > 6) {
-//                ecr.dob7 = getLongFromDate(dob7.value)
-//                ecr.age7 = age7.value?.toInt()
-//                ecr.gender7 = when (gender7.value) {
-//                    gender7.entries!![0] -> Gender.MALE
-//                    gender7.entries!![1] -> Gender.FEMALE
-//                    else -> null
-//                }
-//                ecr.sixthAndSeventhChildGap =sixthAndSeventhChildGap.value?.filter { it.isDigit() }?.toIntOrNull() ?: 0
-//            }
-//            if (noOfChildren.value?.toInt()!! > 7) {
-//                ecr.dob8 = getLongFromDate(dob8.value)
-//                ecr.age8 = age8.value?.toInt()
-//                ecr.gender8 = when (gender8.value) {
-//                    gender8.entries!![0] -> Gender.MALE
-//                    gender8.entries!![1] -> Gender.FEMALE
-//                    else -> null
-//                }
-//                ecr.seventhAndEighthChildGap = seventhAndEighthChildGap.value?.filter { it.isDigit() }?.toIntOrNull() ?: 0
-//            }
-//            if (noOfChildren.value?.toInt()!! > 8) {
-//                ecr.dob9 = getLongFromDate(dob9.value)
-//                ecr.age9 = age9.value?.toInt()
-//                ecr.gender9 = when (gender9.value) {
-//                    gender9.entries!![0] -> Gender.MALE
-//                    gender9.entries!![1] -> Gender.FEMALE
-//                    else -> null
-//                }
-//                ecr.eighthAndNinthChildGap = eighthAndNinthChildGap.value?.filter { it.isDigit() }?.toIntOrNull() ?: 0
-//            }
-//        }
-//    }
-
 
     private val children = listOf(
         ChildBundle(firstChildDetails, firstChildName, dob1, age1, gender1, marriageFirstChildGap),

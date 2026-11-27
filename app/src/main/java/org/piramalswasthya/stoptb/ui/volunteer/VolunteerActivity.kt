@@ -57,7 +57,6 @@ import org.piramalswasthya.stoptb.ui.login_activity.LoginActivity
 import org.piramalswasthya.stoptb.ui.service_location_activity.ServiceLocationActivity
 import org.piramalswasthya.stoptb.ui.volunteer.fragment.VolunteerViewModel
 import org.piramalswasthya.stoptb.work.WorkerUtils
-import org.piramalswasthya.stoptb.utils.sync.CampHubReachability
 import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -65,7 +64,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 
 /** Process-wide: whether the last VolunteerActivity was destroyed for a configuration change. */
@@ -79,7 +77,8 @@ class VolunteerActivity : AppCompatActivity(), AutoFlowBackNavigationHost {
     private var showQuickRefreshAction: Boolean = false
     private var quickRefreshActionEnabled: Boolean = true
 
-    /** Mirrors the same listener in HomeActivity — see comments there. */
+    /** Reacts to camp-hub connection changes: refreshes the offline banner and, when camp mode
+     *  is on and the hub is connected, resets sync backoff and triggers push + quick pull. */
     private val campHubPrefListener =
         android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == pref.getCampHubConnectedKey()) {

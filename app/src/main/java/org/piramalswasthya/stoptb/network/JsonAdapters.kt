@@ -26,18 +26,6 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import org.piramalswasthya.stoptb.utils.ServerDateParser
 
-@JsonClass(generateAdapter = true)
-data class D2DAuthUserRequest(val username: String, val password: String)
-
-@JsonClass(generateAdapter = true)
-data class D2DAuthUserResponse(val jwt: String)
-
-@JsonClass(generateAdapter = true)
-data class D2DSaveUserRequest(val id: Int, val username: String, val password: String)
-
-@JsonClass(generateAdapter = true)
-data class D2DSaveUserResponse(val jwt: String)
-
 ////////////////////---------TMC------------//////////////////////
 
 @JsonClass(generateAdapter = true)
@@ -48,18 +36,6 @@ data class TmcAuthUserRequest(
 
 @JsonClass(generateAdapter = true)
 data class TmcRefreshTokenRequest(val refreshToken: String)
-
-@JsonClass(generateAdapter = true)
-data class TmcUserDetailsRequest(val userID: Int)
-
-@JsonClass(generateAdapter = true)
-data class TmcUserVanSpDetailsRequest(val userID: Int, val providerServiceMapID: Int)
-
-@JsonClass(generateAdapter = true)
-data class TmcLocationDetailsRequest(val spID: Int, val spPSMID: Int)
-
-@JsonClass(generateAdapter = true)
-data class TmcGenerateBenIdsRequest(val benIDRequired: Int, val vanID: Int)
 
 @JsonClass(generateAdapter = true)
 data class GetDataPaginatedRequest(
@@ -122,38 +98,10 @@ data class NikshayUpdateData(
 )
 
 @JsonClass(generateAdapter = true)
-data class NurseWorklistRequest(
-    val providerServiceMapID: Int,
-    val villageId: Int,
-    val pageNumber: Int,
-)
-
-@JsonClass(generateAdapter = true)
 data class GetCBACRequest(val createdBy: String)
-
-@JsonClass(generateAdapter = true)
-data class GetDataPaginatedRequestForGeneralOPD(
-    val userId: Int, val villageID: Int, val userName: String,
-    val ashaId: Int, val pageNo: Int, val fromDate: String, val toDate: String
-)
-
-@JsonClass(generateAdapter = true)
-data class GetVHNDRequest(val formType: String, val userId: Int)
-
-@JsonClass(generateAdapter = true)
-data class GetDataPaginatedRequestForDisease(
-    val ashaId: Int, val pageNo: Int, val fromDate: String,
-    val toDate: String, val diseaseTypeID: Int, val userName: String? = null
-)
 
 data class ValidateOtpRequest(val otp: Int, val mobNo: String)
 data class sendOtpRequest(val mobNo: String)
-
-@JsonClass(generateAdapter = true)
-data class GetDataRequest(
-    val villageID: Int, val fromDate: String, val toDate: String,
-    val pageNo: Int, val userId: Long, val userName: String, val ashaId: Long
-)
 
 @JsonClass(generateAdapter = true)
 data class BenResponse(
@@ -527,22 +475,6 @@ data class DiagnosticManualResultRequest(
     val reasonToCloseRif: String? = null
 )
 
-// Real, confirmed `getBeneficiariesByStatus` response shape — exactly these 5 buckets.
-data class DiagnosticBeneficiaryStatusData(
-    val awaitingProviderResult: List<Long>? = emptyList(),
-    val completed: List<Long>? = emptyList(),
-    val failed: List<Long>? = emptyList(),
-    val closed: List<Long>? = emptyList(),
-    val awaitingManualEntry: List<Long>? = emptyList()
-)
-
-data class DiagnosticBeneficiariesStatusResponse(
-    val success: Boolean? = true,
-    val message: String? = null,
-    val statusCode: Int? = null,
-    val data: DiagnosticBeneficiaryStatusData? = null
-)
-
 data class TBDiagnosticsSaveRequest(
     val benRegID: Long,
     val providerServiceMapID: Int,
@@ -613,15 +545,6 @@ data class TBDiagnosticsSaveRequest(
         }
     }
 }
-data class KalaAzarScreeningRequestDTO(val userId: Int, val kalaAzarLists: List<KALAZARScreeningDTO>)
-data class MalariaScreeningRequestDTO(val userId: Int, val malariaLists: List<MalariaScreeningDTO>)
-data class IRSScreeningRequestDTO(val rounds: List<ScreeningRoundDTO>)
-data class LeprosyScreeningRequestDTO(val userId: Int, val leprosyLists: List<LeprosyScreeningDTO>)
-data class AESScreeningRequestDTO(val userId: Int, val aesJeLists: List<AESScreeningDTO>)
-data class FilariaScreeningRequestDTO(val userId: Int, val filariaLists: List<FilariaScreeningDTO>)
-data class UserDataDTO<T>(val userId: Int, val entries: List<T>)
-data class MalariaConfirmedRequestDTO(val userId: Int, val malariaFollowListUp: List<MalariaConfirmedDTO>)
-
 data class ABHAGeneratedDTO(
     val id: Int = 0, val beneficiaryID: Long, val beneficiaryRegID: Long,
     val benName: String, val createdBy: String, val message: String, val txnId: String,
@@ -1109,8 +1032,6 @@ data class FilariaScreeningDTO(
         createdBy = createdBy.toString(), createdDate = getLongFromDate(createdDate),
     )
 }
-
-data class ScreeningRoundDTO(val date: String, val rounds: Int, val householdId: Long)
 
 data class KALAZARScreeningDTO(
     val id: Int = 0, val benId: Long, var visitDate: String, val houseHoldDetailsId: Long,

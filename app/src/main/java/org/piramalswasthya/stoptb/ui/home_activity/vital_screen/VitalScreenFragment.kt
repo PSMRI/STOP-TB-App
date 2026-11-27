@@ -2,7 +2,6 @@ package org.piramalswasthya.stoptb.ui.home_activity.vital_screen
 
 import android.os.Bundle
 import android.text.InputFilter
-import androidx.core.os.bundleOf
 import androidx.core.widget.doAfterTextChanged
 import android.view.LayoutInflater
 import android.view.View
@@ -14,7 +13,6 @@ import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.android.material.textfield.TextInputLayout
 import androidx.appcompat.app.AlertDialog
 import android.widget.Toast
-import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
@@ -707,10 +705,6 @@ class VitalScreenFragment : Fragment() {
         super.onStart()
         activity?.let {
             when (it) {
-//                is HomeActivity -> it.updateActionBar(
-//                    R.drawable.ic__ncd,
-//                    getString(R.string.vital_screen)
-//                ).also { _ -> it.setToolbarNavigationVisible(!viewModel.autoFlow) }
 //                is VolunteerActivity -> it.updateActionBar(
 //                    R.drawable.ic__ncd,
 //                    getString(R.string.vital_screen)
