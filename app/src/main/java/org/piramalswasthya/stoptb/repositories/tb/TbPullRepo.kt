@@ -59,7 +59,6 @@ import org.piramalswasthya.stoptb.model.TBSuspectedCache
 import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
 import org.piramalswasthya.stoptb.model.VisitCategoryMasterCache
 import org.piramalswasthya.stoptb.network.AmritApiService
-import org.piramalswasthya.stoptb.network.DiagnosticBeneficiaryStatusData
 import org.piramalswasthya.stoptb.network.DiagnosticManualResultRequest
 import org.piramalswasthya.stoptb.network.DiagnosticOrderPushRequest
 import org.piramalswasthya.stoptb.network.GeneralOpdDrugResponse

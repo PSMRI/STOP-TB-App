@@ -54,28 +54,13 @@ import org.piramalswasthya.stoptb.model.TBConfirmedTreatmentCache
 import org.piramalswasthya.stoptb.model.TBDiagnosticsCache
 import org.piramalswasthya.stoptb.model.TBScreeningCache
 import org.piramalswasthya.stoptb.model.TBSuspectedCache
-import org.piramalswasthya.stoptb.model.TbScreeningSymptoms
-import org.piramalswasthya.stoptb.model.VisitCategoryMasterCache
 import org.piramalswasthya.stoptb.network.AmritApiService
-import org.piramalswasthya.stoptb.network.DiagnosticBeneficiaryStatusData
-import org.piramalswasthya.stoptb.network.DiagnosticManualResultRequest
-import org.piramalswasthya.stoptb.network.DiagnosticOrderPushRequest
-import org.piramalswasthya.stoptb.network.GeneralOpdDrugResponse
-import org.piramalswasthya.stoptb.network.GeneralOpdRequestDTO
 import org.piramalswasthya.stoptb.network.GeneralOpdSaveRequest
-import org.piramalswasthya.stoptb.network.GetDataPaginatedRequest
-import org.piramalswasthya.stoptb.network.PatientRequest
-import org.piramalswasthya.stoptb.network.StopTbVillageRequest
 import org.piramalswasthya.stoptb.network.TBConfirmedRequestDTO
-import org.piramalswasthya.stoptb.network.TBDiagnosticsRequestDTO
 import org.piramalswasthya.stoptb.network.TBDiagnosticsSaveRequest
-import org.piramalswasthya.stoptb.network.TBScreeningRequestDTO
 import org.piramalswasthya.stoptb.network.TBScreeningSaveRequest
 import org.piramalswasthya.stoptb.network.TBSuspectedRequestDTO
 import org.piramalswasthya.stoptb.repositories.UserRepo
-import org.piramalswasthya.stoptb.utils.ServerDateParser
-import org.piramalswasthya.stoptb.utils.throttleLatest
-import org.piramalswasthya.stoptb.work.WorkerUtils
 import timber.log.Timber
 
 /**
