@@ -4,6 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.AndroidEntryPoint
@@ -92,6 +95,15 @@ class ContactTracingActivity : AppCompatActivity(), ContactTracingNavigator {
     }
 
     private fun setupToolbar() {
+        // Edge-to-edge (Android 15+) draws the toolbar under the status bar. Pad the toolbar's
+        // container down by the status-bar inset: the container colour fills behind the status
+        // bar and the toolbar keeps its normal height, so the back arrow and title stay aligned.
+        // Insets are not consumed, so the form fragment's own bottom/IME inset handling keeps working.
+        ViewCompat.setOnApplyWindowInsetsListener(binding.toolbarContainerContactTracing) { view, insets ->
+            view.updatePadding(top = insets.getInsets(WindowInsetsCompat.Type.systemBars()).top)
+            insets
+        }
+
         setSupportActionBar(binding.toolbarContactTracing)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 

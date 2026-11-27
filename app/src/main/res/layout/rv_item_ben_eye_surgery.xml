@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Eye surgery (above 30) button of rv_item_ben. Not shown anywhere today (the adapter always hid it), so it is a ViewStub in rv_item_ben
+     that nothing inflates: kept for when the feature returns, without costing every row its views. -->
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <data>
+        <variable name="ben" type="org.piramalswasthya.stoptb.model.BenBasicDomain" />
+        <variable name="clickListener" type="org.piramalswasthya.stoptb.adapters.BenListAdapter.BenClickListener" />
+        <variable name="isMatched" type="Boolean" />
+    </data>
+
+    <LinearLayout
+                android:id="@+id/ll_ben_details_4"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:orientation="horizontal"
+               
+               
+                
+               >
+
+                        <Button
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:id="@+id/btn_above_30"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:visibility="gone"
+                            android:onClick="@{()-> clickListener.clickedAddAllBenBtn(ben,isMatched,false)}"
+                            android:text="@string/add_eye_surgery"
+                            tools:ignore="NestedWeights"/>
+
+                    </LinearLayout>
+</layout>

@@ -1742,5 +1742,6 @@
     <string name="sync_summary_yesterday">Yesterday</string>
     <string name="sync_summary_all">All</string>
     <string name="sync_summary_empty">No structured sync reports yet. Run sync, then refresh this summary.</string>
+    <string name="link_hh_hof_min_age">Head of Family must be at least 15 years old. Link to an existing household instead.</string>
 </resources>
 

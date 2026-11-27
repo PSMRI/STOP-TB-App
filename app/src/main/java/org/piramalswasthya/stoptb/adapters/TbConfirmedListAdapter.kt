@@ -155,6 +155,10 @@ PagingDataAdapter<BenWithTbSuspectedDomain, TbConfirmedListAdapter.BenViewHolder
                     binding.tvCounsellingSectionsCompleted.visibility = View.GONE
                 }
             }
+            // Non-household beneficiaries have no household members to view.
+            if (item.ben.isNonHH ) {
+                binding.ivViewMember.visibility = View.GONE
+            }
             if (item.ben.spouseName == "Not Available" && item.ben.fatherName == "Not Available") {
                 binding.father = true
                 binding.husband = false

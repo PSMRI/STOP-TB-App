@@ -103,6 +103,8 @@ class NonHHViewModel @Inject constructor(
 
     suspend fun getBenFromId(benId: Long) = benRepo.getBenFromId(benId)
 
+    suspend fun getHouseholdMembers(hhId: Long) = benRepo.getBenListFromHousehold(hhId)
+
     fun linkBenToHousehold(benId: Long, hhId: Long, relationPos: Int, relationName: String) {
         viewModelScope.launch {
             benRepo.linkBenToHousehold(benId, hhId, relationPos, relationName)

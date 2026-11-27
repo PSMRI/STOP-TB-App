@@ -185,7 +185,7 @@ abstract class Dataset(context: Context, val currentLanguage: Languages) {
 //                newList[updateIndex] = list[updateIndex].cloneForm()
 //                updateUIForCurrentElement = false
 //            }
-                Timber.d("Emitting ${newList}}")
+                Timber.d("Emitting ${newList.size} form elements")
 //            _listFlow.emit(emptyList())
                 _listFlow.emit(newList)
             }

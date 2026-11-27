@@ -1,7 +1,10 @@
 package org.piramalswasthya.stoptb.database.room.dao
 
+import androidx.lifecycle.LiveData
+import androidx.paging.PagingSource
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
+import org.piramalswasthya.stoptb.database.room.SyncState
 import org.piramalswasthya.stoptb.helpers.Konstants
 import org.piramalswasthya.stoptb.model.*
 
@@ -12,6 +15,12 @@ import org.piramalswasthya.stoptb.model.*
  * readable. Room generates these queries as part of BenDao_Impl - SQL and callers unchanged.
  */
 interface BenTbListQueries {
+
+    @Transaction
+    // tbsnFilled is a literal in the view now - these two genuinely mean "has a screening
+    // row", so they ask TB_SCREENING directly and go on observing it, which is correct here.
+    @Query("SELECT * FROM BEN_BASIC_CACHE where villageId = :selectedVillage and isDeactivate=0 and EXISTS (SELECT 1 FROM TB_SCREENING s WHERE s.benId = BEN_BASIC_CACHE.benId) ORDER BY BEN_BASIC_CACHE.updatedDate DESC")
+    fun getPendingTbScreeningBen(selectedVillage: Int): Flow<List<BenWithTbScreeningCache>>
 
     @Transaction
     @Query(PRESUMPTIVE_LIST_SQL + " ORDER BY b.updatedDate DESC")
@@ -91,6 +100,9 @@ interface BenTbListQueries {
     fun getReferredHWCBenList(
         selectedVillage: Int,
     ):  Flow<List<BenWithCbacAndReferalCache>>
+
+    @Query("UPDATE BENEFICIARY SET chestXrayDoneDate = :date, screeningStatus = 'CHEST_XRAY_DONE', syncState = :unsynced, processed = 'U', serverUpdatedStatus = 2 WHERE beneficiaryId = :benId")
+    suspend fun markChestXrayDone(benId: Long, date: Long = System.currentTimeMillis(), unsynced: SyncState = SyncState.UNSYNCED)
 
     companion object {
         /**

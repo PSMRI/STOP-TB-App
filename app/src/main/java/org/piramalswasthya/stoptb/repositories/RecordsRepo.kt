@@ -60,6 +60,11 @@ class RecordsRepo @Inject constructor(
         Pager(tbListPagingConfig) { noCountSource("HOUSEHOLD", "BENEFICIARY") { limit, offset -> householdDao.getHouseholdsWithNumMembersPage(selectedVillage, doorLocked, query, limit, offset) } }
             .flow.map { page -> page.map { row -> row.asBasicDomainModel() } }
 
+    // PR 6: All Household paged, searched and sorted in SQL.
+    fun householdsPaged(query: String) =
+        Pager(tbListPagingConfig) { noCountSource("HOUSEHOLD", "BENEFICIARY") { limit, offset -> householdDao.getHouseholdsWithNumMembersPage(selectedVillage, false, query, limit, offset) } }
+            .flow.map { page -> page.map { row -> row.asBasicDomainModel() } }
+
     val hhListforAsha get() = householdDao.getAllHouseholdForAshaFamilyMembers(selectedVillage)
         .map { list -> list.map { it.asBasicDomainModel() } }
 
