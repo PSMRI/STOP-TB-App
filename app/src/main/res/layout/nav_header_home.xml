@@ -39,6 +39,12 @@
             android:textStyle="bold" />
 
         <TextView
+            android:id="@+id/tv_nav_team"
+            style="@style/nav_header_item_tv"
+            android:alpha="0.92"
+            android:textColor="@color/md_theme_light_onPrimary" />
+
+        <TextView
             android:id="@+id/tv_nav_role"
             style="@style/nav_header_item_tv"
             android:alpha="0.92"

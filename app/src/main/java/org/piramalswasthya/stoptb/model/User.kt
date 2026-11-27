@@ -269,7 +269,8 @@ data class User(
     val healthFacilities: List<LocationEntity>? = emptyList(),
     val villages: List<LocationEntity>,
     val subCentre: String? = null,
-    val assignedRoleScreenNames: List<String> = emptyList()
+    val assignedRoleScreenNames: List<String> = emptyList(),
+    val teamName: String? = null
 )
 
 
@@ -311,6 +312,8 @@ data class UserDetailsInResponse(
     val tuName: String? = null,
     val healthFacilityId: String? = null,
     val healthFacilityName: String? = null,
+    val teamId: String? = null,
+    val teamName: String? = null,
     val updateDate: String? = null,
     // Pincode / Residential Area per village (master data). Optional: absent until the backend sends it.
     val villageDetails: List<VillageDetailResponse>? = null
@@ -362,7 +365,8 @@ data class UserDetailsInResponse(
                 } ?: emptyList()
             },
             villages = getLocationEntityList(villageId, villageName),
-            subCentre = subCentre
+            subCentre = subCentre,
+            teamName = teamName
         )
     }
 
